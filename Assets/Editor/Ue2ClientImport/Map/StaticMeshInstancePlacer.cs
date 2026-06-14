@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Models;
+using UnityEditor;
 using UnityEngine;
 using L2Viewer.SceneDomain.Services;
 using NumericsVector3 = System.Numerics.Vector3;
@@ -10,6 +11,7 @@ using NumericsVector3 = System.Numerics.Vector3;
 internal static class StaticMeshInstancePlacer
 {
     private const float UnrealToUnityScale = 0.01f;
+    private const string DefaultFlame01Token = "Default_Flame01";
 
     public static void PlaceInstances(
         IReadOnlyList<SceneStaticMeshInstance> instances,
@@ -23,6 +25,12 @@ internal static class StaticMeshInstancePlacer
 
         foreach (var instance in instances)
         {
+            if (TryPlaceOverrideInstance(instance, parent, spawnedCount, log))
+            {
+                spawnedCount++;
+                continue;
+            }
+
             if (string.IsNullOrEmpty(instance.MeshReference) || !meshCache.TryGetValue(instance.MeshReference, out var mesh))
             {
                 continue;
@@ -66,6 +74,53 @@ internal static class StaticMeshInstancePlacer
         }
 
         log($"Finished placing {spawnedCount} static meshes.");
+    }
+
+    private static bool TryPlaceOverrideInstance(
+        SceneStaticMeshInstance instance,
+        GameObject parent,
+        int spawnedCount,
+        Action<string> log)
+    {
+        if (instance == null || string.IsNullOrWhiteSpace(instance.MeshReference))
+        {
+            return false;
+        }
+
+        if (instance.MeshReference.IndexOf(DefaultFlame01Token, StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return false;
+        }
+
+        var prefab = StaticMeshOverridePrefabUtility.GetDefaultFlame01OverridePrefab();
+        if (prefab == null)
+        {
+            throw new InvalidOperationException("Could not load Default_Flame01 override prefab.");
+        }
+
+        var wrapper = new GameObject(BuildInstanceName(instance, spawnedCount))
+        {
+            isStatic = true
+        };
+        wrapper.transform.SetParent(parent.transform, false);
+        wrapper.transform.localPosition = ConvertPosition(instance.WorldLocation);
+        wrapper.transform.localRotation = ConvertEulerAngles(instance.RotationEulerDegrees);
+        wrapper.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
+
+        var visual = PrefabUtility.InstantiatePrefab(prefab, wrapper.transform) as GameObject;
+        if (visual == null)
+        {
+            throw new InvalidOperationException("Unity failed to instantiate Default_Flame01 override prefab.");
+        }
+
+        visual.name = prefab.name;
+        visual.isStatic = true;
+        visual.transform.localPosition = Vector3.zero;
+        visual.transform.localRotation = Quaternion.identity;
+        visual.transform.localScale = Vector3.one;
+
+        log?.Invoke($"[StaticMesh/Override] Replaced '{instance.MeshReference}' with Default_Flame01 override prefab.");
+        return true;
     }
 
     private static string BuildInstanceName(SceneStaticMeshInstance instance, int spawnedCount)

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -8,10 +10,13 @@ internal static class L2LightAssetBuilder
     private const float UnrealToUnityScale = 0.01f;
     private const float UnrealLightRadiusScale = 64f;
     private const float DefaultLightIntensity = 2.35f;
+    private const float DefaultFlame01LightCullDistance = 1.1f;
 
     public static void BuildLights(SceneLightData[] lights, SceneSunData[] suns, SceneMoonData[] moons, GameObject parent, Action<string> log)
     {
         var importedCount = 0;
+        var skippedOverrideDuplicates = 0;
+        var overrideMatches = BuildDefaultFlame01OverrideLightMatches(lights);
 
         if (lights != null)
         {
@@ -23,10 +28,17 @@ internal static class L2LightAssetBuilder
                     continue;
                 }
 
+                var lightPosition = ConvertPosition(lightData.WorldLocation ?? System.Numerics.Vector3.Zero);
+                if (overrideMatches.Contains(i))
+                {
+                    skippedOverrideDuplicates++;
+                    continue;
+                }
+
                 var lightGo = new GameObject(BuildLightObjectName(lightData.Name, lightData.ClassName, lightData.ExportIndex));
                 lightGo.isStatic = true;
                 lightGo.transform.SetParent(parent.transform, false);
-                lightGo.transform.localPosition = ConvertPosition(lightData.WorldLocation ?? System.Numerics.Vector3.Zero);
+                lightGo.transform.localPosition = lightPosition;
 
                 if (lightData.WorldRotationEulerDegrees is System.Numerics.Vector3 lightRotationDegrees)
                 {
@@ -53,7 +65,7 @@ internal static class L2LightAssetBuilder
 
         var detectedSuns = suns != null ? suns.Length : 0;
         var detectedMoons = moons != null ? moons.Length : 0;
-        log($"Imported {importedCount} light actors. Shadow casting is disabled for imported map lights. Context only: suns={detectedSuns}, moons={detectedMoons}.");
+        log($"Imported {importedCount} light actors. Skipped {skippedOverrideDuplicates} duplicate lights covered by Default_Flame01 overrides. Shadow casting is disabled for imported map lights. Context only: suns={detectedSuns}, moons={detectedMoons}.");
     }
 
     private static string BuildLightObjectName(string name, string className, int exportIndex)
@@ -124,6 +136,64 @@ internal static class L2LightAssetBuilder
     private static Quaternion ConvertEulerAngles(System.Numerics.Vector3 rotDegrees)
     {
         return Quaternion.Euler(rotDegrees.X, -rotDegrees.Y, -rotDegrees.Z);
+    }
+
+    private static HashSet<int> BuildDefaultFlame01OverrideLightMatches(SceneLightData[] lights)
+    {
+        var matchedLightIndices = new HashSet<int>();
+        if (lights == null || lights.Length == 0)
+        {
+            return matchedLightIndices;
+        }
+
+        var overrides = Resources.FindObjectsOfTypeAll<DefaultFlame01Override>()
+            .Where(component => component != null && component.gameObject.scene.IsValid())
+            .ToArray();
+        if (overrides.Length == 0)
+        {
+            return matchedLightIndices;
+        }
+
+        for (var overrideIndex = 0; overrideIndex < overrides.Length; overrideIndex++)
+        {
+            var flameOverride = overrides[overrideIndex];
+            var overridePosition = flameOverride.transform.position;
+            var overrideScale = flameOverride.transform.lossyScale;
+            var overrideRadius = DefaultFlame01LightCullDistance * Mathf.Max(0.25f, Mathf.Max(Mathf.Abs(overrideScale.x), Mathf.Abs(overrideScale.z)));
+
+            var bestLightIndex = -1;
+            var bestDistance = float.MaxValue;
+            for (var lightIndex = 0; lightIndex < lights.Length; lightIndex++)
+            {
+                if (matchedLightIndices.Contains(lightIndex))
+                {
+                    continue;
+                }
+
+                var lightData = lights[lightIndex];
+                if (lightData == null)
+                {
+                    continue;
+                }
+
+                var lightPosition = ConvertPosition(lightData.WorldLocation ?? System.Numerics.Vector3.Zero);
+                var distance = Vector3.Distance(lightPosition, overridePosition);
+                if (distance > overrideRadius || distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                bestLightIndex = lightIndex;
+            }
+
+            if (bestLightIndex >= 0)
+            {
+                matchedLightIndices.Add(bestLightIndex);
+            }
+        }
+
+        return matchedLightIndices;
     }
 }
 

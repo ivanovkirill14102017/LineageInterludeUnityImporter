@@ -14,16 +14,16 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
-  m_Fog: 0
+  m_Fog: 1
   m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  m_FogMode: 3
+  m_FogMode: 1
   m_FogDensity: 0.01
-  m_LinearFogStart: 0
-  m_LinearFogEnd: 300
+  m_LinearFogStart: 47.55963
+  m_LinearFogEnd: 49.541283
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
-  m_AmbientIntensity: 1
+  m_AmbientIntensity: 1.01
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
   m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
@@ -119,6 +119,85 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &85456057
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 85456059}
+  - component: {fileID: 85456058}
+  m_Layer: 0
+  m_Name: DayNight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &85456058
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 85456057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16a2ace4c2d91d74b99e1e9275c18d56, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::L2DayNightController
+  Probe: {fileID: 757211963}
+  Sun: {fileID: 410087040}
+  Moon: {fileID: 0}
+  AutoFindDirectionalLights: 1
+  ControlTimeOfDay: 1
+  AnimateTimeOfDay: 0
+  AnimateTimeOfDayInEditMode: 0
+  TimeOfDayHours: 12
+  DayLengthMinutes: 20
+  SunriseHour: 6
+  SunsetHour: 18
+  TwilightSoftnessHours: 1.5
+  OutdoorSunIntensity: 4
+  MaxSunElevation: 55
+  NoonAzimuth: 0
+  UseMapSunRotation: 1
+  CaptureCurrentSunYawAsNoonAzimuth: 1
+  SunriseSunIntensity: 0.35
+  NightSunIntensity: 0
+  NoonColorTemperature: 6500
+  SunriseSunColorTemperature: 3800
+  NightSunColorTemperature: 2200
+  ControlMoon: 1
+  MoonIntensity: 0.08
+  MaxMoonElevation: 35
+  MidnightAzimuth: 180
+  UseMapMoonRotation: 1
+  MoonColorTemperature: 9000
+  currentTimeOfDayHours: 12
+  dayFactor: 1
+  solarElevation: 55
+  lunarElevation: -35
+  currentOutdoorSunIntensity: 4
+  currentOutdoorSunColorTemperature: 6500
+  currentMoonIntensity: 0
+--- !u!4 &85456059
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 85456057}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 330585546}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -131,6 +210,7 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
+  - component: {fileID: 330585548}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -205,11 +285,15 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalRotation: {x: -0.07322713, y: 0.79728794, z: -0.09882408, w: -0.59093446}
+  m_LocalPosition: {x: 240.53926, y: -40.03493, z: 809.97125}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 757211964}
+  - {fileID: 85456059}
+  - {fileID: 1122924534}
+  - {fileID: 1345396047}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &330585547
@@ -256,6 +340,29 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &330585548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1722def914a882d46bb0c61d664cfa76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::L2CameraAtmosphereRig
+  AutoBuildRig: 1
+  FollowSceneViewCameraInEditMode: 1
+  ProbeNodeName: AtmosphereProbe
+  DayNightNodeName: DayNight
+  SunNodeName: SunControl
+  FogNodeName: FogControl
+  EditorSyncIntervalSeconds: 0.1
+  probe: {fileID: 757211963}
+  dayNight: {fileID: 85456058}
+  sun: {fileID: 1122924533}
+  fog: {fileID: 1345396046}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -285,13 +392,13 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 2
+  m_Intensity: 4
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
-    m_Type: 2
+    m_Type: 0
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 1
@@ -328,7 +435,7 @@ Light:
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 1
-  m_ColorTemperature: 5000
+  m_ColorTemperature: 6500
   m_UseColorTemperature: 1
   m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
@@ -347,7 +454,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410087039}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
+  m_LocalRotation: {x: 0.1612967, y: 0.83113325, z: -0.43266055, w: 0.3098481}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -383,6 +490,74 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &757211962
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 757211964}
+  - component: {fileID: 757211963}
+  m_Layer: 0
+  m_Name: AtmosphereProbe
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &757211963
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 757211962}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43c74f2823420c3468c9b4cd1b89e114, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::L2CameraAtmosphereProbe
+  UseSceneViewCameraInEditMode: 1
+  OutdoorApproachDistance: 20
+  IndoorDepthDistance: 0.08
+  TransitionResetDistance: 0
+  ContextRefreshIntervalSeconds: 2
+  DrawOverlay: 1
+  OverlayOffset: {x: 16, y: 16}
+  currentMapKey: 
+  currentZone: -1
+  currentLeaf: -1
+  currentZoneHasInfo: 0
+  currentDistanceFogEnabled: 0
+  currentZoneHasDistanceFogEnd: 0
+  observedIndoor: 0
+  isIndoor: 0
+  indoorWeight: 0
+  signedTransitionDepth: 0
+  sunShouldAffect: 1
+  currentZoneTag: 
+  worldScaleFactor: 1
+  mapAverageIndoorFogEnd: 0
+  activeSourceFogEnd: 0
+  probeSource: SceneView
+  currentContextVolume: {fileID: 0}
+--- !u!4 &757211964
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 757211962}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 330585546}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -431,6 +606,130 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1122924532
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1122924534}
+  - component: {fileID: 1122924533}
+  m_Layer: 0
+  m_Name: SunControl
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1122924533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1122924532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96d88b44927cb1348879970e68c3026e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::L2SunController
+  Probe: {fileID: 757211963}
+  DayNight: {fileID: 85456058}
+  Sun: {fileID: 410087040}
+  AutoFindReferences: 0
+  OutdoorIntensityOverride: -1
+  IndoorIntensity: 0
+  TransitionDurationSeconds: 3
+  DisabledIntensityThreshold: 0.001
+  MaxSunIntensity: 4
+  MaxColorTemperatureDeltaPerSecond: 2000
+  targetSunIntensity: 4
+  currentSunIntensity: 4
+  targetSunColorTemperature: 6500
+  currentSunColorTemperature: 6500
+--- !u!4 &1122924534
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1122924532}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 330585546}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1345396045
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1345396047}
+  - component: {fileID: 1345396046}
+  m_Layer: 0
+  m_Name: FogControl
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1345396046
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1345396045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1fb84493d3976d94fafce60d4441eaca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::L2FogController
+  Probe: {fileID: 757211963}
+  AutoFindReferences: 1
+  AdjustFog: 1
+  IndoorFogAttenuationDistance: 50
+  IndoorVolumetricFogDistance: 2
+  UseMapAverageFogCalibration: 1
+  FallbackAverageSourceFogEnd: 12000
+  FogSourceScaleMin: 0.35
+  FogSourceScaleMax: 2.5
+  UseOutdoorZoneFogOverride: 1
+  OutdoorZoneSourceFogEnd: 15000
+  OutdoorZoneSourceFogEndTolerance: 1
+  OutdoorZoneFogAttenuationDistance: 300
+  fogAvailable: 1
+  usingOutdoorZoneOverride: 0
+  fogSourceScale: 1
+  effectiveIndoorFogAttenuationDistance: 50
+  effectiveIndoorVolumetricFogDistance: 2
+  targetFogAttenuationDistance: 49.541283
+  currentFogAttenuationDistance: 49.541283
+  targetVolumetricFogDistance: 1.9816513
+  currentVolumetricFogDistance: 1.9816513
+--- !u!4 &1345396047
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1345396045}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 330585546}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
