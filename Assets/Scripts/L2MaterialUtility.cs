@@ -176,6 +176,21 @@ public static class L2MaterialUtility
             material.SetFloat("_Surface", 1f);
         }
 
+        if (material.HasProperty("_AlphaClip"))
+        {
+            material.SetFloat("_AlphaClip", 0f);
+        }
+
+        if (material.HasProperty("_AlphaCutoffEnable"))
+        {
+            material.SetFloat("_AlphaCutoffEnable", 0f);
+        }
+
+        if (material.HasProperty("_Cutoff"))
+        {
+            material.SetFloat("_Cutoff", 0f);
+        }
+
         material.SetInt("_SrcBlend", (int)srcBlend);
         material.SetInt("_DstBlend", (int)dstBlend);
         material.SetInt("_ZWrite", 0);

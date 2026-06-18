@@ -205,7 +205,7 @@ internal static class L2AssetManager
             material.doubleSidedGI = true;
         }
 
-        if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Masked || traits.HasMaskInput || traits.HasOpacityInput)
+        if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Masked || traits.HasMaskInput)
         {
             L2MaterialUtility.ConfigureCutout(material);
         }

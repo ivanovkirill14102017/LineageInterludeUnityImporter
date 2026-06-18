@@ -9,7 +9,6 @@ using UnityEngine;
 internal static class L2BspAssetBuilder
 {
     private const float UnrealToUnityScale = 0.01f;
-    private static readonly Vector2 NewBspMaterialMainTextureOffset = new Vector2(0.73f, 0f);
 
     private sealed class BspSectionEntry
     {
@@ -191,7 +190,7 @@ internal static class L2BspAssetBuilder
                 continue;
             }
 
-            var modelGo = new GameObject($"Model_{AssetNameUtility.SanitizeName(model.Name)}");
+            var modelGo = new GameObject(model.StableName);
             modelGo.isStatic = true;
             modelGo.transform.SetParent(parent.transform, false);
 
@@ -205,7 +204,7 @@ internal static class L2BspAssetBuilder
                     continue;
                 }
 
-                var chunkGo = new GameObject($"Chunk_{AssetNameUtility.SanitizeName(chunk.Name)}");
+                var chunkGo = new GameObject(chunk.StableName);
                 chunkGo.isStatic = true;
                 chunkGo.transform.SetParent(modelGo.transform, false);
 
@@ -217,8 +216,8 @@ internal static class L2BspAssetBuilder
                         continue;
                     }
 
-                    var sectionName = $"Section_{sectionIndex:000}_{AssetNameUtility.SanitizeName(section.Name)}";
-                    var sectionAssetPath = BuildSectionAssetPath(meshDir, model.Name, chunk.Name, section.Name, sectionIndex);
+                    var sectionName = section.StableName;
+                    var sectionAssetPath = BuildSectionAssetPath(meshDir, model.StableName, chunk.StableName, section.StableName);
                     if (!meshAssets.TryGetValue(sectionAssetPath, out var mesh) ||
                         !materialAssets.TryGetValue(sectionAssetPath, out var material))
                     {
@@ -279,12 +278,12 @@ internal static class L2BspAssetBuilder
 
                     entries.Add(new BspSectionEntry
                     {
-                        ModelName = model.Name,
-                        ChunkName = chunk.Name,
+                        ModelName = model.StableName,
+                        ChunkName = chunk.StableName,
                         Section = section,
                         ResolvedMaterial = resolvedMaterial,
-                        SectionName = $"Section_{sectionIndex:000}_{AssetNameUtility.SanitizeName(section.Name)}",
-                        MeshAssetPath = BuildSectionAssetPath(meshDir, model.Name, chunk.Name, section.Name, sectionIndex)
+                        SectionName = section.StableName,
+                        MeshAssetPath = BuildSectionAssetPath(meshDir, model.StableName, chunk.StableName, section.StableName)
                     });
                 }
             }
@@ -352,9 +351,9 @@ internal static class L2BspAssetBuilder
         return textureRefs;
     }
 
-    private static string BuildSectionAssetPath(string meshDir, string modelName, string chunkName, string sectionName, int sectionIndex)
+    private static string BuildSectionAssetPath(string meshDir, string modelName, string chunkName, string sectionName)
     {
-        return $"{meshDir}/{AssetNameUtility.SanitizeName(modelName)}_{AssetNameUtility.SanitizeName(chunkName)}_{AssetNameUtility.SanitizeName(sectionName)}_{sectionIndex:000}.asset";
+        return $"{meshDir}/{AssetNameUtility.SanitizeName(modelName)}_{AssetNameUtility.SanitizeName(chunkName)}_{AssetNameUtility.SanitizeName(sectionName)}.asset";
     }
 
     private static Mesh BuildSectionMesh(L2Viewer.SceneDomain.Models.SceneBspMeshSection section, L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial, System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch, string sectionName)
@@ -437,7 +436,7 @@ internal static class L2BspAssetBuilder
             ? null
             : L2Viewer.SceneDomain.Services.MaterialHeuristics.GetKnownTraits(resolvedMaterial);
         var blendHint = traits?.BlendModeHint.ToString() ?? "Opaque";
-        var materialKey = $"{section.MaterialReference ?? section.Name}_{blendHint}";
+        var materialKey = $"{section.MaterialReference ?? section.StableName}_{blendHint}";
         if (materialCache.TryGetValue(materialKey, out var cached))
         {
             return cached;
@@ -446,7 +445,7 @@ internal static class L2BspAssetBuilder
         var materialReference = L2AssetManager.BuildReferenceText(
             section.MaterialPackageName,
             section.MaterialObjectName,
-            section.MaterialReference ?? section.Name);
+            section.MaterialReference ?? section.StableName);
         var materialPath = L2AssetManager.BuildClientPackageAssetPath(
             materialDir,
             materialReference,
@@ -471,7 +470,6 @@ internal static class L2BspAssetBuilder
         if (textureChoice.Texture != null)
         {
             L2MaterialUtility.AssignMainTexture(material, textureChoice.Texture);
-            L2MaterialUtility.AssignMainTextureOffset(material, NewBspMaterialMainTextureOffset);
         }
         else if (section.ColorArgb != 0)
         {
@@ -503,7 +501,7 @@ internal static class L2BspAssetBuilder
     {
         if (resolvedMaterial?.TextureSlots == null || resolvedMaterial.TextureSlots.Count == 0)
         {
-            log($"BSP texture missing: section={section.Name} mat={section.MaterialReference ?? "<null>"} primary={section.PrimaryTextureReference ?? "<null>"} slots=[<no material graph>]");
+            log($"BSP texture missing: section={section.StableName} mat={section.MaterialReference ?? "<null>"} primary={section.PrimaryTextureReference ?? "<null>"} slots=[<no material graph>]");
             return (null, null);
         }
 
@@ -528,7 +526,7 @@ internal static class L2BspAssetBuilder
                 if (texture != null)
                 {
                     textureCache[reference] = texture;
-                    log($"BSP texture reused: section={section.Name} ref={reference}");
+                    log($"BSP texture reused: section={section.StableName} ref={reference}");
                     return (texture, reference);
                 }
             }
@@ -557,11 +555,11 @@ internal static class L2BspAssetBuilder
 
         if (texture == null)
         {
-            log($"BSP texture asset load failed: section={section.Name} source=MaterialSlot:{firstSlotWithTexture.SlotName} ref={reference}");
+            log($"BSP texture asset load failed: section={section.StableName} source=MaterialSlot:{firstSlotWithTexture.SlotName} ref={reference}");
             return (null, reference);
         }
 
-        log($"BSP texture: section={section.Name} source=MaterialSlot:{firstSlotWithTexture.SlotName} ref={reference}");
+        log($"BSP texture: section={section.StableName} source=MaterialSlot:{firstSlotWithTexture.SlotName} ref={reference}");
         return (texture, reference);
     }
 
