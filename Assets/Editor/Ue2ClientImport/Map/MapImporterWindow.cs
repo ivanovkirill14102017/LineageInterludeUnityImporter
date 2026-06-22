@@ -96,6 +96,10 @@ public sealed class MapImporterWindow : EditorWindow
                 {
                     QueueImport(ImportVolumesAsync);
                 }
+                if (GUILayout.Button("Import Particles Only", GUILayout.Height(24f)))
+                {
+                    QueueImport(ImportParticlesAsync);
+                }
             }
         }
 
@@ -215,6 +219,21 @@ public sealed class MapImporterWindow : EditorWindow
             _status = "Ready to import volumes.";
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, true);
             await MapImportOrchestrator.ImportVolumes(request, AppendStatus);
+        }
+        catch (System.Exception exception)
+        {
+            _status = exception.ToString();
+            Debug.LogException(exception);
+        }
+    }
+
+    private async Task ImportParticlesAsync()
+    {
+        try
+        {
+            _status = "Ready to import particles.";
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, true);
+            await MapImportOrchestrator.ImportParticles(request, AppendStatus);
         }
         catch (System.Exception exception)
         {

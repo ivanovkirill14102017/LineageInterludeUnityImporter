@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 internal static class L2LightAssetBuilder
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
     private const float UnrealLightRadiusScale = 64f;
     private const float DefaultLightIntensity = 2.35f;
     private const float DefaultFlame01LightCullDistance = 1.1f;

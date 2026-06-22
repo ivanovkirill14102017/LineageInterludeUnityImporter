@@ -5,7 +5,7 @@ using UnityEngine;
 
 internal static class L2MapContextAssetBuilder
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
 
     public static L2MapAtmosphereContextAsset BuildContextAsset(SceneMapContextData source, string outputDir)
     {

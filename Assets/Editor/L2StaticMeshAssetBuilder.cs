@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
+using UnityEditor;
 using UnityEngine;
 
 internal static class L2StaticMeshAssetBuilder
@@ -25,9 +26,11 @@ internal static class L2StaticMeshAssetBuilder
         bool placeTreeInstancesAsRegularInstances = false)
     {
         var meshDir = L2AssetManager.SharedStaticMeshesRoot;
+        var prefabDir = L2AssetManager.ManagedStaticMeshPrefabsRoot;
         var materialDir = L2AssetManager.SharedMaterialsRoot;
         var textureDir = L2AssetManager.SharedTexturesRoot;
         L2AssetManager.EnsureFolderExists(meshDir);
+        L2AssetManager.EnsureFolderExists(prefabDir);
         L2AssetManager.EnsureFolderExists(materialDir);
         L2AssetManager.EnsureFolderExists(textureDir);
 
@@ -66,6 +69,12 @@ internal static class L2StaticMeshAssetBuilder
         geometryStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Geometry asset build ({geometryStopwatch.Elapsed.TotalSeconds:F2}s)");
 
+        log("[StaticMesh/Pipeline] START Prefab asset build");
+        var prefabStopwatch = Stopwatch.StartNew();
+        var prefabCache = BuildPrefabAssets(meshCache, materialCatalog, prefabDir);
+        prefabStopwatch.Stop();
+        log($"[StaticMesh/Pipeline] DONE Prefab asset build ({prefabStopwatch.Elapsed.TotalSeconds:F2}s)");
+
         log("[StaticMesh/Pipeline] START Instance placement");
         var placementStopwatch = Stopwatch.StartNew();
         var regularInstances = instancedResult.Instances
@@ -85,12 +94,12 @@ internal static class L2StaticMeshAssetBuilder
 
         if (placeRegularInstances)
         {
-            StaticMeshInstancePlacer.PlaceInstances(regularInstances, parent, meshCache, materialCatalog, log);
+            StaticMeshInstancePlacer.PlaceInstances(regularInstances, parent, prefabCache, log);
         }
 
         if (placeTreeInstancesAsRegularInstances && treeInstances.Length > 0)
         {
-            StaticMeshInstancePlacer.PlaceInstances(treeInstances, parent, meshCache, materialCatalog, log);
+            StaticMeshInstancePlacer.PlaceInstances(treeInstances, parent, prefabCache, log);
         }
 
         TerrainGrassDetailBuilder.PopulateTerrainVegetation(
@@ -106,10 +115,50 @@ internal static class L2StaticMeshAssetBuilder
 
         if (placeTerrainDecorations)
         {
-            TerrainDecorationInstancePlacer.PlaceDecorations(instancedResult.TerrainDecorations, parent, meshCache, materialCatalog, clientPath, log);
+            TerrainDecorationInstancePlacer.PlaceDecorations(instancedResult.TerrainDecorations, parent, prefabCache, clientPath, log);
         }
         placementStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Instance placement ({placementStopwatch.Elapsed.TotalSeconds:F2}s)");
+    }
+
+    private static Dictionary<string, GameObject> BuildPrefabAssets(
+        IReadOnlyDictionary<string, Mesh> meshCache,
+        StaticMeshMaterialCatalog materialCatalog,
+        string prefabDir)
+    {
+        var prefabCache = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pair in meshCache)
+        {
+            var meshReference = pair.Key;
+            var mesh = pair.Value;
+            if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
+            {
+                continue;
+            }
+
+            var materials = StaticMeshRendererMaterialUtility.BuildRendererMaterials(meshReference, mesh, materialCatalog);
+            if (materials == null || materials.Length == 0)
+            {
+                continue;
+            }
+
+            var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
+                prefabDir,
+                meshReference,
+                "PF",
+                "prefab",
+                "StaticMeshPrefabs");
+
+            materialCatalog.FlipbooksByMeshReference.TryGetValue(meshReference, out var flipbooks);
+            var prefab = CreateOrUpdatePrefab(prefabPath, mesh, materials, flipbooks);
+            if (prefab != null)
+            {
+                prefabCache[meshReference] = prefab;
+            }
+        }
+
+        return prefabCache;
     }
 
     private static Dictionary<string, Mesh> BuildMeshAssets(
@@ -246,8 +295,41 @@ internal static class L2StaticMeshAssetBuilder
         return UnityAssetDatabaseUtility.CreateOrReplaceAsset(unityMesh, assetPath);
     }
 
+    private static GameObject CreateOrUpdatePrefab(string prefabPath, Mesh mesh, Material[] materials, Texture2D[][] flipbooks)
+    {
+        var prefabRoot = new GameObject(Path.GetFileNameWithoutExtension(prefabPath));
+        try
+        {
+            prefabRoot.transform.localScale = Vector3.one;
+            prefabRoot.isStatic = true;
+
+            var geometryRoot = new GameObject("Geometry");
+            geometryRoot.isStatic = true;
+            geometryRoot.transform.SetParent(prefabRoot.transform, false);
+            geometryRoot.transform.localPosition = Vector3.zero;
+            geometryRoot.transform.localRotation = Quaternion.identity;
+            geometryRoot.transform.localScale = Vector3.one;
+
+            var filter = geometryRoot.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+
+            var renderer = geometryRoot.AddComponent<MeshRenderer>();
+            renderer.sharedMaterials = materials;
+            StaticMeshFlipbookUtility.ApplyFlipbooks(geometryRoot, renderer, flipbooks);
+
+            L2AssetManager.EnsureParentFolderExists(prefabPath);
+            var prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
+            return prefab;
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(prefabRoot);
+        }
+    }
+
     private static Vector3 ConvertPosition(System.Numerics.Vector3 raw)
     {
-        return new Vector3(raw.X * 0.01f, raw.Z * 0.01f, raw.Y * 0.01f);
+        return new Vector3(raw.X * L2WorldScale.BakeUnrealToUnityScale, raw.Z * L2WorldScale.BakeUnrealToUnityScale, raw.Y * L2WorldScale.BakeUnrealToUnityScale);
     }
 }

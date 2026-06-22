@@ -8,7 +8,7 @@ using UnityEditor;
 
 internal static class L2SceneVolumeAssetBuilder
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
     private const float ZoneMarkerScale = 1.5f;
     private const float WaterVolumeVerticalOffsetUnreal = -45f;
 

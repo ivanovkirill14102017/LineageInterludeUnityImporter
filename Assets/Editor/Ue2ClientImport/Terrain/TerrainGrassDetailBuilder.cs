@@ -9,7 +9,7 @@ using UnityEngine;
 
 internal static class TerrainGrassDetailBuilder
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.UnrealToUnityScale;
     private const string ManagedPrefabPrefix = "GrassDetail_";
     private const string ManagedTreePrefabPrefix = "TerrainTree_";
     private const int DefaultDetailResolution = 512;
@@ -228,6 +228,9 @@ internal static class TerrainGrassDetailBuilder
         var prefabRoot = new GameObject(Path.GetFileNameWithoutExtension(prefabPath));
         try
         {
+            prefabRoot.transform.localScale = Vector3.one;
+            prefabRoot.isStatic = true;
+
             var filter = prefabRoot.AddComponent<MeshFilter>();
             filter.sharedMesh = mesh;
 
@@ -235,7 +238,6 @@ internal static class TerrainGrassDetailBuilder
             renderer.sharedMaterials = materials;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             renderer.receiveShadows = true;
-            prefabRoot.isStatic = true;
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
             AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
@@ -405,8 +407,8 @@ internal static class TerrainGrassDetailBuilder
                     Mathf.Clamp01(normalizedX),
                     Mathf.Clamp01(normalizedY),
                     Mathf.Clamp01(normalizedZ)),
-                widthScale = Mathf.Max(0.1f, Mathf.Abs(instance.Scale.X)),
-                heightScale = Mathf.Max(0.1f, Mathf.Abs(instance.Scale.Z)),
+                widthScale = 1f,
+                heightScale = 1f,
                 rotation = -instance.RotationEulerDegrees.Y * Mathf.Deg2Rad,
                 color = Color.white,
                 lightmapColor = Color.white

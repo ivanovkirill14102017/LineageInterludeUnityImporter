@@ -8,7 +8,7 @@ using UnityEngine;
 
 internal static class L2BspAssetBuilder
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
 
     private sealed class BspSectionEntry
     {

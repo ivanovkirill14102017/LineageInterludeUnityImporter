@@ -10,14 +10,13 @@ using NumericsVector3 = System.Numerics.Vector3;
 
 internal static class StaticMeshInstancePlacer
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.UnrealToUnityScale;
     private const string DefaultFlame01Token = "Default_Flame01";
 
     public static void PlaceInstances(
         IReadOnlyList<SceneStaticMeshInstance> instances,
         GameObject parent,
-        IReadOnlyDictionary<string, Mesh> meshCache,
-        StaticMeshMaterialCatalog materialCatalog,
+        IReadOnlyDictionary<string, GameObject> prefabCache,
         Action<string> log)
     {
         log($"Placing {instances.Count} instances on the scene...");
@@ -31,44 +30,29 @@ internal static class StaticMeshInstancePlacer
                 continue;
             }
 
-            if (string.IsNullOrEmpty(instance.MeshReference) || !meshCache.TryGetValue(instance.MeshReference, out var mesh))
+            if (string.IsNullOrEmpty(instance.MeshReference) || !prefabCache.TryGetValue(instance.MeshReference, out var prefab))
             {
                 continue;
             }
 
-            if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
+            if (prefab == null)
             {
                 continue;
             }
 
             var gameObjectName = BuildInstanceName(instance, spawnedCount);
-            var gameObject = new GameObject(gameObjectName)
-            {
-                isStatic = true
-            };
-            gameObject.transform.SetParent(parent.transform, false);
-            gameObject.transform.localPosition = ConvertPosition(instance.WorldLocation);
-            gameObject.transform.localRotation = ConvertEulerAngles(instance.RotationEulerDegrees);
-            gameObject.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
-
-            var meshRoot = CreateMeshRoot(gameObject.transform, instance);
-
-            var filter = meshRoot.AddComponent<MeshFilter>();
-            filter.sharedMesh = mesh;
-
-            var rendererMaterials = StaticMeshRendererMaterialUtility.BuildRendererMaterials(instance.MeshReference, mesh, materialCatalog);
-            if (rendererMaterials == null)
+            var visual = PrefabUtility.InstantiatePrefab(prefab, parent.transform) as GameObject;
+            if (visual == null)
             {
                 continue;
             }
 
-            var renderer = meshRoot.AddComponent<MeshRenderer>();
-            renderer.sharedMaterials = rendererMaterials;
-
-            if (materialCatalog.FlipbooksByMeshReference.TryGetValue(instance.MeshReference, out var flipbooks))
-            {
-                StaticMeshFlipbookUtility.ApplyFlipbooks(meshRoot, renderer, flipbooks);
-            }
+            visual.name = gameObjectName;
+            visual.isStatic = true;
+            visual.transform.localPosition = ConvertPosition(instance.WorldLocation);
+            visual.transform.localRotation = ConvertEulerAngles(instance.RotationEulerDegrees);
+            visual.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
+            ApplyPrePivotOffset(visual.transform, instance);
 
             spawnedCount++;
         }
@@ -98,26 +82,17 @@ internal static class StaticMeshInstancePlacer
             throw new InvalidOperationException("Could not load Default_Flame01 override prefab.");
         }
 
-        var wrapper = new GameObject(BuildInstanceName(instance, spawnedCount))
-        {
-            isStatic = true
-        };
-        wrapper.transform.SetParent(parent.transform, false);
-        wrapper.transform.localPosition = ConvertPosition(instance.WorldLocation);
-        wrapper.transform.localRotation = ConvertEulerAngles(instance.RotationEulerDegrees);
-        wrapper.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
-
-        var visual = PrefabUtility.InstantiatePrefab(prefab, wrapper.transform) as GameObject;
+        var visual = PrefabUtility.InstantiatePrefab(prefab, parent.transform) as GameObject;
         if (visual == null)
         {
             throw new InvalidOperationException("Unity failed to instantiate Default_Flame01 override prefab.");
         }
 
-        visual.name = prefab.name;
+        visual.name = BuildInstanceName(instance, spawnedCount);
         visual.isStatic = true;
-        visual.transform.localPosition = Vector3.zero;
-        visual.transform.localRotation = Quaternion.identity;
-        visual.transform.localScale = Vector3.one;
+        visual.transform.localPosition = ConvertPosition(instance.WorldLocation);
+        visual.transform.localRotation = ConvertEulerAngles(instance.RotationEulerDegrees);
+        visual.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
 
         log?.Invoke($"[StaticMesh/Override] Replaced '{instance.MeshReference}' with Default_Flame01 override prefab.");
         return true;
@@ -136,22 +111,22 @@ internal static class StaticMeshInstancePlacer
         return gameObjectName;
     }
 
-    private static GameObject CreateMeshRoot(Transform parent, SceneStaticMeshInstance instance)
+    private static void ApplyPrePivotOffset(Transform visualRoot, SceneStaticMeshInstance instance)
     {
-        if (instance.PrePivot == System.Numerics.Vector3.Zero)
+        if (visualRoot == null)
         {
-            return parent.gameObject;
+            return;
         }
 
-        var meshRoot = new GameObject("MeshRoot")
+        var geometry = visualRoot.Find("Geometry");
+        if (geometry == null)
         {
-            isStatic = true
-        };
-        meshRoot.transform.SetParent(parent, false);
-        meshRoot.transform.localPosition = ConvertPosition(ComputePrePivotOffset(instance.PrePivot, instance.Scale));
-        meshRoot.transform.localRotation = Quaternion.identity;
-        meshRoot.transform.localScale = Vector3.one;
-        return meshRoot;
+            geometry = visualRoot;
+        }
+
+        geometry.localPosition = instance.PrePivot == System.Numerics.Vector3.Zero
+            ? Vector3.zero
+            : ConvertPosition(ComputePrePivotOffset(instance.PrePivot, instance.Scale));
     }
 
     private static System.Numerics.Vector3 ComputePrePivotOffset(
@@ -182,14 +157,13 @@ internal static class StaticMeshInstancePlacer
 
 internal static class TerrainDecorationInstancePlacer
 {
-    private const float UnrealToUnityScale = 0.01f;
+    private const float UnrealToUnityScale = L2WorldScale.UnrealToUnityScale;
     private const int MaxSampleResolution = 128;
 
     public static void PlaceDecorations(
         IReadOnlyList<SceneTerrainDecorationLayer> terrainDecorations,
         GameObject parent,
-        IReadOnlyDictionary<string, Mesh> meshCache,
-        StaticMeshMaterialCatalog materialCatalog,
+        IReadOnlyDictionary<string, GameObject> prefabCache,
         string clientPath,
         Action<string> log)
     {
@@ -214,10 +188,8 @@ internal static class TerrainDecorationInstancePlacer
         foreach (var layer in terrainDecorations)
         {
             if (string.IsNullOrWhiteSpace(layer.MeshReference) ||
-                !meshCache.TryGetValue(layer.MeshReference, out var mesh) ||
-                mesh == null ||
-                mesh.vertexCount == 0 ||
-                mesh.subMeshCount == 0)
+                !prefabCache.TryGetValue(layer.MeshReference, out var prefab) ||
+                prefab == null)
             {
                 continue;
             }
@@ -271,31 +243,17 @@ internal static class TerrainDecorationInstancePlacer
                         var scale = ResolveScale(layer, jitterU, jitterV, rng);
                         var yawDegrees = layer.RandomYaw ? (float)(rng.NextDouble() * 360.0) : 0f;
 
-                        var gameObject = new GameObject($"{layer.TerrainActorName}:Deco{layer.LayerIndex:D2}:{++emitted:D5}")
-                        {
-                            isStatic = true
-                        };
-                        gameObject.transform.SetParent(terrainDecorationRoot.transform, false);
-                        gameObject.transform.localPosition = ConvertTerrainPosition(worldPosition);
-                        gameObject.transform.localRotation = Quaternion.Euler(0f, -yawDegrees, 0f);
-                        gameObject.transform.localScale = new Vector3(scale.X, scale.Z, scale.Y);
-
-                        var filter = gameObject.AddComponent<MeshFilter>();
-                        filter.sharedMesh = mesh;
-
-                        var rendererMaterials = StaticMeshRendererMaterialUtility.BuildRendererMaterials(layer.MeshReference, mesh, materialCatalog);
-                        if (rendererMaterials == null)
+                        var visual = PrefabUtility.InstantiatePrefab(prefab, terrainDecorationRoot.transform) as GameObject;
+                        if (visual == null)
                         {
                             continue;
                         }
 
-                        var renderer = gameObject.AddComponent<MeshRenderer>();
-                        renderer.sharedMaterials = rendererMaterials;
-
-                        if (materialCatalog.FlipbooksByMeshReference.TryGetValue(layer.MeshReference, out var flipbooks))
-                        {
-                            StaticMeshFlipbookUtility.ApplyFlipbooks(gameObject, renderer, flipbooks);
-                        }
+                        visual.name = $"{layer.TerrainActorName}:Deco{layer.LayerIndex:D2}:{++emitted:D5}";
+                        visual.isStatic = true;
+                        visual.transform.localPosition = ConvertTerrainPosition(worldPosition);
+                        visual.transform.localRotation = Quaternion.Euler(0f, -yawDegrees, 0f);
+                        visual.transform.localScale = new Vector3(scale.X, scale.Z, scale.Y);
 
                         spawnedCount++;
                     }

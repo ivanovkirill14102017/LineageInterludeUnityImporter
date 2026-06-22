@@ -10,10 +10,10 @@
       "L2Viewer.SceneDomain/1.0.0": {
         "dependencies": {
           "L2Viewer.PackageCore": "1.0.0",
-          "L2Viewer.UkxFile": "1.0.0",
-          "L2Viewer.UnrFile": "1.0.0",
-          "L2Viewer.UsxFile": "1.0.0",
-          "L2Viewer.UtxFile": "1.0.0"
+          "L2Viewer.UtxFile": "1.0.0",
+          "L2Viewer.UkxFile": "1.0.0.0",
+          "L2Viewer.UnrFile": "1.0.0.0",
+          "L2Viewer.UsxFile": "1.0.0.0"
         },
         "runtime": {
           "L2Viewer.SceneDomain.dll": {}
@@ -27,11 +27,18 @@
           }
         }
       },
-      "L2Viewer.UkxFile/1.0.0": {
+      "L2Viewer.UtxFile/1.0.0": {
         "dependencies": {
-          "L2Viewer.PackageCore": "1.0.0",
-          "L2Viewer.UtxFile": "1.0.0"
+          "L2Viewer.PackageCore": "1.0.0"
         },
+        "runtime": {
+          "L2Viewer.UtxFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.UkxFile/1.0.0.0": {
         "runtime": {
           "L2Viewer.UkxFile.dll": {
             "assemblyVersion": "1.0.0.0",
@@ -39,10 +46,7 @@
           }
         }
       },
-      "L2Viewer.UnrFile/1.0.0": {
-        "dependencies": {
-          "L2Viewer.PackageCore": "1.0.0"
-        },
+      "L2Viewer.UnrFile/1.0.0.0": {
         "runtime": {
           "L2Viewer.UnrFile.dll": {
             "assemblyVersion": "1.0.0.0",
@@ -50,24 +54,9 @@
           }
         }
       },
-      "L2Viewer.UsxFile/1.0.0": {
-        "dependencies": {
-          "L2Viewer.PackageCore": "1.0.0",
-          "L2Viewer.UtxFile": "1.0.0"
-        },
+      "L2Viewer.UsxFile/1.0.0.0": {
         "runtime": {
           "L2Viewer.UsxFile.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
-          }
-        }
-      },
-      "L2Viewer.UtxFile/1.0.0": {
-        "dependencies": {
-          "L2Viewer.PackageCore": "1.0.0"
-        },
-        "runtime": {
-          "L2Viewer.UtxFile.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -86,23 +75,23 @@
       "serviceable": false,
       "sha512": ""
     },
-    "L2Viewer.UkxFile/1.0.0": {
-      "type": "project",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "L2Viewer.UnrFile/1.0.0": {
-      "type": "project",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "L2Viewer.UsxFile/1.0.0": {
-      "type": "project",
-      "serviceable": false,
-      "sha512": ""
-    },
     "L2Viewer.UtxFile/1.0.0": {
       "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UkxFile/1.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UnrFile/1.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UsxFile/1.0.0.0": {
+      "type": "reference",
       "serviceable": false,
       "sha512": ""
     }

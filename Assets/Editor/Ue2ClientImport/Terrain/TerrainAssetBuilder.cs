@@ -7,8 +7,7 @@ using UnityEngine;
 
 internal static class TerrainAssetBuilder
 {
-    private const float UnrealToUnityScale = 0.01f;
-    private const float TerrainVerticalOffsetUnreal = 30f;
+    private const float UnrealToUnityScale = L2WorldScale.UnrealToUnityScale;
 
     public static GameObject BuildTerrain(TerrainImportData terrainImport, MapImportRequest request, GameObject mapRoot)
     {
@@ -87,7 +86,7 @@ internal static class TerrainAssetBuilder
         var baseZ = raw.Z - (terrainImport.HeightValueScale * 0.5f);
         return new Vector3(
             raw.X * UnrealToUnityScale,
-            (baseZ * UnrealToUnityScale) + (TerrainVerticalOffsetUnreal * UnrealToUnityScale),
+            baseZ * UnrealToUnityScale,
             raw.Y * UnrealToUnityScale);
     }
 

@@ -6,7 +6,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class L2MapContextVolume : MonoBehaviour
 {
-    private const float UnityToUnrealScale = 100f;
+    private const float UnityToUnrealScale = 1f / L2WorldScale.BakeUnrealToUnityScale;
 
     [Header("Context")]
     public L2MapAtmosphereContextAsset Context;

@@ -103,6 +103,23 @@ internal static class MapImportOrchestrator
         }, "Import Volumes", log);
     }
 
+    public static Task ImportParticles(MapImportRequest request, Action<string> log)
+    {
+        return Run(async () =>
+        {
+            log("[Import Particles] START Load map");
+            var source = await Ue2MapLoader.LoadAsync(request, log);
+            log("[Import Particles] DONE Load map");
+
+            log("[Import Particles] START Particle stage");
+            var stopwatch = Stopwatch.StartNew();
+            await ParticleMapImporter.ImportAsync(request, source, log);
+            stopwatch.Stop();
+            log($"Particle stage took {stopwatch.Elapsed.TotalSeconds:F2}s");
+            log("[Import Particles] DONE Particle stage");
+        }, "Import Particles", log);
+    }
+
     public static Task ImportAll(MapImportRequest request, Action<string> log)
     {
         return Run(async () =>
@@ -145,6 +162,13 @@ internal static class MapImportOrchestrator
             volumeStopwatch.Stop();
             log($"Volume stage took {volumeStopwatch.Elapsed.TotalSeconds:F2}s");
             log("[Import All] DONE Volume stage");
+
+            log("[Import All] START Particle stage");
+            var particleStopwatch = Stopwatch.StartNew();
+            await ParticleMapImporter.ImportAsync(request, source, log);
+            particleStopwatch.Stop();
+            log($"Particle stage took {particleStopwatch.Elapsed.TotalSeconds:F2}s");
+            log("[Import All] DONE Particle stage");
 
             log("[Import All] START Map context stage");
             var contextStopwatch = Stopwatch.StartNew();
