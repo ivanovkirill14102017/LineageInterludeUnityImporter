@@ -3,9 +3,11 @@ using UnityEngine;
 
 internal static class TerrainHeightMapBuilder
 {
+    private const int TerrainDensityMultiplier = 2;
+
     public static float[,] BuildUnityHeights(TerrainImportData terrainImport, int heightmapResolution, int smoothLevel = 0)
     {
-        if (smoothLevel <= 0 && heightmapResolution == ToUnityHeightmapResolution(terrainImport.HeightWidth, terrainImport.HeightHeight))
+        if (smoothLevel <= 0 && heightmapResolution == GetBaseUnityHeightmapResolution(terrainImport.HeightWidth, terrainImport.HeightHeight))
         {
             return BuildLegacyUnityHeights(terrainImport, heightmapResolution);
         }
@@ -36,6 +38,12 @@ internal static class TerrainHeightMapBuilder
     }
 
     public static int ToUnityHeightmapResolution(int width, int height)
+    {
+        var baseResolution = GetBaseUnityHeightmapResolution(width, height);
+        return ((baseResolution - 1) * TerrainDensityMultiplier) + 1;
+    }
+
+    private static int GetBaseUnityHeightmapResolution(int width, int height)
     {
         var sampleCount = Mathf.Max(width, height);
         return Mathf.IsPowerOfTwo(sampleCount) ? sampleCount + 1 : sampleCount;

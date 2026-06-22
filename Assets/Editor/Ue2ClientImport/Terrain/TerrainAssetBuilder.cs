@@ -49,7 +49,6 @@ internal static class TerrainAssetBuilder
             heights,
             $"{terrainHeightPreviewDir}/{mapKey}_Height_Unity_{heightmapResolution}_S{terrainHeightSmooth}.png");
         var layers = TerrainTextureAssetBuilder.BuildTerrainLayers(terrainImport, usefulLayers, mapKey, terrainMaskPreviewDir);
-        var alphamaps = TerrainAlphaMapBuilder.BuildAlphamaps(usefulLayers);
 
         var terrainData = new TerrainData();
         var terrainDataPath = $"{terrainRootDir}/{mapKey}_TerrainData.asset";
@@ -68,6 +67,7 @@ internal static class TerrainAssetBuilder
 
         terrainData.terrainLayers = layers;
         terrainData.SetHeights(0, 0, heights);
+        var alphamaps = TerrainAlphaMapBuilder.BuildAlphamaps(usefulLayers);
         terrainData.SetAlphamaps(0, 0, alphamaps);
 
         if (terrainImport.QuadVisibilityMask != null && terrainImport.QuadVisibilityMask.Bits != null)
