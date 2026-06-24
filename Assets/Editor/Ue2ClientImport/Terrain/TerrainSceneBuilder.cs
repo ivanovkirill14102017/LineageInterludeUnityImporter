@@ -11,7 +11,7 @@ internal static class TerrainSceneBuilder
         var terrainObject = Terrain.CreateTerrainGameObject(terrainData);
         terrainObject.name = $"{objectName}_Terrain";
         terrainObject.isStatic = true;
-        terrainObject.transform.SetParent(mapRoot.transform, true);
+        terrainObject.transform.SetParent(mapRoot.transform, false);
         terrainObject.transform.position = TerrainAssetBuilder.ConvertTerrainPosition(terrainImport, terrainData);
 
         var terrain = terrainObject.GetComponent<Terrain>();

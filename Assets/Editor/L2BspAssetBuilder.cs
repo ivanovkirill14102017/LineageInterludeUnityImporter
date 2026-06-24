@@ -353,7 +353,7 @@ internal static class L2BspAssetBuilder
 
     private static string BuildSectionAssetPath(string meshDir, string modelName, string chunkName, string sectionName)
     {
-        return $"{meshDir}/{AssetNameUtility.SanitizeName(modelName)}_{AssetNameUtility.SanitizeName(chunkName)}_{AssetNameUtility.SanitizeName(sectionName)}.asset";
+        return $"{meshDir}/{modelName}_{chunkName}_{sectionName}.asset";
     }
 
     private static Mesh BuildSectionMesh(L2Viewer.SceneDomain.Models.SceneBspMeshSection section, L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial, System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch, string sectionName)

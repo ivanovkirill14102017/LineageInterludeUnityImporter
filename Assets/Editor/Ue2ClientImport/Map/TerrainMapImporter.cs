@@ -45,8 +45,6 @@ internal static class TerrainMapImporter
             request.MapKey,
             request.OutputDir,
             log,
-            request.ImportTrees,
-            request.ImportNonTrees,
             request.ReuseExistingMaterialTextureAssets,
             placeRegularInstances: false,
             placeTerrainDecorations: false,

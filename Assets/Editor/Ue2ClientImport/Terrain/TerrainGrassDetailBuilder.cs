@@ -119,7 +119,7 @@ internal static class TerrainGrassDetailBuilder
             var densityMap = BuildDensityMap(group.ToArray(), terrain, mesh, detailWidth, detailHeight);
             terrainData.detailPrototypes = detailPrototypeList.ToArray();
             terrainData.SetDetailLayer(0, 0, prototypeIndex, densityMap);
-            SaveDensityPreview(densityMap, $"{detailPreviewDir}/{mapKey}_{AssetNameUtility.SanitizeName(group.Key)}_Detail.png");
+            SaveDensityPreview(densityMap, $"{detailPreviewDir}/{mapKey}_{group.Key}_Detail.png");
             createdGrassLayers++;
         }
 
@@ -144,7 +144,7 @@ internal static class TerrainGrassDetailBuilder
             var densityMap = BuildDensityMap(group.ToArray(), detailWidth, detailHeight);
             terrainData.detailPrototypes = detailPrototypeList.ToArray();
             terrainData.SetDetailLayer(0, 0, prototypeIndex, densityMap);
-            SaveDensityPreview(densityMap, $"{detailPreviewDir}/{mapKey}_{AssetNameUtility.SanitizeName(group.Key)}_TerrainDecoDetail.png");
+            SaveDensityPreview(densityMap, $"{detailPreviewDir}/{mapKey}_{group.Key}_TerrainDecoDetail.png");
             createdGrassLayers++;
         }
 
@@ -213,13 +213,13 @@ internal static class TerrainGrassDetailBuilder
 
     private static string BuildDetailPrefabPath(string detailPrefabDir, string meshReference)
     {
-        var fileName = $"{ManagedPrefabPrefix}{AssetNameUtility.SanitizeName(meshReference)}.prefab";
+        var fileName = $"{ManagedPrefabPrefix}{meshReference}.prefab";
         return $"{detailPrefabDir}/{fileName}";
     }
 
     private static string BuildTreePrefabPath(string treePrefabDir, string meshReference)
     {
-        var fileName = $"{ManagedTreePrefabPrefix}{AssetNameUtility.SanitizeName(meshReference)}.prefab";
+        var fileName = $"{ManagedTreePrefabPrefix}{meshReference}.prefab";
         return $"{treePrefabDir}/{fileName}";
     }
 
@@ -284,7 +284,7 @@ internal static class TerrainGrassDetailBuilder
         Action<string> log)
     {
         var sourceName = source != null ? source.name : $"TreeMaterial_{index}";
-        var assetPath = $"{treeMaterialDir}/{AssetNameUtility.SanitizeName(meshReference)}_{index:D2}_{AssetNameUtility.SanitizeName(sourceName)}.mat";
+        var assetPath = $"{treeMaterialDir}/{meshReference}_{index:D2}_{sourceName}.mat";
         var assetName = Path.GetFileNameWithoutExtension(assetPath);
         var material = AssetDatabase.LoadAssetAtPath<Material>(assetPath);
         if (material == null)
@@ -385,7 +385,7 @@ internal static class TerrainGrassDetailBuilder
 
         foreach (var instance in instances)
         {
-            var worldPosition = ConvertPosition(instance.WorldLocation);
+            var worldPosition = instance.WorldLocation.TransformFromUnrealToUnityWithScale();
             var localPosition = worldPosition - terrainPosition;
             if (terrainSize.x <= 0f || terrainSize.y <= 0f || terrainSize.z <= 0f)
             {
@@ -440,7 +440,7 @@ internal static class TerrainGrassDetailBuilder
 
         foreach (var instance in instances)
         {
-            var worldPosition = ConvertPosition(instance.WorldLocation);
+            var worldPosition = instance.WorldLocation.TransformFromUnrealToUnityWithScale();
             var localPosition = worldPosition - terrainPosition;
 
             if (terrainSize.x <= 0f || terrainSize.z <= 0f)
@@ -720,11 +720,6 @@ internal static class TerrainGrassDetailBuilder
             hash ^= hash >> 16;
             return (hash & 0x7fffffff) / (float)int.MaxValue;
         }
-    }
-
-    private static Vector3 ConvertPosition(System.Numerics.Vector3 raw)
-    {
-        return new Vector3(raw.X * UnrealToUnityScale, raw.Z * UnrealToUnityScale, raw.Y * UnrealToUnityScale);
     }
 
     private static void SaveDensityPreview(int[,] densityMap, string assetPath)

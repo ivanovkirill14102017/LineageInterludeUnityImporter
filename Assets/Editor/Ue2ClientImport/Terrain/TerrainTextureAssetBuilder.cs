@@ -139,7 +139,7 @@ internal static class TerrainTextureAssetBuilder
                 ? layer.TextureReference
                 : $"Layer_{index:00}";
 
-        return $"Layer_{index:00}_{AssetNameUtility.SanitizeName(rawName)}";
+        return $"Layer_{index:00}_{rawName}";
     }
 
     private static string ResolveTextureReference(TerrainLayerImportData layer, int index)
@@ -160,7 +160,7 @@ internal static class TerrainTextureAssetBuilder
     private static string BuildTextureAssetName(string textureReference, int index, string suffix)
     {
         var name = string.IsNullOrWhiteSpace(textureReference) ? $"Layer_{index:00}" : textureReference;
-        return $"TEX_{AssetNameUtility.SanitizeName(name)}_{suffix}_{index:00}";
+        return $"TEX_{name}_{suffix}_{index:00}";
     }
 }
 

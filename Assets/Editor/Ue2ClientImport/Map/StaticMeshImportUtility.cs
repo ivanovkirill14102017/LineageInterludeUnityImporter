@@ -16,15 +16,13 @@ internal static class StaticMeshImportUtility
     };
 
     public static IReadOnlyDictionary<string, SceneStaticMeshDefinition> FilterMeshDefinitions(
-        IReadOnlyDictionary<string, SceneStaticMeshDefinition> uniqueMeshes,
-        bool importTrees,
-        bool importNonTrees)
+        IReadOnlyDictionary<string, SceneStaticMeshDefinition> uniqueMeshes)
     {
         return uniqueMeshes
             .Where(pair =>
             {
                 var isTree = pair.Key != null && pair.Key.IndexOf("tree", StringComparison.OrdinalIgnoreCase) >= 0;
-                return (isTree && importTrees) || (!isTree && importNonTrees);
+                return isTree || !isTree;
             })
             .ToDictionary(pair => pair.Key, pair => pair.Value);
     }

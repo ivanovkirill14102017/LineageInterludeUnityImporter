@@ -57,23 +57,23 @@ internal static class AngelNpcImportBuilder
 
         var characterName = string.IsNullOrWhiteSpace(meshName) ? sharedAsset.MeshObjectName : meshName;
         var characterAsset = BuildCharacterAsset(characterName, sharedAsset);
-        var outputDir = $"{OutputRoot}/{AssetNameUtility.SanitizeName(characterName)}";
+        var outputDir = $"{OutputRoot}/{characterName}";
         L2AssetManager.EnsureFolderExists(OutputRoot);
         L2AssetManager.EnsureFolderExists(outputDir);
 
-        var assetPath = $"{outputDir}/NPC_{AssetNameUtility.SanitizeName(characterName)}.asset";
+        var assetPath = $"{outputDir}/NPC_{characterName}.asset";
         var meshAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(characterAsset, assetPath);
         log($"Character asset updated: {assetPath}");
 
-        var sourceMeshPath = $"{outputDir}/SM_{AssetNameUtility.SanitizeName(characterName)}_diagnostic.asset";
+        var sourceMeshPath = $"{outputDir}/SM_{characterName}_diagnostic.asset";
         var sourceMesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(
-            L2SceneSkeletalAssetBridge.BuildUnityMesh(bindPoseMesh, $"SM_{AssetNameUtility.SanitizeName(characterName)}_diagnostic"),
+            L2SceneSkeletalAssetBridge.BuildUnityMesh(bindPoseMesh, $"SM_{characterName}_diagnostic"),
             sourceMeshPath);
         log($"Diagnostic mesh asset updated: {sourceMeshPath}");
 
         var textures = ImportTextures(meshAsset, clientRoot, characterName, log);
         var materials = CreateMaterials(meshAsset, outputDir, textures, log);
-        var prefabPath = $"{outputDir}/PF_{AssetNameUtility.SanitizeName(characterName)}.prefab";
+        var prefabPath = $"{outputDir}/PF_{characterName}.prefab";
         CreatePrefab(meshAsset, sourceMesh, materials, prefabPath);
         log($"Prefab updated: {prefabPath}");
 
@@ -260,7 +260,7 @@ internal static class AngelNpcImportBuilder
                 resolvedTexture.Reference,
                 "TEX",
                 "png",
-                $"{AssetNameUtility.SanitizeName(characterName)}/SkeletalTextures");
+                $"{characterName}/SkeletalTextures");
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath) ??
                           L2AssetManager.CreateTextureAsset(
                               resolvedTexture.Texture,
@@ -355,7 +355,7 @@ internal static class AngelNpcImportBuilder
         for (var i = 0; i < materialCount; i++)
         {
             var materialId = asset.SubMeshes != null && i < asset.SubMeshes.Length ? asset.SubMeshes[i].MaterialId : i;
-            var materialPath = $"{outputDir}/MAT_{AssetNameUtility.SanitizeName(asset.CharacterName)}_{materialId:00}.mat";
+            var materialPath = $"{outputDir}/MAT_{asset.CharacterName}_{materialId:00}.mat";
             var material = new Material(shader)
             {
                 name = Path.GetFileNameWithoutExtension(materialPath),
@@ -381,7 +381,7 @@ internal static class AngelNpcImportBuilder
 
     private static void CreatePrefab(L2SkeletalCharacterAsset asset, Mesh sourceMesh, Material[] materials, string prefabPath)
     {
-        var root = new GameObject($"NPC_{AssetNameUtility.SanitizeName(asset.CharacterName)}");
+        var root = new GameObject($"NPC_{asset.CharacterName}");
         try
         {
             var meshFilter = root.AddComponent<MeshFilter>();

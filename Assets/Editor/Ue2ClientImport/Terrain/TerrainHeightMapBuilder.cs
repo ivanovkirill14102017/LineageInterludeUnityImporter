@@ -5,13 +5,8 @@ internal static class TerrainHeightMapBuilder
 {
     private const int TerrainDensityMultiplier = 2;
 
-    public static float[,] BuildUnityHeights(TerrainImportData terrainImport, int heightmapResolution, int smoothLevel = 0)
+    public static float[,] BuildUnityHeights(TerrainImportData terrainImport, int heightmapResolution)
     {
-        if (smoothLevel <= 0 && heightmapResolution == GetBaseUnityHeightmapResolution(terrainImport.HeightWidth, terrainImport.HeightHeight))
-        {
-            return BuildLegacyUnityHeights(terrainImport, heightmapResolution);
-        }
-
         var heights = new float[heightmapResolution, heightmapResolution];
         var sourceWidth = Mathf.Max(1, terrainImport.HeightWidth);
         var sourceHeight = Mathf.Max(1, terrainImport.HeightHeight);
@@ -29,11 +24,6 @@ internal static class TerrainHeightMapBuilder
             }
         }
 
-        if (smoothLevel > 0)
-        {
-            heights = SmoothHeights(heights, smoothLevel);
-        }
-
         return heights;
     }
 
@@ -47,24 +37,6 @@ internal static class TerrainHeightMapBuilder
     {
         var sampleCount = Mathf.Max(width, height);
         return Mathf.IsPowerOfTwo(sampleCount) ? sampleCount + 1 : sampleCount;
-    }
-
-    private static float[,] BuildLegacyUnityHeights(TerrainImportData terrainImport, int heightmapResolution)
-    {
-        var heights = new float[heightmapResolution, heightmapResolution];
-
-        for (var y = 0; y < heightmapResolution; y++)
-        {
-            var sourceY = Mathf.Clamp(y, 0, terrainImport.HeightHeight - 1);
-
-            for (var x = 0; x < heightmapResolution; x++)
-            {
-                var sourceX = Mathf.Clamp(x, 0, terrainImport.HeightWidth - 1);
-                heights[y, x] = SampleHeightPoint(terrainImport, sourceX, sourceY);
-            }
-        }
-
-        return heights;
     }
 
     private static float RemapSampleCoordinate(int targetIndex, int targetResolution, int sourceResolution)
@@ -101,51 +73,4 @@ internal static class TerrainHeightMapBuilder
         return terrainImport.HeightSamples[index];
     }
 
-    private static float[,] SmoothHeights(float[,] source, int smoothLevel)
-    {
-        var width = source.GetLength(1);
-        var height = source.GetLength(0);
-        var iterations = smoothLevel switch
-        {
-            1 => 1,
-            2 => 3,
-            _ => 0
-        };
-
-        if (iterations <= 0 || width <= 1 || height <= 1)
-        {
-            return source;
-        }
-
-        var current = source;
-        for (var iteration = 0; iteration < iterations; iteration++)
-        {
-            var next = new float[height, width];
-            for (var y = 0; y < height; y++)
-            {
-                for (var x = 0; x < width; x++)
-                {
-                    var sum = 0f;
-                    var weight = 0f;
-                    for (var oy = -1; oy <= 1; oy++)
-                    {
-                        var sy = Mathf.Clamp(y + oy, 0, height - 1);
-                        for (var ox = -1; ox <= 1; ox++)
-                        {
-                            var sx = Mathf.Clamp(x + ox, 0, width - 1);
-                            var kernel = ox == 0 && oy == 0 ? 4f : (ox == 0 || oy == 0 ? 2f : 1f);
-                            sum += current[sy, sx] * kernel;
-                            weight += kernel;
-                        }
-                    }
-
-                    next[y, x] = sum / weight;
-                }
-            }
-
-            current = next;
-        }
-
-        return current;
-    }
 }

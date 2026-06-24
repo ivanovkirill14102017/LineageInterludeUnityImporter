@@ -119,7 +119,6 @@ internal static class L2AssetManager
         var normalizedRoot = root.Replace('\\', '/');
         var parts = (referenceText ?? string.Empty)
             .Split(new[] { '.', '/', '\\', ':' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(AssetNameUtility.SanitizeName)
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .ToArray();
 
@@ -127,8 +126,8 @@ internal static class L2AssetManager
         string directory = normalizedRoot;
         if (parts.Length == 0)
         {
-            directory = $"{normalizedRoot}/{AssetNameUtility.SanitizeName(fallbackCategory)}";
-            fileStem = AssetNameUtility.SanitizeName(prefix);
+            directory = $"{normalizedRoot}/{fallbackCategory}";
+            fileStem = prefix;
         }
         else
         {
@@ -141,7 +140,7 @@ internal static class L2AssetManager
         }
 
         EnsureFolderExists(directory);
-        var suffixPart = string.IsNullOrWhiteSpace(suffix) ? string.Empty : $"_{AssetNameUtility.SanitizeName(suffix)}";
+        var suffixPart = string.IsNullOrWhiteSpace(suffix) ? string.Empty : $"_{suffix}";
         return $"{directory}/{prefix}_{fileStem}{suffixPart}.{extension.TrimStart('.')}";
     }
 

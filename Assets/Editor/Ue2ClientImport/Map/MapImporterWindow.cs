@@ -9,8 +9,6 @@ public sealed class MapImporterWindow : EditorWindow
     private const string DefaultMapRelativePath = @"Maps\20_20.unr";
 
     private string _mapRelativePath = DefaultMapRelativePath;
-    private bool _importTrees = true;
-    private bool _importNonTrees = true;
     private bool _reuseExistingMaterialTextureAssets = true;
     private bool _isImportRunning;
     private string _status = "Ready to import.";
@@ -59,11 +57,8 @@ public sealed class MapImporterWindow : EditorWindow
         {
             EditorGUILayout.LabelField("Client", ConstInfo.L2GameClientPath);
             _mapRelativePath = EditorGUILayout.TextField("Map", _mapRelativePath);
-            _importTrees = EditorGUILayout.Toggle("Import Trees", _importTrees);
-            _importNonTrees = EditorGUILayout.Toggle("Import Non-Trees", _importNonTrees);
             _reuseExistingMaterialTextureAssets = EditorGUILayout.Toggle("Reuse Existing Materials/Textures", _reuseExistingMaterialTextureAssets);
             EditorGUILayout.LabelField("Output Root", MapImportPaths.OutputRoot);
-            EditorGUILayout.LabelField("Behavior", "Map folders keep terrain and BSP meshes. Shared meshes, materials and textures are reused from client-like package folders.");
         }
 
         EditorGUILayout.Space();
@@ -142,7 +137,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import all map content.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, _reuseExistingMaterialTextureAssets);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportAll(request, AppendStatus);
         }
         catch (System.Exception exception)
@@ -157,7 +152,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import terrain.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, _reuseExistingMaterialTextureAssets);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportTerrain(request, AppendStatus);
         }
         catch (System.Exception exception)
@@ -172,7 +167,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import meshes.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, _reuseExistingMaterialTextureAssets);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportMeshes(request, AppendStatus);
         }
         catch (System.Exception exception)
@@ -187,7 +182,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import room-grouped BSP.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, _reuseExistingMaterialTextureAssets);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportBsp(request, AppendStatus);
         }
         catch (System.Exception exception)
@@ -202,7 +197,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import lights.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, true);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
             await MapImportOrchestrator.ImportLights(request, AppendStatus);
         }
         catch (System.Exception exception)
@@ -217,7 +212,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import volumes.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, true);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
             await MapImportOrchestrator.ImportVolumes(request, AppendStatus);
         }
         catch (System.Exception exception)
@@ -232,7 +227,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import particles.";
-            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _importTrees, _importNonTrees, true);
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
             await MapImportOrchestrator.ImportParticles(request, AppendStatus);
         }
         catch (System.Exception exception)

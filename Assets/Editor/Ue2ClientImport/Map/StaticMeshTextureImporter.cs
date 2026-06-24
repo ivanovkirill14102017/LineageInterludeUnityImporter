@@ -132,7 +132,7 @@ internal static class StaticMeshTextureImporter
         StaticMeshTextureCatalog catalog,
         System.Action<string> log)
     {
-        var cacheKey = textureReference ?? AssetNameUtility.SanitizeName(textureData?.Name ?? "Texture");
+        var cacheKey = textureReference ?? (textureData?.Name ?? "Texture");
         if (catalog.TexturesByReference.TryGetValue(cacheKey, out var cached))
         {
             return cached;

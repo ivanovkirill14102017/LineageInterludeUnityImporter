@@ -40,8 +40,6 @@ internal static class StaticMeshMapImporter
                 request.MapKey,
                 request.OutputDir,
                 log,
-                request.ImportTrees,
-                request.ImportNonTrees,
                 request.ReuseExistingMaterialTextureAssets);
         pipelineStopwatch.Stop();
         log($"[StaticMesh] DONE Asset pipeline ({pipelineStopwatch.Elapsed.TotalSeconds:F2}s)");

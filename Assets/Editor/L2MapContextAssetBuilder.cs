@@ -5,13 +5,11 @@ using UnityEngine;
 
 internal static class L2MapContextAssetBuilder
 {
-    private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
-
     public static L2MapAtmosphereContextAsset BuildContextAsset(SceneMapContextData source, string outputDir)
     {
         var contextDir = $"{outputDir}/Context";
         L2AssetManager.EnsureFolderExists(contextDir);
-        var assetPath = $"{contextDir}/{AssetNameUtility.SanitizeName(source.MapKey)}_MapContext.asset";
+        var assetPath = $"{contextDir}/{source.MapKey}_MapContext.asset";
 
         var asset = AssetDatabase.LoadAssetAtPath<L2MapAtmosphereContextAsset>(assetPath);
         if (asset == null)
@@ -20,8 +18,8 @@ internal static class L2MapContextAssetBuilder
             AssetDatabase.CreateAsset(asset, assetPath);
         }
 
-        var boundsMin = ConvertPosition(source.WorldBoundsMin);
-        var boundsMax = ConvertPosition(source.WorldBoundsMax);
+        var boundsMin = source.WorldBoundsMin.TransformFromUnrealToUnityWithScale();
+        var boundsMax = source.WorldBoundsMax.TransformFromUnrealToUnityWithScale();
 
         asset.MapKey = source.MapKey;
         asset.SourcePath = source.SourcePath;
@@ -33,9 +31,9 @@ internal static class L2MapContextAssetBuilder
         asset.MapAverageIndoorFogEnd = source.MapAverageIndoorFogEnd;
         asset.LevelDistanceFogEnd = source.LevelDistanceFogEnd;
         asset.HasSunRotation = source.HasSunRotation;
-        asset.MapSunEulerDegrees = ConvertEuler(source.PrimarySunEulerDegrees);
+        asset.MapSunEulerDegrees = source.PrimarySunEulerDegrees.ToDirectUnityVectorWithoutModification();
         asset.HasMoonRotation = source.HasMoonRotation;
-        asset.MapMoonEulerDegrees = ConvertEuler(source.PrimaryMoonEulerDegrees);
+        asset.MapMoonEulerDegrees = source.PrimaryMoonEulerDegrees.ToDirectUnityVectorWithoutModification();
         asset.Nodes = source.Nodes == null
             ? new L2MapAtmosphereContextAsset.ProbeNodeData[0]
             : source.Nodes.Select(x => new L2MapAtmosphereContextAsset.ProbeNodeData
@@ -67,15 +65,6 @@ internal static class L2MapContextAssetBuilder
         return asset;
     }
 
-    private static Vector3 ConvertPosition(System.Numerics.Vector3 raw)
-    {
-        return new Vector3(raw.X * UnrealToUnityScale, raw.Z * UnrealToUnityScale, raw.Y * UnrealToUnityScale);
-    }
-
-    private static Vector3 ConvertEuler(System.Numerics.Vector3 raw)
-    {
-        return new Vector3(raw.X, raw.Y, raw.Z);
-    }
 }
 
 

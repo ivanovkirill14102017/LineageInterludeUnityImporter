@@ -10,20 +10,11 @@ internal static class MapImportFinalizer
 {
     public static void Complete(GameObject mapRoot, Action<string> log = null)
     {
-        var saveStopwatch = Stopwatch.StartNew();
         AssetDatabase.SaveAssets();
-        saveStopwatch.Stop();
-        log?.Invoke($"[Finalizer] SaveAssets ({saveStopwatch.Elapsed.TotalSeconds:F2}s)");
 
-        var refreshStopwatch = Stopwatch.StartNew();
         AssetDatabase.Refresh();
-        refreshStopwatch.Stop();
-        log?.Invoke($"[Finalizer] Refresh ({refreshStopwatch.Elapsed.TotalSeconds:F2}s)");
 
-        var cameraRigStopwatch = Stopwatch.StartNew();
         EnsureCameraAtmosphereRig(log);
-        cameraRigStopwatch.Stop();
-        log?.Invoke($"[Finalizer] Camera atmosphere setup ({cameraRigStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         Selection.activeObject = mapRoot;
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());

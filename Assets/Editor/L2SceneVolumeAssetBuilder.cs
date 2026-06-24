@@ -71,7 +71,7 @@ internal static class L2SceneVolumeAssetBuilder
             }
 
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = BuildVolumeName(volume);
+            go.name = volume.StableName;
             go.transform.SetParent(parent, false);
             go.transform.localPosition = center;
             go.transform.localScale = new Vector3(
@@ -175,7 +175,7 @@ internal static class L2SceneVolumeAssetBuilder
         }
 
         var shader = L2MaterialUtility.FindBestLitShader();
-        var safeTextureName = AssetNameUtility.SanitizeName(waterTexture.ReferenceText);
+        var safeTextureName = waterTexture.ReferenceText;
         var texturePath = AssetDatabase.GenerateUniqueAssetPath($"{waterTextureDir}/TEX_{safeTextureName}.png");
         var texture = L2AssetManager.CreateTextureAsset(waterTexture.Texture, texturePath, false, true);
 
@@ -198,23 +198,13 @@ internal static class L2SceneVolumeAssetBuilder
         return material;
     }
 
-    private static string BuildVolumeName(L2Viewer.SceneDomain.Models.SceneVolumeData volume)
-    {
-        var actorName = AssetNameUtility.SanitizeName(volume.Name);
-        var className = AssetNameUtility.SanitizeName(volume.ClassName);
-        var brushName = string.IsNullOrWhiteSpace(volume.BrushReference)
-            ? "NoBrush"
-            : AssetNameUtility.SanitizeName(volume.BrushReference);
-        return $"VOL_{className}_{actorName}_{volume.ExportIndex}_{brushName}";
-    }
-
     private static string BuildZoneName(L2Viewer.SceneDomain.Models.SceneZoneInfoData zone)
     {
         var fogState = zone.DistanceFogEnabled ? "FogOn" : "FogOff";
         var terrainState = zone.TerrainZone ? "TerrainZone" : "ZoneInfo";
         var ambient = zone.AmbientBrightness?.ToString() ?? "NoAmbient";
-        var tag = string.IsNullOrWhiteSpace(zone.ZoneTag) ? "NoTag" : AssetNameUtility.SanitizeName(zone.ZoneTag);
-        return $"ZONE_{terrainState}_{fogState}_A{ambient}_{tag}_{AssetNameUtility.SanitizeName(zone.Name)}_{zone.ExportIndex}";
+        var tag = string.IsNullOrWhiteSpace(zone.ZoneTag) ? "NoTag" : zone.ZoneTag;
+        return $"ZONE_{terrainState}_{fogState}_A{ambient}_{tag}_{zone.Name}_{zone.ExportIndex}";
     }
 
     private static Material GetDebugMaterial(string key, Dictionary<string, Material> cache)

@@ -16,8 +16,6 @@ internal static class L2StaticMeshAssetBuilder
         string mapKey,
         string outputDir,
         Action<string> log,
-        bool importTrees = true,
-        bool importNonTrees = true,
         bool reuseExistingMaterialTextureAssets = true,
         bool placeRegularInstances = true,
         bool placeTerrainDecorations = true,
@@ -34,7 +32,7 @@ internal static class L2StaticMeshAssetBuilder
         L2AssetManager.EnsureFolderExists(materialDir);
         L2AssetManager.EnsureFolderExists(textureDir);
 
-        var meshDefinitions = StaticMeshImportUtility.FilterMeshDefinitions(instancedResult.UniqueMeshes, importTrees, importNonTrees);
+        var meshDefinitions = StaticMeshImportUtility.FilterMeshDefinitions(instancedResult.UniqueMeshes);
         var shader = StaticMeshImportUtility.FindDefaultShader();
 
         log($"Building {meshDefinitions.Count} unique mesh assets...");

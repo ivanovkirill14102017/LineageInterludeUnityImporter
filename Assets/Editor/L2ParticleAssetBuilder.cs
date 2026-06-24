@@ -12,7 +12,6 @@ using NumericsVector3 = System.Numerics.Vector3;
 internal static class L2ParticleAssetBuilder
 {
     private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
-    private const string UnnamedObjectLabel = "Unnamed";
     private const float NeutralParticleStartSize = 1f;
 
     public static void BuildParticles(
@@ -33,114 +32,40 @@ internal static class L2ParticleAssetBuilder
         var textureAssets = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
         var materialAssets = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
 
-        var importedRoots = 0;
-        var importedParticleSystems = 0;
-        var placeholderBeamLayers = 0;
-        var failedLayers = 0;
-        var skippedLayers = 0;
         var missingTextureReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var emitter in emitters
-                     .OrderBy(x => NormalizeName(x.Name), StringComparer.OrdinalIgnoreCase)
-                     .ThenBy(x => x.ExportIndex))
+        foreach (var emitter in emitters.OrderBy(x => x.ExportIndex))
         {
-            var emitterRoot = new GameObject(BuildEmitterObjectName(emitter));
+            var emitterRoot = new GameObject(emitter.StableName);
             emitterRoot.transform.SetParent(parent.transform, false);
             ApplyEmitterTransform(emitterRoot.transform, emitter);
-            importedRoots++;
-            log($"[Particles] Emitter START name={NormalizeName(emitter.Name)} exportIndex={emitter.ExportIndex} sprite={emitter.Layers.Length} mesh={emitter.MeshLayers.Length} beam={emitter.BeamLayers.Length} vertMesh={emitter.VertMeshLayers.Length}");
 
-            foreach (var layer in emitter.Layers.OrderBy(x => NormalizeName(x.Name), StringComparer.OrdinalIgnoreCase).ThenBy(x => x.ExportIndex))
+            foreach (var layer in emitter.Layers.OrderBy(x => x.ExportIndex))
             {
-                if (TryBuildLayer(
-                        "Sprite",
-                        emitter,
-                        layer,
-                        log,
-                        () => BuildSpriteLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, missingTextureReferences)))
-                {
-                    importedParticleSystems++;
-                }
-                else
-                {
-                    failedLayers++;
-                }
+               BuildSpriteLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, missingTextureReferences);               
             }
 
-            foreach (var layer in emitter.MeshLayers.OrderBy(x => NormalizeName(x.Name), StringComparer.OrdinalIgnoreCase).ThenBy(x => x.ExportIndex))
+            foreach (var layer in emitter.MeshLayers.OrderBy(x => x.ExportIndex))
             {
-                if (TryBuildLayer(
-                        "Mesh",
-                        emitter,
-                        layer,
-                        log,
-                        () => BuildMeshLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform)))
-                {
-                    importedParticleSystems++;
-                }
-                else
-                {
-                    failedLayers++;
-                }
+                BuildMeshLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform);
             }
 
-            foreach (var layer in emitter.VertMeshLayers.OrderBy(x => NormalizeName(x.Name), StringComparer.OrdinalIgnoreCase).ThenBy(x => x.ExportIndex))
+            foreach (var layer in emitter.VertMeshLayers.OrderBy(x => x.ExportIndex))
             {
-                if (TryBuildLayer(
-                        "VertMesh",
-                        emitter,
-                        layer,
-                        log,
-                        () => BuildVertMeshLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform)))
-                {
-                    importedParticleSystems++;
-                }
-                else
-                {
-                    failedLayers++;
-                }
+                BuildVertMeshLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform);
             }
 
-            foreach (var layer in emitter.BeamLayers.OrderBy(x => NormalizeName(x.Name), StringComparer.OrdinalIgnoreCase).ThenBy(x => x.ExportIndex))
+            foreach (var layer in emitter.BeamLayers.OrderBy(x => x.ExportIndex))
             {
-                if (TryBuildLayer(
-                        "Beam",
-                        emitter,
-                        layer,
-                        log,
-                        () => BuildBeamLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, missingTextureReferences)))
-                {
-                    importedParticleSystems++;
-                }
-                else
-                {
-                    failedLayers++;
-                }
+                BuildBeamLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, missingTextureReferences);
 
                 if (layer.UnknownProperties.Any(x => x.Name.Equals("BeamEndPoints", StringComparison.OrdinalIgnoreCase)))
                 {
-                    placeholderBeamLayers++;
-                    log($"[Particles] Beam placeholder endpoints emitter={NormalizeName(emitter.Name)} emitterExportIndex={emitter.ExportIndex} layer={NormalizeName(layer.Name)} layerExportIndex={layer.ExportIndex}");
+                    throw new Exception("BeamEndPoints should be, return SceneDomain to complete parsing!");
                 }
             }
-
-            if (emitter.Layers.Length + emitter.MeshLayers.Length + emitter.BeamLayers.Length + emitter.VertMeshLayers.Length == 0)
-            {
-                skippedLayers++;
-                log($"[Particles] Emitter SKIP name={NormalizeName(emitter.Name)} exportIndex={emitter.ExportIndex} reason=no-supported-layers");
-                continue;
-            }
-
-            log($"[Particles] Emitter DONE name={NormalizeName(emitter.Name)} exportIndex={emitter.ExportIndex}");
         }
-
-        if (missingTextureReferences.Count > 0)
-        {
-            log($"[Particles] Missing textures count={missingTextureReferences.Count}: {string.Join(", ", missingTextureReferences.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}");
-        }
-
-        log($"[Particles] Imported roots={importedRoots}, particleSystems={importedParticleSystems}, failedLayers={failedLayers}, skippedEmitters={skippedLayers}, beamLayersWithUnresolvedEndpoints={placeholderBeamLayers}.");
-    }
+  }
 
     private static bool BuildSpriteLayer(
         SceneSpriteEmitterLayerData layer,
@@ -151,7 +76,7 @@ internal static class L2ParticleAssetBuilder
         Transform parent,
         ISet<string> missingTextureReferences)
     {
-        var particleSystem = CreateParticleSystemObject(BuildLayerObjectName("Sprite", layer), parent, ParticleSystemRenderMode.Billboard);
+        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Billboard);
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -181,7 +106,7 @@ internal static class L2ParticleAssetBuilder
         IDictionary<string, Material> materialAssets,
         Transform parent)
     {
-        var particleSystem = CreateParticleSystemObject(BuildLayerObjectName("Mesh", layer), parent, ParticleSystemRenderMode.Billboard);
+        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Billboard);
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -210,7 +135,7 @@ internal static class L2ParticleAssetBuilder
         IDictionary<string, Material> materialAssets,
         Transform parent)
     {
-        var particleSystem = CreateParticleSystemObject(BuildLayerObjectName("VertMesh", layer), parent, ParticleSystemRenderMode.Billboard);
+        var particleSystem = CreateParticleSystemObject( layer.StableName, parent, ParticleSystemRenderMode.Billboard);
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -240,7 +165,7 @@ internal static class L2ParticleAssetBuilder
         Transform parent,
         ISet<string> missingTextureReferences)
     {
-        var particleSystem = CreateParticleSystemObject(BuildLayerObjectName("Beam", layer), parent, ParticleSystemRenderMode.Stretch);
+        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Stretch);
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -328,7 +253,7 @@ internal static class L2ParticleAssetBuilder
 
     private static ParticleSystem CreateParticleSystemObject(string name, Transform parent, ParticleSystemRenderMode renderMode)
     {
-        var gameObject = new GameObject(AssetNameUtility.SanitizeName(name));
+        var gameObject = new GameObject(name);
         gameObject.transform.SetParent(parent, false);
         var particleSystem = gameObject.AddComponent<ParticleSystem>();
         var renderer = gameObject.GetComponent<ParticleSystemRenderer>();
@@ -349,11 +274,6 @@ internal static class L2ParticleAssetBuilder
             Math.Max(0.0001f, Math.Abs(scale.X * emitter.DrawScale)),
             Math.Max(0.0001f, Math.Abs(scale.Z * emitter.DrawScale)),
             Math.Max(0.0001f, Math.Abs(scale.Y * emitter.DrawScale)));
-    }
-
-    private static string BuildEmitterObjectName(SceneParticleEmitterData emitter)
-    {
-        return $"Particles_{AssetNameUtility.SanitizeName(NormalizeName(emitter.Name))}_{emitter.ExportIndex}";
     }
 
     private static IReadOnlyDictionary<string, BspTextureManager.ResolvedTexture> ResolveTextures(
@@ -494,8 +414,8 @@ internal static class L2ParticleAssetBuilder
         }
 
         return new ParticleSystem.MinMaxCurve(
-            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: false) * UnrealToUnityScale),
-            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: true) * UnrealToUnityScale));
+            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: false)),//* UnrealToUnityScale),
+            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: true)));// * UnrealToUnityScale));
     }
 
     private static ParticleSystem.MinMaxCurve BuildRotationCurve(UnrRangeVector? range)
@@ -722,37 +642,6 @@ internal static class L2ParticleAssetBuilder
     private static Quaternion ConvertEulerAngles(NumericsVector3 rotDegrees)
     {
         return Quaternion.Euler(rotDegrees.X, -rotDegrees.Y, -rotDegrees.Z);
-    }
-
-    private static string BuildLayerObjectName(string kind, SceneParticleLayerData layer)
-    {
-        return $"{kind}_{NormalizeName(layer.Name)}_{layer.ExportIndex}";
-    }
-
-    private static string NormalizeName(string? name)
-    {
-        return string.IsNullOrWhiteSpace(name) ? UnnamedObjectLabel : name.Trim();
-    }
-
-    private static bool TryBuildLayer(
-        string layerKind,
-        SceneParticleEmitterData emitter,
-        SceneParticleLayerData layer,
-        Action<string> log,
-        Func<bool> build)
-    {
-        try
-        {
-            var result = build();
-            var outcome = result ? "DONE" : "SKIP";
-            log($"[Particles] Layer {outcome} kind={layerKind} emitter={NormalizeName(emitter.Name)} emitterExportIndex={emitter.ExportIndex} layer={NormalizeName(layer.Name)} layerExportIndex={layer.ExportIndex}");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            log($"[Particles] Layer FAIL kind={layerKind} emitter={NormalizeName(emitter.Name)} emitterExportIndex={emitter.ExportIndex} layer={NormalizeName(layer.Name)} layerExportIndex={layer.ExportIndex} error={ex.GetType().Name}: {ex.Message}");
-            return false;
-        }
     }
 
     private static Color ToUnityColor(UnrFileColor color)

@@ -14,16 +14,14 @@ internal static class TerrainAssetBuilder
         var terrainData = BuildTerrainData(
             terrainImport,
             request.MapKey,
-            request.OutputDir,
-            request.TerrainHeightSmooth);
+            request.OutputDir);
         return TerrainSceneBuilder.CreateTerrainObject(request.ObjectName, terrainImport, terrainData, mapRoot);
     }
 
     public static TerrainData BuildTerrainData(
         TerrainImportData terrainImport,
         string mapKey,
-        string outputDir,
-        int terrainHeightSmooth = 0)
+        string outputDir)
     {
         var terrainRootDir = $"{outputDir}/Terrain";
         var terrainMaskPreviewDir = $"{terrainRootDir}/MaskPreviews";
@@ -37,17 +35,12 @@ internal static class TerrainAssetBuilder
             terrainImport.HeightWidth,
             terrainImport.HeightHeight);
         var usefulLayers = TerrainAlphaMapBuilder.GetUsefulLayers(terrainImport);
-        var heights = TerrainHeightMapBuilder.BuildUnityHeights(terrainImport, heightmapResolution, terrainHeightSmooth);
+        var heights = TerrainHeightMapBuilder.BuildUnityHeights(terrainImport, heightmapResolution);
         SaveHeightPreviewTexture(
             terrainImport.HeightWidth,
             terrainImport.HeightHeight,
             terrainImport.HeightSamples,
             $"{terrainHeightPreviewDir}/{mapKey}_Height_Source.png");
-        SaveHeightPreviewTexture(
-            heightmapResolution,
-            heightmapResolution,
-            heights,
-            $"{terrainHeightPreviewDir}/{mapKey}_Height_Unity_{heightmapResolution}_S{terrainHeightSmooth}.png");
         var layers = TerrainTextureAssetBuilder.BuildTerrainLayers(terrainImport, usefulLayers, mapKey, terrainMaskPreviewDir);
 
         var terrainData = new TerrainData();
