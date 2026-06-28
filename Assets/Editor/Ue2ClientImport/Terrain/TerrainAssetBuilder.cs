@@ -93,10 +93,10 @@ internal static class TerrainAssetBuilder
         {
             for (var x = 0; x < width; x++)
             {
-                var index = y * width + x;
-                holes[y, x] = index >= 0 &&
-                              index < quadMask.Bits.Length &&
-                              quadMask.Bits[index];
+                var sourceIndex = (y * width) + x;
+                holes[y, x] = sourceIndex >= 0 &&
+                              sourceIndex < quadMask.Bits.Length &&
+                              quadMask.Bits[sourceIndex];
             }
         }
 

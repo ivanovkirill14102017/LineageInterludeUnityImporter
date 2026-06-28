@@ -7,4 +7,5 @@ using System.Threading.Tasks;
     public static  class ConstInfo
     {
         public static string L2GameClientPath = @"C:\Users\User\Downloads\Lineage2_Interlude_windows10\Interlude";
+        public static string L2DbRootPath = @"C:\Users\User\Downloads\Lineage2_Interlude_windows10\data";
     }

@@ -7,7 +7,7 @@ using UnityEngine;
 
 internal static class TerrainTextureAssetBuilder
 {
-    private const float TerrainTextureSizeModifier = 0.3f;
+    private const float TerrainTextureSizeModifier = 0.15f;
     private const float UnrealToUnityScale = L2WorldScale.UnrealToUnityScale;
 
     public static TerrainLayer[] BuildTerrainLayers(

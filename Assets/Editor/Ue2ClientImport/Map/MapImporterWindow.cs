@@ -9,6 +9,7 @@ public sealed class MapImporterWindow : EditorWindow
     private const string DefaultMapRelativePath = @"Maps\20_20.unr";
 
     private string _mapRelativePath = DefaultMapRelativePath;
+    private string _dbRootPath = ConstInfo.L2DbRootPath;
     private bool _reuseExistingMaterialTextureAssets = true;
     private bool _isImportRunning;
     private string _status = "Ready to import.";
@@ -56,6 +57,7 @@ public sealed class MapImporterWindow : EditorWindow
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("Client", ConstInfo.L2GameClientPath);
+            _dbRootPath = EditorGUILayout.TextField("DB Root", _dbRootPath);
             _mapRelativePath = EditorGUILayout.TextField("Map", _mapRelativePath);
             _reuseExistingMaterialTextureAssets = EditorGUILayout.Toggle("Reuse Existing Materials/Textures", _reuseExistingMaterialTextureAssets);
             EditorGUILayout.LabelField("Output Root", MapImportPaths.OutputRoot);
@@ -94,6 +96,10 @@ public sealed class MapImporterWindow : EditorWindow
                 if (GUILayout.Button("Import Particles Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportParticlesAsync);
+                }
+                if (GUILayout.Button("Import Creatures Only", GUILayout.Height(24f)))
+                {
+                    QueueImport(ImportCreaturesAsync);
                 }
             }
         }
@@ -137,6 +143,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import all map content.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportAll(request, AppendStatus);
         }
@@ -152,6 +159,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import terrain.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportTerrain(request, AppendStatus);
         }
@@ -167,6 +175,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import meshes.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportMeshes(request, AppendStatus);
         }
@@ -182,6 +191,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import room-grouped BSP.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, _reuseExistingMaterialTextureAssets);
             await MapImportOrchestrator.ImportBsp(request, AppendStatus);
         }
@@ -197,6 +207,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import lights.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
             await MapImportOrchestrator.ImportLights(request, AppendStatus);
         }
@@ -212,6 +223,7 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import volumes.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
             await MapImportOrchestrator.ImportVolumes(request, AppendStatus);
         }
@@ -227,8 +239,25 @@ public sealed class MapImporterWindow : EditorWindow
         try
         {
             _status = "Ready to import particles.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
             await MapImportOrchestrator.ImportParticles(request, AppendStatus);
+        }
+        catch (System.Exception exception)
+        {
+            _status = exception.ToString();
+            Debug.LogException(exception);
+        }
+    }
+
+    private async Task ImportCreaturesAsync()
+    {
+        try
+        {
+            _status = "Ready to import creatures.";
+            ConstInfo.L2DbRootPath = _dbRootPath;
+            var request = MapImportRequest.FromMapRelativePath(_mapRelativePath, true);
+            await MapImportOrchestrator.ImportCreatures(request, AppendStatus);
         }
         catch (System.Exception exception)
         {
