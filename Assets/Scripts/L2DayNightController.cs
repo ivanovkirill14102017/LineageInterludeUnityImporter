@@ -21,6 +21,8 @@ public sealed class L2DayNightController : MonoBehaviour
     public bool ControlTimeOfDay = true;
     public bool AnimateTimeOfDay = false;
     public bool AnimateTimeOfDayInEditMode = false;
+    public bool RunInEditMode = false;
+    public float EditModeUpdateIntervalSeconds = 60f;
     [Range(0f, 24f)]
     public float TimeOfDayHours = 12f;
     public float DayLengthMinutes = 20f;
@@ -62,6 +64,7 @@ public sealed class L2DayNightController : MonoBehaviour
     private bool _capturedMoonYaw;
     private float _capturedSunNoonAzimuth;
     private float _capturedMoonMidnightAzimuth;
+    private double _nextEditorUpdateTime;
 
     public float CurrentTimeOfDayHours { get { return currentTimeOfDayHours; } }
     public float DayFactor { get { return dayFactor; } }
@@ -96,6 +99,11 @@ public sealed class L2DayNightController : MonoBehaviour
 
     private void Update()
     {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
         EnsureReferences();
         AdvanceTimeOfDay(GetDeltaTime(true));
         UpdateCycle();
@@ -109,6 +117,18 @@ public sealed class L2DayNightController : MonoBehaviour
             return;
         }
 
+        if (!RunInEditMode)
+        {
+            return;
+        }
+
+        var now = EditorApplication.timeSinceStartup;
+        if (now < _nextEditorUpdateTime)
+        {
+            return;
+        }
+
+        _nextEditorUpdateTime = now + Mathf.Max(0.1f, EditModeUpdateIntervalSeconds);
         EnsureReferences();
         AdvanceTimeOfDay(GetDeltaTime(false));
         UpdateCycle();

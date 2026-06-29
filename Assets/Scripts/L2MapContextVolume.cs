@@ -158,7 +158,7 @@ public sealed class L2MapContextVolume : MonoBehaviour
                 continue;
             }
 
-            candidate.RefreshContext();
+            // candidate.RefreshContext();
             if (candidate.ContainsWorldPosition(worldPosition))
             {
                 volume = candidate;

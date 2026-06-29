@@ -9,6 +9,8 @@ using UnityEngine;
 internal static class L2BspAssetBuilder
 {
     private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
+    private const uint UnknownPolyFlag02000 = 0x00002000;
+    private const uint UnknownPolyFlag08000 = 0x00008000;
 
     private sealed class BspSectionEntry
     {
@@ -211,7 +213,11 @@ internal static class L2BspAssetBuilder
                 for (var sectionIndex = 0; sectionIndex < chunk.MeshSections.Length; sectionIndex++)
                 {
                     var section = chunk.MeshSections[sectionIndex];
-                    if (section.Indices == null || section.Indices.Length == 0 || section.Positions == null || section.Positions.Length == 0)
+                    if (ShouldSkipSection(section) ||
+                        section.Indices == null ||
+                        section.Indices.Length == 0 ||
+                        section.Positions == null ||
+                        section.Positions.Length == 0)
                     {
                         continue;
                     }
@@ -267,7 +273,11 @@ internal static class L2BspAssetBuilder
                 for (var sectionIndex = 0; sectionIndex < chunk.MeshSections.Length; sectionIndex++)
                 {
                     var section = chunk.MeshSections[sectionIndex];
-                    if (section.Indices == null || section.Indices.Length == 0 || section.Positions == null || section.Positions.Length == 0)
+                    if (ShouldSkipSection(section) ||
+                        section.Indices == null ||
+                        section.Indices.Length == 0 ||
+                        section.Positions == null ||
+                        section.Positions.Length == 0)
                     {
                         continue;
                     }
@@ -585,6 +595,18 @@ internal static class L2BspAssetBuilder
         }
 
         return $"{packageName}.{objectName}";
+    }
+
+    private static bool ShouldSkipSection(SceneBspMeshSection section)
+    {
+        if ((section.KnownPolyFlags & L2Viewer.UnrFile.UnrPolyFlags.FakeBackdrop) != 0)
+        {
+            return true;
+        }
+
+        var unknownMask = section.UnknownPolyFlagsMask;
+        return (unknownMask & UnknownPolyFlag02000) != 0 &&
+               (unknownMask & UnknownPolyFlag08000) != 0;
     }
 
     private static Vector3 ConvertPosition(System.Numerics.Vector3 raw)
