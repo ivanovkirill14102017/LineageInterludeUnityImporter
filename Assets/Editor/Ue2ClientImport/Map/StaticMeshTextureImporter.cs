@@ -138,24 +138,17 @@ internal static class StaticMeshTextureImporter
             return cached;
         }
 
-        var texturePath = L2AssetManager.BuildClientPackageAssetPath(
-            textureDir,
+        var texturePath = ImportedTextureAssetUtility.BuildTextureAssetPath(textureDir, textureReference, $"{mapKey}/StaticMeshTextures");
+        var texture = ImportedTextureAssetUtility.LoadOrCreateTextureAsset(
             textureReference,
-            "TEX",
-            "png",
-            $"{mapKey}/StaticMeshTextures");
-
-        var texture = reuseExistingMaterialTextureAssets
-            ? AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
-            : null;
-
+            textureData,
+            textureDir,
+            $"{mapKey}/StaticMeshTextures",
+            traits,
+            reuseExistingMaterialTextureAssets);
         if (texture == null && textureData != null)
         {
-            texture = L2AssetManager.CreateTextureAsset(textureData, texturePath, false, StaticMeshImportUtility.NeedsAlpha(traits));
-            if (texture == null)
-            {
-                log($"[StaticMesh/Textures] Failed to create texture asset: {textureReference} -> {texturePath}");
-            }
+            log($"[StaticMesh/Textures] Failed to create texture asset: {textureReference} -> {texturePath}");
         }
 
         if (texture != null)

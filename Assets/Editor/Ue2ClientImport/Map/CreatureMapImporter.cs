@@ -25,13 +25,28 @@ internal static class CreatureMapImporter
         log("[Creatures] START Spawn analysis");
         var builder = new SceneCreatureMapBuilder();
         var spawns = builder.Build(dbRootPath, source.ClientPath, request.MapKey, source.UnrFile);
-        log($"[Creatures] DONE Spawn analysis. Found {spawns.Length} spawn records for quadrant '{request.MapKey}'.");
+        log($"[Creatures] DONE Spawn analysis. SceneDomain returned {spawns.Length} spawn records for quadrant '{request.MapKey}'.");
 
         if (spawns.Length == 0)
         {
             log("[Creatures] No creature spawns were found for the requested map.");
             return Task.CompletedTask;
         }
+
+        var selectedPrefabKeys = spawns
+            .Where(x => x != null && x.MeshResource != null && !string.IsNullOrWhiteSpace(x.MeshResource.PackagePath) && !string.IsNullOrWhiteSpace(x.MeshResource.ObjectName))
+            .GroupBy(BuildPrefabKey, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (selectedPrefabKeys.Count == 0)
+        {
+            log($"[Creatures] No valid creature prefab keys were returned by SceneDomain for map '{request.MapKey}'.");
+            return Task.CompletedTask;
+        }
+
+        var selectedSpawns = spawns
+            .Where(x => x != null && selectedPrefabKeys.Contains(BuildPrefabKey(x)))
+            .ToArray();
 
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
@@ -40,8 +55,8 @@ internal static class CreatureMapImporter
         var creatureRoot = new GameObject($"{request.ObjectName}_Creatures");
         creatureRoot.transform.SetParent(mapRoot.transform, false);
 
-        var prefabCache = BuildPrefabCache(spawns, source.ClientPath, log);
-        PlaceSpawns(spawns, creatureRoot, prefabCache, log);
+        var prefabCache = BuildPrefabCache(selectedSpawns, source.ClientPath, log);
+        PlaceSpawns(selectedSpawns, creatureRoot, prefabCache, log);
         MapImportFinalizer.Complete(mapRoot, log);
         log("[Creatures] Import finished.");
         return Task.CompletedTask;
@@ -53,7 +68,7 @@ internal static class CreatureMapImporter
         Action<string> log)
     {
         var resolver = new SceneSkeletalMeshResolver();
-        var buildContext = L2SkeletalPrefabAssetBuilder.CreateBuildContext(clientRoot);
+        var buildContext = L2SkeletalAnimatorPrefabBuilder.CreateBuildContext(clientRoot);
         var prefabCache = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
         var prefabPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var uniquePrefabs = spawns
@@ -61,8 +76,7 @@ internal static class CreatureMapImporter
             .GroupBy(BuildPrefabKey, StringComparer.OrdinalIgnoreCase)
             .Select(x => x.First())
             .ToArray();
-
-        log($"[Creatures] Building {uniquePrefabs.Length} unique prefab assets.");
+        log($"[Creatures] Preparing {uniquePrefabs.Length} prefab assets for {spawns.Count} spawn instances.");
         var buildStopwatch = Stopwatch.StartNew();
         UnityAssetDatabaseUtility.RunAssetEditingBatch(() =>
         {
@@ -70,19 +84,29 @@ internal static class CreatureMapImporter
             {
                 try
                 {
+                    var prefabKey = BuildPrefabKey(spawn);
+                    var expectedPrefabPath = BuildPrefabPath(spawn);
+                    var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(expectedPrefabPath);
+                    if (existingPrefab != null)
+                    {
+                        prefabPaths[prefabKey] = expectedPrefabPath;
+                        log($"[Creatures] Reusing existing prefab for '{spawn.DisplayName}': {expectedPrefabPath}");
+                        continue;
+                    }
+
                     var sharedAsset = resolver.ResolveAssetNamed(spawn.MeshResource.PackagePath, spawn.MeshResource.ObjectName);
-                    var build = L2SkeletalPrefabAssetBuilder.BuildFromResolvedAsset(
+                    var build = L2SkeletalAnimatorPrefabBuilder.BuildFromResolvedAsset(
                         clientRoot,
                         sharedAsset,
                         L2AssetManager.ManagedCreaturePrefabsRoot,
                         L2AssetManager.SharedSkeletalCharactersRoot,
                         spawn.MeshResource.Reference,
-                        MakeSafeAssetToken(spawn.DisplayName),
+                        prefabNameSuffix: null,
                         spawn.DisplayName,
                         log,
                         buildContext,
                         finalizeAssets: false);
-                    prefabPaths[BuildPrefabKey(spawn)] = build.PrefabPath;
+                    prefabPaths[prefabKey] = build.PrefabPath;
                 }
                 catch (Exception ex)
                 {
@@ -102,7 +126,7 @@ internal static class CreatureMapImporter
             }
         }
         buildStopwatch.Stop();
-        log($"[Creatures] Prefab batch complete. Requested={uniquePrefabs.Length}, loaded={prefabCache.Count} ({buildStopwatch.Elapsed.TotalSeconds:F2}s)");
+        log($"[Creatures] Prefab batch complete. RequestedTypes={uniquePrefabs.Length}, loaded={prefabCache.Count} ({buildStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         return prefabCache;
     }
@@ -134,7 +158,7 @@ internal static class CreatureMapImporter
                 continue;
             }
 
-            visual.name = BuildSceneObjectName(spawn);
+            visual.name = spawn.StableName;
             visual.isStatic = false;
             visual.transform.localPosition = spawn.Position.TransformFromUnrealToUnityWithScale();
             visual.transform.localRotation = ConvertHeadingToRotation(spawn.Heading);
@@ -161,28 +185,21 @@ internal static class CreatureMapImporter
         return Quaternion.Euler(0f, -yawDegrees, 0f);
     }
 
-    private static string BuildSceneObjectName(SceneCreatureSpawnData spawn)
-    {
-        var displayName = string.IsNullOrWhiteSpace(spawn.DisplayName) ? "Creature" : spawn.DisplayName.Trim();
-        return $"{spawn.SpawnLocationKey}_{spawn.SpawnId}_{displayName}";
-    }
-
     private static string BuildPrefabKey(SceneCreatureSpawnData spawn)
     {
-        return $"{spawn.VisualKey}::{spawn.DisplayName}";
+        return spawn?.MeshResource?.Reference
+            ?? spawn?.MeshResource?.ObjectName
+            ?? spawn?.VisualKey
+            ?? string.Empty;
     }
 
-    private static string MakeSafeAssetToken(string value)
+    private static string BuildPrefabPath(SceneCreatureSpawnData spawn)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "Creature";
-        }
-
-        var invalid = Path.GetInvalidFileNameChars();
-        var chars = value.Trim()
-            .Select(ch => invalid.Contains(ch) || ch == '/' || ch == '\\' || ch == ':' ? '_' : ch)
-            .ToArray();
-        return new string(chars);
+        return L2AssetManager.BuildClientPackageAssetPath(
+            L2AssetManager.ManagedCreaturePrefabsRoot,
+            spawn.MeshResource.Reference,
+            "PF",
+            "prefab",
+            "CreaturePrefabs");
     }
 }

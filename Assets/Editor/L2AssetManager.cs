@@ -88,19 +88,24 @@ internal static class L2AssetManager
 
     public static void EnsureFolderExists(string assetPath)
     {
-        if (string.IsNullOrWhiteSpace(assetPath) || AssetDatabase.IsValidFolder(assetPath)) 
+        if (string.IsNullOrWhiteSpace(assetPath)) 
             return;
-            
-        var folders = assetPath.Replace('\\', '/').Split('/');
-        string path = folders[0];
-        for (int i = 1; i < folders.Length; i++)
+
+        var normalized = assetPath.Replace('\\', '/');
+        if (AssetDatabase.IsValidFolder(normalized))
         {
-            string newPath = path + "/" + folders[i];
-            if (!AssetDatabase.IsValidFolder(newPath))
-            {
-                AssetDatabase.CreateFolder(path, folders[i]);
-            }
-            path = newPath;
+            return;
+        }
+
+        var relativePath = normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+            ? normalized.Substring("Assets/".Length)
+            : normalized.Equals("Assets", StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : normalized;
+        var absolutePath = Path.Combine(Directory.GetCurrentDirectory(), "Assets", relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!Directory.Exists(absolutePath))
+        {
+            Directory.CreateDirectory(absolutePath);
         }
     }
 
