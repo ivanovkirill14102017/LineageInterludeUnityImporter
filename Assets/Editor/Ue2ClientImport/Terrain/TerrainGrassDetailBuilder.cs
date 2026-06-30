@@ -19,6 +19,7 @@ internal static class TerrainGrassDetailBuilder
     private const float NoiseFrequency = 0.31f;
     private const float NoiseContrast = 1.35f;
     private const int BlurRadius = 2;
+    private const float MinimumTreeTerrainHeightTolerance = 1f;
     public static bool IsGrassInstance(SceneStaticMeshInstance instance)
     {
         return StaticMeshImportUtility.IsGrassInstance(instance);
@@ -27,6 +28,48 @@ internal static class TerrainGrassDetailBuilder
     public static bool IsGrassMeshReference(string meshReference)
     {
         return StaticMeshImportUtility.IsGrassMeshReference(meshReference);
+    }
+
+    public static (SceneStaticMeshInstance[] TerrainInstances, SceneStaticMeshInstance[] RegularInstances) SplitTreeInstancesByTerrainSurface(
+        IReadOnlyList<SceneStaticMeshInstance> treeInstances,
+        GameObject staticMeshRoot,
+        Action<string> log)
+    {
+        if (treeInstances == null || treeInstances.Count == 0)
+        {
+            return (Array.Empty<SceneStaticMeshInstance>(), Array.Empty<SceneStaticMeshInstance>());
+        }
+
+        var terrain = FindTerrain(staticMeshRoot);
+        if (terrain == null || terrain.terrainData == null)
+        {
+            log?.Invoke("[Terrain/Vegetation] Terrain not found while classifying trees. All tree instances will be placed as regular static meshes.");
+            return (Array.Empty<SceneStaticMeshInstance>(), treeInstances.Where(instance => instance != null).ToArray());
+        }
+
+        var terrainAccepted = new List<SceneStaticMeshInstance>(treeInstances.Count);
+        var regularFallback = new List<SceneStaticMeshInstance>();
+        var tolerance = ComputeTreeTerrainHeightTolerance(terrain.terrainData);
+
+        foreach (var instance in treeInstances)
+        {
+            if (instance == null)
+            {
+                continue;
+            }
+
+            if (IsTreeInstanceOnTerrainSurface(instance, terrain, tolerance))
+            {
+                terrainAccepted.Add(instance);
+            }
+            else
+            {
+                regularFallback.Add(instance);
+            }
+        }
+
+        log?.Invoke($"[Terrain/Vegetation] Tree terrain classification: {terrainAccepted.Count} snapped to terrain, {regularFallback.Count} kept as regular meshes. Height tolerance: {tolerance:F2}.");
+        return (terrainAccepted.ToArray(), regularFallback.ToArray());
     }
 
     public static void PopulateTerrainVegetation(
@@ -415,6 +458,49 @@ internal static class TerrainGrassDetailBuilder
             };
             treeInstances.Add(treeInstance);
         }
+    }
+
+    private static bool IsTreeInstanceOnTerrainSurface(
+        SceneStaticMeshInstance instance,
+        Terrain terrain,
+        float heightTolerance)
+    {
+        if (instance == null || terrain == null || terrain.terrainData == null)
+        {
+            return false;
+        }
+
+        var terrainData = terrain.terrainData;
+        var terrainPosition = terrain.transform.position;
+        var terrainSize = terrainData.size;
+        if (terrainSize.x <= 0f || terrainSize.z <= 0f)
+        {
+            return false;
+        }
+
+        var worldPosition = instance.WorldLocation.TransformFromUnrealToUnityWithScale();
+        var localPosition = worldPosition - terrainPosition;
+        var normalizedX = localPosition.x / terrainSize.x;
+        var normalizedZ = localPosition.z / terrainSize.z;
+        if (normalizedX < 0f || normalizedX > 1f || normalizedZ < 0f || normalizedZ > 1f)
+        {
+            return false;
+        }
+
+        var terrainSurfaceY = terrainPosition.y + terrainData.GetInterpolatedHeight(normalizedX, normalizedZ);
+        return Mathf.Abs(worldPosition.y - terrainSurfaceY) <= heightTolerance;
+    }
+
+    private static float ComputeTreeTerrainHeightTolerance(TerrainData terrainData)
+    {
+        if (terrainData == null)
+        {
+            return MinimumTreeTerrainHeightTolerance;
+        }
+
+        var heightmapScale = terrainData.heightmapScale;
+        var adaptiveTolerance = Mathf.Max(heightmapScale.x, heightmapScale.z) * 0.5f;
+        return Mathf.Max(MinimumTreeTerrainHeightTolerance, adaptiveTolerance);
     }
 
     private static void ClearManagedVegetation(TerrainData terrainData)

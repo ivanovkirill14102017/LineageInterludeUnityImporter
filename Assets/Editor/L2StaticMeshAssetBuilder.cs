@@ -86,8 +86,22 @@ internal static class L2StaticMeshAssetBuilder
         var treeInstances = instancedResult.Instances
             .Where(StaticMeshImportUtility.IsTreeInstance)
             .ToArray();
-        var treeToTerrainCount = convertTreeInstancesToTerrainVegetation ? treeInstances.Length : 0;
-        var treeAsRegularCount = convertTreeInstancesToTerrainVegetation ? 0 : treeInstances.Length;
+        SceneStaticMeshInstance[] terrainTreeInstances;
+        SceneStaticMeshInstance[] regularTreeInstances;
+        if (convertTreeInstancesToTerrainVegetation)
+        {
+            var split = TerrainGrassDetailBuilder.SplitTreeInstancesByTerrainSurface(treeInstances, parent, log);
+            terrainTreeInstances = split.TerrainInstances;
+            regularTreeInstances = split.RegularInstances;
+        }
+        else
+        {
+            terrainTreeInstances = Array.Empty<SceneStaticMeshInstance>();
+            regularTreeInstances = treeInstances;
+        }
+
+        var treeToTerrainCount = terrainTreeInstances.Length;
+        var treeAsRegularCount = regularTreeInstances.Length;
         log($"[StaticMesh/Pipeline] Regular instances: {regularInstances.Length}, grass-to-terrain instances: {grassInstances.Length}, tree-to-terrain instances: {treeToTerrainCount}, tree-as-regular instances: {treeAsRegularCount}.");
 
         if (placeRegularInstances)
@@ -95,14 +109,16 @@ internal static class L2StaticMeshAssetBuilder
             StaticMeshInstancePlacer.PlaceInstances(regularInstances, parent, prefabCache, log);
         }
 
-        if (placeTreeInstancesAsRegularInstances && treeInstances.Length > 0)
+        var shouldPlaceRegularTreeInstances = regularTreeInstances.Length > 0 &&
+                                              (placeTreeInstancesAsRegularInstances || convertTreeInstancesToTerrainVegetation);
+        if (shouldPlaceRegularTreeInstances)
         {
-            StaticMeshInstancePlacer.PlaceInstances(treeInstances, parent, prefabCache, log);
+            StaticMeshInstancePlacer.PlaceInstances(regularTreeInstances, parent, prefabCache, log);
         }
 
         TerrainGrassDetailBuilder.PopulateTerrainVegetation(
             grassInstances,
-            convertTreeInstancesToTerrainVegetation ? treeInstances : Array.Empty<SceneStaticMeshInstance>(),
+            terrainTreeInstances,
             convertTerrainDecorationsToTerrainVegetation ? instancedResult.TerrainDecorations : null,
             parent,
             meshCache,
