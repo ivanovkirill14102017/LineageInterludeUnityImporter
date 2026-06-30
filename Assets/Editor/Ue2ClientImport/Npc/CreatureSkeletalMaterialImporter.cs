@@ -10,6 +10,20 @@ using UnityEngine;
 
 internal static class CreatureSkeletalMaterialImporter
 {
+    public sealed class TextureImportPlan
+    {
+        public TextureImportPlan(string textureReference, TextureData textureData, MaterialKnownTraits traits)
+        {
+            TextureReference = textureReference;
+            TextureData = textureData;
+            Traits = traits;
+        }
+
+        public string TextureReference { get; }
+        public TextureData TextureData { get; }
+        public MaterialKnownTraits Traits { get; }
+    }
+
     public static Material[] CreateMaterials(
         L2SkeletalCharacterAsset asset,
         string referenceText,
@@ -61,21 +75,19 @@ internal static class CreatureSkeletalMaterialImporter
         return materials;
     }
 
-    private static Dictionary<string, Texture2D> ImportTextures(
+    public static List<TextureImportPlan> CollectTextureImportPlans(
         L2SkeletalCharacterAsset asset,
         string referenceText,
         Action<string> log,
         L2SkeletalAnimatorPrefabBuilder.BuildContext context)
     {
-        var result = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        var plans = new List<TextureImportPlan>();
         if (asset == null || context == null || string.IsNullOrWhiteSpace(context.ClientRoot))
         {
-            return result;
+            return plans;
         }
 
-        var textureDir = L2AssetManager.SharedTexturesRoot;
-        L2AssetManager.EnsureFolderExists(textureDir);
-
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var bindings = asset.MaterialBindings ?? Array.Empty<L2SkeletalMaterialBindingData>();
         if (bindings.Length == 0)
         {
@@ -106,22 +118,78 @@ internal static class CreatureSkeletalMaterialImporter
                 asset.PrimaryTextureReference = resolvedTexture.Reference;
             }
 
-            if (result.ContainsKey(resolvedTexture.Reference))
+            if (seen.Add(resolvedTexture.Reference))
+            {
+                plans.Add(new TextureImportPlan(resolvedTexture.Reference, resolvedTexture.Texture, resolvedTexture.Traits));
+            }
+        }
+
+        foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
+        {
+            TryCollectTextureReferencePlan(textureRef?.Reference, context.TextureManager, seen, plans);
+        }
+
+        if (!string.IsNullOrWhiteSpace(asset.PrimaryTextureReference))
+        {
+            TryCollectTextureReferencePlan(asset.PrimaryTextureReference, context.TextureManager, seen, plans);
+        }
+
+        EditorUtility.SetDirty(asset);
+        return plans;
+    }
+
+    public static void ImportTexturePlansBatch(
+        IReadOnlyCollection<TextureImportPlan> plans,
+        string textureDir)
+    {
+        if (plans == null || plans.Count == 0)
+        {
+            return;
+        }
+
+        L2AssetManager.EnsureFolderExists(textureDir);
+        foreach (var plan in plans)
+        {
+            if (plan == null || string.IsNullOrWhiteSpace(plan.TextureReference) || plan.TextureData == null)
             {
                 continue;
             }
 
-            var texture = ImportedTextureAssetUtility.LoadOrCreateTextureAsset(
-                resolvedTexture.Reference,
-                resolvedTexture.Texture,
-                textureDir,
-                "SkeletalTextures",
-                resolvedTexture.Traits,
-                reuseExisting: true);
-            if (texture != null)
+            var texturePath = ImportedTextureAssetUtility.BuildTextureAssetPath(textureDir, plan.TextureReference, "SkeletalTextures");
+            var existingTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (existingTexture != null)
             {
-                result[resolvedTexture.Reference] = texture;
+                continue;
             }
+
+            L2AssetManager.WriteTextureAssetFile(
+                plan.TextureData,
+                texturePath,
+                false,
+                StaticMeshImportUtility.NeedsAlpha(plan.Traits));
+        }
+    }
+
+    private static Dictionary<string, Texture2D> ImportTextures(
+        L2SkeletalCharacterAsset asset,
+        string referenceText,
+        Action<string> log,
+        L2SkeletalAnimatorPrefabBuilder.BuildContext context)
+    {
+        var result = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        if (asset == null || context == null || string.IsNullOrWhiteSpace(context.ClientRoot))
+        {
+            return result;
+        }
+
+        var textureDir = L2AssetManager.SharedTexturesRoot;
+        L2AssetManager.EnsureFolderExists(textureDir);
+
+        PrimeExistingTextureAssets(asset, textureDir, result);
+        if (result.Count == 0)
+        {
+            CollectTextureImportPlans(asset, referenceText, log, context);
+            PrimeExistingTextureAssets(asset, textureDir, result);
         }
 
         foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
@@ -199,6 +267,38 @@ internal static class CreatureSkeletalMaterialImporter
         }
 
         TryUseExistingTextureAsset(asset.PrimaryTextureReference, textureDir, result);
+    }
+
+    private static void TryCollectTextureReferencePlan(
+        string textureReference,
+        BspTextureManager textureManager,
+        HashSet<string> seen,
+        List<TextureImportPlan> plans)
+    {
+        if (string.IsNullOrWhiteSpace(textureReference) || textureManager == null || seen == null || plans == null || !seen.Add(textureReference))
+        {
+            return;
+        }
+
+        if (!TryParseTextureReference(textureReference, out var packageName, out var objectName))
+        {
+            return;
+        }
+
+        var resolvedTexture = textureManager.ResolveMany(new[]
+        {
+            new SceneTextureRequest(packageName, objectName)
+        });
+        if (!resolvedTexture.TryGetValue(textureReference, out var textureEntry) || textureEntry?.Texture == null)
+        {
+            var directKey = $"{packageName}.{objectName}";
+            if (!resolvedTexture.TryGetValue(directKey, out textureEntry) || textureEntry?.Texture == null)
+            {
+                return;
+            }
+        }
+
+        plans.Add(new TextureImportPlan(textureReference, textureEntry.Texture, traits: null));
     }
 
     private static void TryImportTextureReference(

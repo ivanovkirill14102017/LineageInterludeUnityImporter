@@ -71,6 +71,8 @@ internal static class CreatureMapImporter
         var buildContext = L2SkeletalAnimatorPrefabBuilder.CreateBuildContext(clientRoot);
         var prefabCache = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
         var prefabPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var preparedBuilds = new List<(string PrefabKey, string DisplayName, L2SkeletalAnimatorPrefabBuilder.PreparedBuildData Build)>();
+        var texturePlansByReference = new Dictionary<string, CreatureSkeletalMaterialImporter.TextureImportPlan>(StringComparer.OrdinalIgnoreCase);
         var uniquePrefabs = spawns
             .Where(x => x != null && x.MeshResource != null && !string.IsNullOrWhiteSpace(x.MeshResource.PackagePath) && !string.IsNullOrWhiteSpace(x.MeshResource.ObjectName))
             .GroupBy(BuildPrefabKey, StringComparer.OrdinalIgnoreCase)
@@ -98,24 +100,83 @@ internal static class CreatureMapImporter
                 }
 
                 var sharedAsset = resolver.ResolveAssetNamed(spawn.MeshResource.PackagePath, spawn.MeshResource.ObjectName);
-                var build = L2SkeletalAnimatorPrefabBuilder.BuildFromResolvedAsset(
+                var prepared = L2SkeletalAnimatorPrefabBuilder.PrepareFromResolvedAsset(
                     clientRoot,
                     sharedAsset,
                     L2AssetManager.ManagedCreaturePrefabsRoot,
                     L2AssetManager.SharedSkeletalCharactersRoot,
                     spawn.MeshResource.Reference,
-                    prefabNameSuffix: null,
-                    spawn.DisplayName,
                     log,
                     buildContext,
-                    finalizeAssets: false);
-                prefabPaths[prefabKey] = build.PrefabPath;
+                    includeMaterials: false);
+                var texturePlans = CreatureSkeletalMaterialImporter.CollectTextureImportPlans(
+                    prepared.CharacterAsset,
+                    prepared.ReferenceText,
+                    log,
+                    buildContext);
+                foreach (var texturePlan in texturePlans)
+                {
+                    if (texturePlan != null && !string.IsNullOrWhiteSpace(texturePlan.TextureReference))
+                    {
+                        texturePlansByReference[texturePlan.TextureReference] = texturePlan;
+                    }
+                }
+
+                preparedBuilds.Add((prefabKey, spawn.DisplayName, prepared));
             }
             catch (Exception ex)
             {
                 log($"[Creatures] Failed to build prefab for '{spawn.DisplayName}' ({spawn.MeshResource.Reference}): {ex.Message}");
             }
         }
+
+        CreatureSkeletalMaterialImporter.ImportTexturePlansBatch(
+            texturePlansByReference.Values.ToArray(),
+            L2AssetManager.SharedTexturesRoot);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        UnityAssetDatabaseUtility.RunAssetEditingBatch(() =>
+        {
+            for (var i = 0; i < preparedBuilds.Count; i++)
+            {
+                try
+                {
+                    var preparedWithMaterials = L2SkeletalAnimatorPrefabBuilder.MaterializePreparedBuildMaterials(
+                        preparedBuilds[i].Build,
+                        log);
+                    preparedBuilds[i] = (preparedBuilds[i].PrefabKey, preparedBuilds[i].DisplayName, preparedWithMaterials);
+                }
+                catch (Exception ex)
+                {
+                    log($"[Creatures] Failed to build materials for '{preparedBuilds[i].DisplayName}' ({preparedBuilds[i].Build.ReferenceText}): {ex.Message}");
+                }
+            }
+        });
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        UnityAssetDatabaseUtility.RunAssetEditingBatch(() =>
+        {
+            foreach (var preparedBuild in preparedBuilds)
+            {
+                try
+                {
+                    var build = L2SkeletalAnimatorPrefabBuilder.CompletePreparedBuild(
+                        preparedBuild.Build,
+                        prefabNameSuffix: null,
+                        displayLabel: preparedBuild.DisplayName,
+                        log,
+                        finalizeAssets: false);
+                    prefabPaths[preparedBuild.PrefabKey] = build.PrefabPath;
+                }
+                catch (Exception ex)
+                {
+                    log($"[Creatures] Failed to complete prefab build for '{preparedBuild.DisplayName}' ({preparedBuild.Build.ReferenceText}): {ex.Message}");
+                }
+            }
+        });
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();

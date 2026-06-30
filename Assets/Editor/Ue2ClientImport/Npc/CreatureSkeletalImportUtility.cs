@@ -330,7 +330,7 @@ internal static class CreatureSkeletalImportUtility
 
     public static Vector3 ToUnityPosition(Vector3 value)
     {
-        return new Vector3(value.x, value.z, -value.y);
+        return new Vector3(value.x, value.z, -value.y) * ImportedCreatureScale;
     }
 
     public static Quaternion ToUnityRotation(System.Numerics.Quaternion value)

@@ -18,6 +18,13 @@ internal static class L2AssetManager
 
     public static Texture2D CreateTextureAsset(TextureData textureData, string assetPath, bool linear, bool generateAlphaIfMissing = false)
     {
+        WriteTextureAssetFile(textureData, assetPath, linear, generateAlphaIfMissing);
+        AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+    }
+
+    public static void WriteTextureAssetFile(TextureData textureData, string assetPath, bool linear, bool generateAlphaIfMissing = false)
+    {
         if (textureData == null)
             throw new InvalidOperationException($"Could not decode texture asset: {assetPath}");
 
@@ -82,8 +89,6 @@ internal static class L2AssetManager
         byte[] pngBytes = texture.EncodeToPNG();
         File.WriteAllBytes(assetPath, pngBytes);
         UnityEngine.Object.DestroyImmediate(texture); // Prevent memory leak which causes PNG encoding to fail
-        AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
     }
 
     public static void EnsureFolderExists(string assetPath)
