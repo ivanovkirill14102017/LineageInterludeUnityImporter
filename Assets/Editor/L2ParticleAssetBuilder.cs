@@ -5,6 +5,8 @@ using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
 using L2Viewer.UnrFile;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using UnityEditor;
 using UnityEngine;
 using NumericsVector3 = System.Numerics.Vector3;
@@ -13,6 +15,11 @@ internal static class L2ParticleAssetBuilder
 {
     private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
     private const float NeutralParticleStartSize = 1f;
+    private static readonly JsonSerializerSettings DiagnosticJsonSettings = new()
+    {
+        Formatting = Formatting.Indented,
+        ContractResolver = new ParticleDiagnosticContractResolver()
+    };
 
     public static void BuildParticles(
         SceneParticleEmitterData[] emitters,
@@ -39,6 +46,7 @@ internal static class L2ParticleAssetBuilder
             var emitterRoot = new GameObject(emitter.StableName);
             emitterRoot.transform.SetParent(parent.transform, false);
             ApplyEmitterTransform(emitterRoot.transform, emitter);
+            AttachDiagnostic(emitterRoot, BuildEmitterDiagnosticJson(emitter));
 
             foreach (var layer in emitter.Layers.OrderBy(x => x.ExportIndex))
             {
@@ -47,7 +55,7 @@ internal static class L2ParticleAssetBuilder
 
             foreach (var layer in emitter.MeshLayers.OrderBy(x => x.ExportIndex))
             {
-                BuildMeshLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform);
+                BuildMeshLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, log);
             }
 
             foreach (var layer in emitter.VertMeshLayers.OrderBy(x => x.ExportIndex))
@@ -76,7 +84,8 @@ internal static class L2ParticleAssetBuilder
         Transform parent,
         ISet<string> missingTextureReferences)
     {
-        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Billboard);
+        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ResolveSpriteRenderMode(layer.UseDirectionAs));
+        AttachDiagnostic(particleSystem.gameObject, BuildSpriteLayerDiagnosticJson(layer));
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -94,6 +103,7 @@ internal static class L2ParticleAssetBuilder
             startLocationRange: null,
             sphereRadiusRange: null,
             particleMaterial: ResolveParticleMaterial(layer.TextureReference, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences),
+            alignment: ResolveSpriteAlignment(layer.UseDirectionAs),
             sizeScale: layer.UseSizeScale ? layer.SizeScale : Array.Empty<UnrParticleSizeScale>());
         return true;
     }
@@ -104,9 +114,17 @@ internal static class L2ParticleAssetBuilder
         IReadOnlyDictionary<string, BspTextureManager.ResolvedTexture> resolvedTextures,
         IDictionary<string, Texture2D> textureAssets,
         IDictionary<string, Material> materialAssets,
-        Transform parent)
+        Transform parent,
+        Action<string> log)
     {
-        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Billboard);
+        var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Mesh);
+        AttachDiagnostic(particleSystem.gameObject, BuildMeshLayerDiagnosticJson(layer));
+        if (!TryResolveMeshEmitterAsset(layer.StaticMeshReference, out var mesh, out var material, out var resolvedAssetPath))
+        {
+            log($"[Particles/MeshEmitter] Missing mesh asset for '{layer.StableName}' ref='{layer.StaticMeshReference ?? "<null>"}'. Layer left as diagnostic-only placeholder.");
+            return false;
+        }
+
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -118,12 +136,26 @@ internal static class L2ParticleAssetBuilder
             layer.StartVelocityRange,
             acceleration: null,
             layer.StartSizeRange,
-            startSpinRange: null,
+            layer.StartSpinRange,
             layer.SpinParticles,
             layer.SpinsPerSecondRange,
             startLocationRange: null,
             sphereRadiusRange: null,
-            particleMaterial: ResolveParticleMaterial(null, outputDir, resolvedTextures, textureAssets, materialAssets));
+            particleMaterial: material,
+            alignment: ParticleSystemRenderSpace.Local);
+
+        var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+        renderer.mesh = mesh;
+        renderer.sharedMaterial = material;
+        if (layer.RenderTwoSided && material != null && material.HasProperty("_Cull"))
+        {
+            material.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+        }
+
+        if (!string.IsNullOrWhiteSpace(resolvedAssetPath))
+        {
+            AttachDiagnostic(particleSystem.gameObject, BuildMeshLayerDiagnosticJson(layer, resolvedAssetPath));
+        }
         return true;
     }
 
@@ -136,6 +168,7 @@ internal static class L2ParticleAssetBuilder
         Transform parent)
     {
         var particleSystem = CreateParticleSystemObject( layer.StableName, parent, ParticleSystemRenderMode.Billboard);
+        AttachDiagnostic(particleSystem.gameObject, BuildVertMeshLayerDiagnosticJson(layer));
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -152,7 +185,8 @@ internal static class L2ParticleAssetBuilder
             layer.RevolutionsPerSecondRange,
             layer.StartLocationRange,
             sphereRadiusRange: null,
-            particleMaterial: ResolveParticleMaterial(null, outputDir, resolvedTextures, textureAssets, materialAssets));
+            particleMaterial: ResolveParticleMaterial(null, outputDir, resolvedTextures, textureAssets, materialAssets),
+            alignment: ParticleSystemRenderSpace.View);
         return true;
     }
 
@@ -166,6 +200,7 @@ internal static class L2ParticleAssetBuilder
         ISet<string> missingTextureReferences)
     {
         var particleSystem = CreateParticleSystemObject(layer.StableName, parent, ParticleSystemRenderMode.Stretch);
+        AttachDiagnostic(particleSystem.gameObject, BuildBeamLayerDiagnosticJson(layer));
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -182,7 +217,8 @@ internal static class L2ParticleAssetBuilder
             spinsPerSecondRange: null,
             layer.StartLocationRange,
             layer.SphereRadiusRange,
-            particleMaterial: ResolveParticleMaterial(layer.TextureReference, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences));
+            particleMaterial: ResolveParticleMaterial(layer.TextureReference, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences),
+            alignment: ParticleSystemRenderSpace.View);
         return true;
     }
 
@@ -203,6 +239,7 @@ internal static class L2ParticleAssetBuilder
         UnrRangeVector? startLocationRange,
         UnrFloatRange? sphereRadiusRange,
         Material particleMaterial,
+        ParticleSystemRenderSpace alignment,
         UnrParticleSizeScale[]? sizeScale = null)
     {
         var lifetimeMin = lifetimeRange?.Min ?? 1f;
@@ -245,7 +282,7 @@ internal static class L2ParticleAssetBuilder
 
         var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
         renderer.sharedMaterial = particleMaterial;
-        renderer.alignment = ParticleSystemRenderSpace.View;
+        renderer.alignment = alignment;
         renderer.sortMode = ParticleSystemSortMode.Distance;
         renderer.minParticleSize = 0.0001f;
         renderer.maxParticleSize = 0.5f;
@@ -414,8 +451,8 @@ internal static class L2ParticleAssetBuilder
         }
 
         return new ParticleSystem.MinMaxCurve(
-            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: false)),//* UnrealToUnityScale),
-            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: true)));// * UnrealToUnityScale));
+            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: false) * UnrealToUnityScale),
+            Math.Max(0.001f, ComputeScalarRangeValue(range, useMax: true) * UnrealToUnityScale));
     }
 
     private static ParticleSystem.MinMaxCurve BuildRotationCurve(UnrRangeVector? range)
@@ -425,8 +462,8 @@ internal static class L2ParticleAssetBuilder
             return new ParticleSystem.MinMaxCurve(0f, 0f);
         }
 
-        var min = ComputeZRangeValue(range, useMax: false) * Mathf.PI * 2f;
-        var max = ComputeZRangeValue(range, useMax: true) * Mathf.PI * 2f;
+        var min = ComputeDominantAxisValue(range, useMax: false) * Mathf.PI * 2f;
+        var max = ComputeDominantAxisValue(range, useMax: true) * Mathf.PI * 2f;
         return new ParticleSystem.MinMaxCurve(min, max);
     }
 
@@ -577,9 +614,11 @@ internal static class L2ParticleAssetBuilder
             alphaKeys.Add(new GradientAlphaKey(0f, 1f));
         }
 
+        var normalizedColorKeys = NormalizeGradientColorKeys(colorKeys);
+        var normalizedAlphaKeys = NormalizeGradientAlphaKeys(alphaKeys);
         gradient.SetKeys(
-            colorKeys.OrderBy(x => x.time).ToArray(),
-            alphaKeys.OrderBy(x => x.time).ToArray());
+            normalizedColorKeys,
+            normalizedAlphaKeys);
         colorOverLifetime.enabled = true;
         colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
     }
@@ -617,8 +656,8 @@ internal static class L2ParticleAssetBuilder
         rotationOverLifetime.enabled = true;
         rotationOverLifetime.separateAxes = false;
         rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(
-            ComputeZRangeValue(spinsPerSecondRange, useMax: false) * Mathf.PI * 2f,
-            ComputeZRangeValue(spinsPerSecondRange, useMax: true) * Mathf.PI * 2f);
+            ComputeDominantAxisValue(spinsPerSecondRange, useMax: false) * Mathf.PI * 2f,
+            ComputeDominantAxisValue(spinsPerSecondRange, useMax: true) * Mathf.PI * 2f);
     }
 
     private static float ComputeScalarRangeValue(UnrRangeVector range, bool useMax)
@@ -629,9 +668,96 @@ internal static class L2ParticleAssetBuilder
         return Math.Max(Math.Abs(x), Math.Max(Math.Abs(y), Math.Abs(z)));
     }
 
-    private static float ComputeZRangeValue(UnrRangeVector range, bool useMax)
+    private static float ComputeDominantAxisValue(UnrRangeVector range, bool useMax)
     {
-        return useMax ? range.Z.Max : range.Z.Min;
+        var x = useMax ? range.X.Max : range.X.Min;
+        var y = useMax ? range.Y.Max : range.Y.Min;
+        var z = useMax ? range.Z.Max : range.Z.Min;
+
+        var absX = Math.Abs(x);
+        var absY = Math.Abs(y);
+        var absZ = Math.Abs(z);
+        if (absX >= absY && absX >= absZ)
+        {
+            return x;
+        }
+
+        if (absY >= absX && absY >= absZ)
+        {
+            return y;
+        }
+
+        return z;
+    }
+
+    private static GradientColorKey[] NormalizeGradientColorKeys(IEnumerable<GradientColorKey> keys)
+    {
+        var ordered = keys
+            .GroupBy(x => Mathf.Clamp01(x.time))
+            .OrderBy(x => x.Key)
+            .Select(x => new GradientColorKey(x.Last().color, x.Key))
+            .ToList();
+        if (ordered.Count == 0)
+        {
+            ordered.Add(new GradientColorKey(Color.white, 0f));
+            ordered.Add(new GradientColorKey(Color.white, 1f));
+        }
+
+        return DownsampleGradientKeys(
+            ordered,
+            maxKeys: 8,
+            firstFactory: key => new GradientColorKey(key.color, key.time),
+            lastFactory: key => new GradientColorKey(key.color, key.time),
+            middleFactory: key => new GradientColorKey(key.color, key.time));
+    }
+
+    private static GradientAlphaKey[] NormalizeGradientAlphaKeys(IEnumerable<GradientAlphaKey> keys)
+    {
+        var ordered = keys
+            .GroupBy(x => Mathf.Clamp01(x.time))
+            .OrderBy(x => x.Key)
+            .Select(x => new GradientAlphaKey(x.Last().alpha, x.Key))
+            .ToList();
+        if (ordered.Count == 0)
+        {
+            ordered.Add(new GradientAlphaKey(1f, 0f));
+            ordered.Add(new GradientAlphaKey(1f, 1f));
+        }
+
+        return DownsampleGradientKeys(
+            ordered,
+            maxKeys: 8,
+            firstFactory: key => new GradientAlphaKey(key.alpha, key.time),
+            lastFactory: key => new GradientAlphaKey(key.alpha, key.time),
+            middleFactory: key => new GradientAlphaKey(key.alpha, key.time));
+    }
+
+    private static TKey[] DownsampleGradientKeys<TKey>(
+        IReadOnlyList<TKey> ordered,
+        int maxKeys,
+        Func<TKey, TKey> firstFactory,
+        Func<TKey, TKey> lastFactory,
+        Func<TKey, TKey> middleFactory)
+    {
+        if (ordered.Count <= maxKeys)
+        {
+            return ordered.ToArray();
+        }
+
+        var result = new List<TKey>(maxKeys)
+        {
+            firstFactory(ordered[0])
+        };
+
+        var middleSlots = maxKeys - 2;
+        for (var i = 0; i < middleSlots; i++)
+        {
+            var sampleIndex = 1 + (int)Math.Round((ordered.Count - 3) * (i / (double)Math.Max(1, middleSlots - 1)));
+            result.Add(middleFactory(ordered[sampleIndex]));
+        }
+
+        result.Add(lastFactory(ordered[ordered.Count - 1]));
+        return result.ToArray();
     }
 
     private static Vector3 ConvertPosition(NumericsVector3 raw)
@@ -647,5 +773,130 @@ internal static class L2ParticleAssetBuilder
     private static Color ToUnityColor(UnrFileColor color)
     {
         return new Color32(color.R, color.G, color.B, color.A);
+    }
+
+    private static bool TryResolveMeshEmitterAsset(string? staticMeshReference, out Mesh mesh, out Material material, out string resolvedAssetPath)
+    {
+        mesh = null;
+        material = null;
+        resolvedAssetPath = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(staticMeshReference))
+        {
+            return false;
+        }
+
+        var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
+            L2AssetManager.ManagedStaticMeshPrefabsRoot,
+            staticMeshReference,
+            "PF",
+            "prefab",
+            "StaticMeshPrefabs");
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        if (prefab != null)
+        {
+            var meshFilter = prefab.GetComponentInChildren<MeshFilter>();
+            var meshRenderer = prefab.GetComponentInChildren<MeshRenderer>();
+            if (meshFilter != null && meshFilter.sharedMesh != null && meshRenderer != null && meshRenderer.sharedMaterials.Length > 0)
+            {
+                mesh = meshFilter.sharedMesh;
+                material = meshRenderer.sharedMaterials.FirstOrDefault(x => x != null);
+                resolvedAssetPath = prefabPath;
+                return mesh != null && material != null;
+            }
+        }
+
+        var meshPath = L2AssetManager.BuildClientPackageAssetPath(
+            L2AssetManager.SharedStaticMeshesRoot,
+            staticMeshReference,
+            "SM",
+            "asset",
+            "StaticMeshes");
+        mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+        resolvedAssetPath = meshPath;
+        return false;
+    }
+
+    private static ParticleSystemRenderMode ResolveSpriteRenderMode(byte? useDirectionAs)
+    {
+        return useDirectionAs == 4
+            ? ParticleSystemRenderMode.HorizontalBillboard
+            : ParticleSystemRenderMode.Billboard;
+    }
+
+    private static ParticleSystemRenderSpace ResolveSpriteAlignment(byte? useDirectionAs)
+    {
+        return useDirectionAs == 4
+            ? ParticleSystemRenderSpace.World
+            : ParticleSystemRenderSpace.View;
+    }
+
+    private static void AttachDiagnostic(GameObject target, string jsonText)
+    {
+        if (target == null || string.IsNullOrWhiteSpace(jsonText))
+        {
+            return;
+        }
+
+        var diagnostic = target.GetComponent<L2JsonDiagnosticData>();
+        if (diagnostic == null)
+        {
+            diagnostic = target.AddComponent<L2JsonDiagnosticData>();
+        }
+
+        diagnostic.JsonText = jsonText;
+    }
+
+    private static string BuildEmitterDiagnosticJson(SceneParticleEmitterData emitter)
+    {
+        return SerializeRawDiagnostic(emitter);
+    }
+
+    private static string BuildSpriteLayerDiagnosticJson(SceneSpriteEmitterLayerData layer)
+    {
+        return SerializeRawDiagnostic(layer);
+    }
+
+    private static string BuildMeshLayerDiagnosticJson(SceneMeshEmitterLayerData layer, string? resolvedAssetPath = null)
+    {
+        return SerializeRawDiagnostic(layer);
+    }
+
+    private static string BuildVertMeshLayerDiagnosticJson(SceneVertMeshEmitterLayerData layer)
+    {
+        return SerializeRawDiagnostic(layer);
+    }
+
+    private static string BuildBeamLayerDiagnosticJson(SceneBeamEmitterLayerData layer)
+    {
+        return SerializeRawDiagnostic(layer);
+    }
+
+    private static string SerializeRawDiagnostic<T>(T value)
+    {
+        return JsonConvert.SerializeObject(value, DiagnosticJsonSettings);
+    }
+
+    private sealed class ParticleDiagnosticContractResolver : DefaultContractResolver
+    {
+        protected override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization)
+        {
+            var properties = base.CreateProperties(type, memberSerialization);
+            if (type == typeof(UnrParticleColorScale))
+            {
+                return properties
+                    .Where(x => !string.Equals(x.PropertyName, nameof(UnrParticleColorScale.RawHex), StringComparison.Ordinal))
+                    .ToList();
+            }
+
+            if (type == typeof(UnrParticleSizeScale))
+            {
+                return properties
+                    .Where(x => !string.Equals(x.PropertyName, nameof(UnrParticleSizeScale.RawHex), StringComparison.Ordinal))
+                    .ToList();
+            }
+
+            return properties;
+        }
     }
 }

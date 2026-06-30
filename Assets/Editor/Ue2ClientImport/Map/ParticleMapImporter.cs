@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.UnrFile;
 using UnityEngine;
 
 internal static class ParticleMapImporter
@@ -23,6 +26,8 @@ internal static class ParticleMapImporter
             return;
         }
 
+        EnsureParticleMeshDependencies(request, source, emitters, log);
+
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         var particlesRootName = $"{request.ObjectName}_Particles";
         UnitySceneObjectUtility.RemoveExistingObject(particlesRootName);
@@ -33,5 +38,83 @@ internal static class ParticleMapImporter
         L2ParticleAssetBuilder.BuildParticles(emitters, source.ClientPath, request.OutputDir, particlesRoot, log);
 
         MapImportFinalizer.Complete(mapRoot, log);
+    }
+
+    private static void EnsureParticleMeshDependencies(
+        MapImportRequest request,
+        Ue2MapSource source,
+        SceneParticleEmitterData[] emitters,
+        Action<string> log)
+    {
+        var meshReferences = emitters
+            .SelectMany(x => x.MeshLayers)
+            .Select(x => x.StaticMeshReference)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (meshReferences.Length == 0)
+        {
+            return;
+        }
+
+        var textureManager = new BspTextureManager(source.ClientPath);
+        var meshResolver = new SceneStaticMeshResolver(source.ClientPath, textureManager);
+        var unresolvedReferences = meshReferences
+            .Select(TryParseStaticMeshReference)
+            .Where(x => x is not null)
+            .Cast<UnrFileObjectReference>()
+            .ToArray();
+        if (unresolvedReferences.Length == 0)
+        {
+            return;
+        }
+
+        IReadOnlyDictionary<string, SceneStaticMeshDefinition> resolvedDefinitions;
+        try
+        {
+            resolvedDefinitions = meshResolver.ResolveMany(source.UnrFile.FilePath, unresolvedReferences);
+        }
+        catch (Exception ex)
+        {
+            log($"[Particles/MeshEmitter] Failed to resolve dependent mesh assets: {ex.Message}");
+            return;
+        }
+
+        if (resolvedDefinitions.Count == 0)
+        {
+            return;
+        }
+
+        L2StaticMeshAssetBuilder.EnsureStaticMeshPrefabs(
+            resolvedDefinitions,
+            source.ClientPath,
+            request.MapKey,
+            log,
+            request.ReuseExistingMaterialTextureAssets);
+    }
+
+    private static UnrFileObjectReference? TryParseStaticMeshReference(string? meshReference)
+    {
+        if (string.IsNullOrWhiteSpace(meshReference))
+        {
+            return null;
+        }
+
+        try
+        {
+            var parsed = SceneReferenceUtilities.ParseFromDbResourceReference(meshReference);
+            return new UnrFileObjectReference
+            {
+                RawReference = 0,
+                Kind = UnrFileReferenceKind.Import,
+                ClassName = "StaticMesh",
+                ObjectName = parsed.ObjectName,
+                PackageName = parsed.PackageName
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

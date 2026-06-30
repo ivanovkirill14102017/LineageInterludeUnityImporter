@@ -9,6 +9,47 @@ using UnityEngine;
 
 internal static class L2StaticMeshAssetBuilder
 {
+    public static IReadOnlyDictionary<string, GameObject> EnsureStaticMeshPrefabs(
+        IReadOnlyDictionary<string, SceneStaticMeshDefinition> meshDefinitions,
+        string clientPath,
+        string mapKey,
+        Action<string> log,
+        bool reuseExistingMaterialTextureAssets = true)
+    {
+        if (meshDefinitions == null || meshDefinitions.Count == 0)
+        {
+            return new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var meshDir = L2AssetManager.SharedStaticMeshesRoot;
+        var prefabDir = L2AssetManager.ManagedStaticMeshPrefabsRoot;
+        var materialDir = L2AssetManager.SharedMaterialsRoot;
+        var textureDir = L2AssetManager.SharedTexturesRoot;
+        EnsureStaticMeshAssetFolders(meshDir, prefabDir, materialDir, textureDir);
+
+        var filteredDefinitions = StaticMeshImportUtility.FilterMeshDefinitions(meshDefinitions);
+        var shader = StaticMeshImportUtility.FindDefaultShader();
+
+        log($"[StaticMesh/Ensure] Importing {filteredDefinitions.Count} mesh definitions for dependent assets.");
+
+        var textureCatalog = StaticMeshTextureImporter.ImportTextures(
+            filteredDefinitions,
+            clientPath,
+            mapKey,
+            textureDir,
+            reuseExistingMaterialTextureAssets,
+            log);
+        var materialCatalog = StaticMeshMaterialImporter.ImportMaterials(
+            filteredDefinitions,
+            mapKey,
+            materialDir,
+            shader,
+            textureCatalog,
+            reuseExistingMaterialTextureAssets);
+        var meshCache = BuildMeshAssets(filteredDefinitions, meshDir, mapKey);
+        return BuildPrefabAssets(meshCache, materialCatalog, prefabDir);
+    }
+
     public static void BuildStaticMeshes(
         SceneInstancedMeshResult instancedResult,
         GameObject parent,
@@ -27,10 +68,7 @@ internal static class L2StaticMeshAssetBuilder
         var prefabDir = L2AssetManager.ManagedStaticMeshPrefabsRoot;
         var materialDir = L2AssetManager.SharedMaterialsRoot;
         var textureDir = L2AssetManager.SharedTexturesRoot;
-        L2AssetManager.EnsureFolderExists(meshDir);
-        L2AssetManager.EnsureFolderExists(prefabDir);
-        L2AssetManager.EnsureFolderExists(materialDir);
-        L2AssetManager.EnsureFolderExists(textureDir);
+        EnsureStaticMeshAssetFolders(meshDir, prefabDir, materialDir, textureDir);
 
         var meshDefinitions = StaticMeshImportUtility.FilterMeshDefinitions(instancedResult.UniqueMeshes);
         var shader = StaticMeshImportUtility.FindDefaultShader();
@@ -133,6 +171,14 @@ internal static class L2StaticMeshAssetBuilder
         }
         placementStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Instance placement ({placementStopwatch.Elapsed.TotalSeconds:F2}s)");
+    }
+
+    private static void EnsureStaticMeshAssetFolders(string meshDir, string prefabDir, string materialDir, string textureDir)
+    {
+        L2AssetManager.EnsureFolderExists(meshDir);
+        L2AssetManager.EnsureFolderExists(prefabDir);
+        L2AssetManager.EnsureFolderExists(materialDir);
+        L2AssetManager.EnsureFolderExists(textureDir);
     }
 
     private static Dictionary<string, GameObject> BuildPrefabAssets(
