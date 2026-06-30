@@ -9,7 +9,7 @@ internal static class L2AssetManager
 {
     public static string SharedPackagesRoot => $"{MapImportPaths.OutputRoot}/ClientPackages";
     public static string SharedStaticMeshesRoot => $"{SharedPackagesRoot}/StaticMeshes";
-    public static string SharedSkeletalCharactersRoot => $"{SharedPackagesRoot}/SkeletalCharacters";
+    public static string SharedSkeletalCharactersRoot => SharedPackagesRoot;
     public static string ManagedStaticMeshPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshPrefabs";
     public static string ManagedCreaturePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/CreaturePrefabs";
     public static string SharedMaterialsRoot => $"{SharedPackagesRoot}/Materials";

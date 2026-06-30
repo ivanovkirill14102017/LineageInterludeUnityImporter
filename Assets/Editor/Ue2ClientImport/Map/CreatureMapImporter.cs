@@ -78,42 +78,44 @@ internal static class CreatureMapImporter
             .ToArray();
         log($"[Creatures] Preparing {uniquePrefabs.Length} prefab assets for {spawns.Count} spawn instances.");
         var buildStopwatch = Stopwatch.StartNew();
-        UnityAssetDatabaseUtility.RunAssetEditingBatch(() =>
+        foreach (var spawn in uniquePrefabs)
         {
-            foreach (var spawn in uniquePrefabs)
+            try
             {
-                try
+                var prefabKey = BuildPrefabKey(spawn);
+                var expectedPrefabPath = BuildPrefabPath(spawn);
+                var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(expectedPrefabPath);
+                if (existingPrefab != null && ShouldReuseExistingPrefab(existingPrefab, spawn))
                 {
-                    var prefabKey = BuildPrefabKey(spawn);
-                    var expectedPrefabPath = BuildPrefabPath(spawn);
-                    var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(expectedPrefabPath);
-                    if (existingPrefab != null)
-                    {
-                        prefabPaths[prefabKey] = expectedPrefabPath;
-                        log($"[Creatures] Reusing existing prefab for '{spawn.DisplayName}': {expectedPrefabPath}");
-                        continue;
-                    }
+                    prefabPaths[prefabKey] = expectedPrefabPath;
+                    log($"[Creatures] Reusing existing prefab for '{spawn.DisplayName}': {expectedPrefabPath}");
+                    continue;
+                }
 
-                    var sharedAsset = resolver.ResolveAssetNamed(spawn.MeshResource.PackagePath, spawn.MeshResource.ObjectName);
-                    var build = L2SkeletalAnimatorPrefabBuilder.BuildFromResolvedAsset(
-                        clientRoot,
-                        sharedAsset,
-                        L2AssetManager.ManagedCreaturePrefabsRoot,
-                        L2AssetManager.SharedSkeletalCharactersRoot,
-                        spawn.MeshResource.Reference,
-                        prefabNameSuffix: null,
-                        spawn.DisplayName,
-                        log,
-                        buildContext,
-                        finalizeAssets: false);
-                    prefabPaths[prefabKey] = build.PrefabPath;
-                }
-                catch (Exception ex)
+                if (existingPrefab != null)
                 {
-                    log($"[Creatures] Failed to build prefab for '{spawn.DisplayName}' ({spawn.MeshResource.Reference}): {ex.Message}");
+                    log($"[Creatures] Rebuilding prefab for '{spawn.DisplayName}' because cached materials are invalid or stale.");
                 }
+
+                var sharedAsset = resolver.ResolveAssetNamed(spawn.MeshResource.PackagePath, spawn.MeshResource.ObjectName);
+                var build = L2SkeletalAnimatorPrefabBuilder.BuildFromResolvedAsset(
+                    clientRoot,
+                    sharedAsset,
+                    L2AssetManager.ManagedCreaturePrefabsRoot,
+                    L2AssetManager.SharedSkeletalCharactersRoot,
+                    spawn.MeshResource.Reference,
+                    prefabNameSuffix: null,
+                    spawn.DisplayName,
+                    log,
+                    buildContext,
+                    finalizeAssets: false);
+                prefabPaths[prefabKey] = build.PrefabPath;
             }
-        });
+            catch (Exception ex)
+            {
+                log($"[Creatures] Failed to build prefab for '{spawn.DisplayName}' ({spawn.MeshResource.Reference}): {ex.Message}");
+            }
+        }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -129,6 +131,82 @@ internal static class CreatureMapImporter
         log($"[Creatures] Prefab batch complete. RequestedTypes={uniquePrefabs.Length}, loaded={prefabCache.Count} ({buildStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         return prefabCache;
+    }
+
+    private static bool ShouldReuseExistingPrefab(GameObject prefab, SceneCreatureSpawnData spawn)
+    {
+        if (prefab == null || spawn?.MeshResource == null)
+        {
+            return false;
+        }
+
+        var characterAssetPath = L2AssetManager.BuildClientPackageAssetPath(
+            L2AssetManager.SharedSkeletalCharactersRoot,
+            spawn.MeshResource.Reference,
+            "NPC",
+            "asset",
+            "SkeletalCharacters");
+        var characterAsset = AssetDatabase.LoadAssetAtPath<L2SkeletalCharacterAsset>(characterAssetPath);
+        if (characterAsset == null)
+        {
+            return false;
+        }
+
+        if (!CharacterAssetExpectsTextures(characterAsset))
+        {
+            return true;
+        }
+
+        var renderer = prefab.GetComponentInChildren<SkinnedMeshRenderer>(true);
+        if (renderer == null || renderer.sharedMaterials == null || renderer.sharedMaterials.Length == 0)
+        {
+            return false;
+        }
+
+        return renderer.sharedMaterials.All(MaterialHasRenderableTexture);
+    }
+
+    private static bool CharacterAssetExpectsTextures(L2SkeletalCharacterAsset asset)
+    {
+        if (asset == null)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(asset.PrimaryTextureReference))
+        {
+            return true;
+        }
+
+        if ((asset.MaterialBindings ?? Array.Empty<L2SkeletalMaterialBindingData>())
+            .Any(x => x != null && !string.IsNullOrWhiteSpace(x.TextureReference)))
+        {
+            return true;
+        }
+
+        return (asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
+            .Any(x => x != null && !string.IsNullOrWhiteSpace(x.Reference));
+    }
+
+    private static bool MaterialHasRenderableTexture(Material material)
+    {
+        if (material == null || material.shader == null)
+        {
+            return false;
+        }
+
+        if (string.Equals(material.shader.name, "Hidden/InternalErrorShader", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var texturePropertyName = L2MaterialUtility.GetPrimaryTexturePropertyName(material);
+        if (!material.HasProperty(texturePropertyName))
+        {
+            return false;
+        }
+
+        return material.GetTexture(texturePropertyName) != null;
     }
 
     private static void PlaceSpawns(

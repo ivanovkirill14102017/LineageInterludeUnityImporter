@@ -134,6 +134,8 @@ internal static class CreatureSkeletalMaterialImporter
             TryImportTextureReference(asset.PrimaryTextureReference, context.TextureManager, textureDir, result);
         }
 
+        PrimeExistingTextureAssets(asset, textureDir, result);
+
         return result;
     }
 
@@ -176,6 +178,29 @@ internal static class CreatureSkeletalMaterialImporter
         return null;
     }
 
+    private static void PrimeExistingTextureAssets(
+        L2SkeletalCharacterAsset asset,
+        string textureDir,
+        Dictionary<string, Texture2D> result)
+    {
+        if (asset == null || result == null)
+        {
+            return;
+        }
+
+        foreach (var binding in asset.MaterialBindings ?? Array.Empty<L2SkeletalMaterialBindingData>())
+        {
+            TryUseExistingTextureAsset(binding?.TextureReference, textureDir, result);
+        }
+
+        foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
+        {
+            TryUseExistingTextureAsset(textureRef?.Reference, textureDir, result);
+        }
+
+        TryUseExistingTextureAsset(asset.PrimaryTextureReference, textureDir, result);
+    }
+
     private static void TryImportTextureReference(
         string textureReference,
         BspTextureManager textureManager,
@@ -187,11 +212,8 @@ internal static class CreatureSkeletalMaterialImporter
             return;
         }
 
-        var texturePath = ImportedTextureAssetUtility.BuildTextureAssetPath(textureDir, textureReference, "SkeletalTextures");
-        var existingTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
-        if (existingTexture != null)
+        if (TryUseExistingTextureAsset(textureReference, textureDir, result))
         {
-            result[textureReference] = existingTexture;
             return;
         }
 
@@ -224,6 +246,27 @@ internal static class CreatureSkeletalMaterialImporter
         {
             result[textureReference] = texture;
         }
+    }
+
+    private static bool TryUseExistingTextureAsset(
+        string textureReference,
+        string textureDir,
+        Dictionary<string, Texture2D> result)
+    {
+        if (string.IsNullOrWhiteSpace(textureReference) || result.ContainsKey(textureReference))
+        {
+            return false;
+        }
+
+        var texturePath = ImportedTextureAssetUtility.BuildTextureAssetPath(textureDir, textureReference, "SkeletalTextures");
+        var existingTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+        if (existingTexture == null)
+        {
+            return false;
+        }
+
+        result[textureReference] = existingTexture;
+        return true;
     }
 
     private static bool TryParseTextureReference(string textureReference, out string packageName, out string objectName)
