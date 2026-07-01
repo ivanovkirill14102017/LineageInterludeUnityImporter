@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using L2Viewer.UtxFile;
 using UnityEditor;
 using UnityEngine;

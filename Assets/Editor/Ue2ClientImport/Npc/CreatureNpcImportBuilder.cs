@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.CharacterServices;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;

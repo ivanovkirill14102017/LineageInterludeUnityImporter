@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using UnityEngine;
 
 internal sealed class StaticMeshTextureCatalog

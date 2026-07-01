@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.CharacterServices;
 using UnityEditor;
 using UnityEngine;
 

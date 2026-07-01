@@ -4,6 +4,7 @@ using System.Linq;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.CharacterServices;
 using UnityEngine;
 
 using QuaternionN = System.Numerics.Quaternion;
@@ -41,6 +42,12 @@ public static class L2SceneSkeletalAssetBridge
             UsedTextures = (asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
                 .Select(x => new MaterialTextureInfo(x.Reference ?? string.Empty, x.ResolvedPackagePath))
                 .ToArray(),
+            RoutingProfiles = Array.Empty<SceneSkeletalAnimationRoutingProfile>(),
+            ConsumerWarnings = new[]
+            {
+                "Routing metadata is not embedded in Unity imported shared skeletal assets."
+            },
+            RequiresExplicitConsumerRouting = true,
             Skeleton = new SceneSkeletalSkeleton
             {
                 Name = asset.MeshObjectName ?? asset.CharacterName ?? "Skeleton",
@@ -119,11 +126,18 @@ public static class L2SceneSkeletalAssetBridge
                     .Select(x => new SceneSkeletalAnimationSequence
                     {
                         Name = x.Name ?? string.Empty,
+                        NormalizedName = NormalizeSequenceName(x.Name),
+                        Category = ClassifySequenceCategory(x.Name),
                         TotalBones = x.TotalBones,
                         TrackTime = x.TrackTime,
                         AnimRate = x.AnimRate,
                         FirstRawFrame = x.FirstRawFrame,
-                        NumRawFrames = x.NumRawFrames
+                        NumRawFrames = x.NumRawFrames,
+                        SuggestedLoop = IsSuggestedLoop(x.Name),
+                        IsOneShot = IsOneShot(x.Name),
+                        RequiresExplicitRouting = IsUnknownSequence(x.Name),
+                        SuggestedNextSequenceNames = BuildSuggestedNextSequenceNames(x.Name, asset.AnimationSequences ?? Array.Empty<L2SkeletalAnimationSequenceData>()),
+                        Notifies = Array.Empty<SceneSkeletalAnimationNotify>()
                     })
                     .ToArray(),
                 Keys = (asset.AnimationKeys ?? Array.Empty<L2SkeletalAnimationKeyData>())
@@ -215,6 +229,151 @@ public static class L2SceneSkeletalAssetBridge
 
         ApplyMeshData(mesh, meshData);
         return mesh;
+    }
+
+    private static string NormalizeSequenceName(string name)
+    {
+        return string.IsNullOrWhiteSpace(name)
+            ? string.Empty
+            : name.Trim().ToLowerInvariant();
+    }
+
+    private static string ClassifySequenceCategory(string name)
+    {
+        var normalized = NormalizeSequenceName(name);
+        if (normalized.Length == 0)
+        {
+            return "unknown";
+        }
+
+        if (normalized.Contains("deathwait", StringComparison.OrdinalIgnoreCase))
+        {
+            return "death_hold";
+        }
+
+        if (normalized.Contains("death", StringComparison.OrdinalIgnoreCase))
+        {
+            return "death";
+        }
+
+        if (normalized.StartsWith("social", StringComparison.OrdinalIgnoreCase))
+        {
+            return "social";
+        }
+
+        if (normalized.Contains("spwait", StringComparison.OrdinalIgnoreCase))
+        {
+            return "combat_skill_idle";
+        }
+
+        if (normalized.Contains("atkwait", StringComparison.OrdinalIgnoreCase))
+        {
+            return "combat_idle";
+        }
+
+        if (normalized == "wait" || normalized.EndsWith("wait", StringComparison.OrdinalIgnoreCase))
+        {
+            return "idle";
+        }
+
+        if (normalized.Contains("run", StringComparison.OrdinalIgnoreCase))
+        {
+            return "run";
+        }
+
+        if (normalized.Contains("walk", StringComparison.OrdinalIgnoreCase))
+        {
+            return "walk";
+        }
+
+        if (normalized.StartsWith("spatk", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("cast", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("spell", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("magic", StringComparison.OrdinalIgnoreCase))
+        {
+            return "skill";
+        }
+
+        if (normalized.StartsWith("atk", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("attack", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("strike", StringComparison.OrdinalIgnoreCase))
+        {
+            return "attack";
+        }
+
+        return "unknown";
+    }
+
+    private static bool IsSuggestedLoop(string name)
+    {
+        switch (ClassifySequenceCategory(name))
+        {
+            case "idle":
+            case "walk":
+            case "run":
+            case "combat_idle":
+            case "combat_skill_idle":
+            case "death_hold":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsOneShot(string name)
+    {
+        switch (ClassifySequenceCategory(name))
+        {
+            case "attack":
+            case "skill":
+            case "social":
+            case "death":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsUnknownSequence(string name)
+    {
+        return string.Equals(ClassifySequenceCategory(name), "unknown", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<string> BuildSuggestedNextSequenceNames(string name, IReadOnlyList<L2SkeletalAnimationSequenceData> sequences)
+    {
+        var sequenceNames = sequences
+            .Select(x => x?.Name)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToArray();
+
+        switch (ClassifySequenceCategory(name))
+        {
+            case "attack":
+                return PreferSequences(sequenceNames, "atkwait", "wait");
+            case "skill":
+                return PreferSequences(sequenceNames, "spwait01", "atkwait", "wait");
+            case "social":
+                return PreferSequences(sequenceNames, "wait");
+            case "death":
+                return PreferSequences(sequenceNames, "deathwait");
+            default:
+                return Array.Empty<string>();
+        }
+    }
+
+    private static string[] PreferSequences(IReadOnlyList<string> sequenceNames, params string[] candidates)
+    {
+        var result = new List<string>(candidates.Length);
+        foreach (var candidate in candidates)
+        {
+            var match = sequenceNames.FirstOrDefault(x => string.Equals(x, candidate, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(match))
+            {
+                result.Add(match);
+            }
+        }
+
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public static void ApplyMeshData(Mesh mesh, MeshData meshData)

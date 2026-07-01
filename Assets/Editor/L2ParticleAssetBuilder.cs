@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using L2Viewer.UnrFile;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;

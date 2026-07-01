@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.MaterialServices;
+using L2Viewer.SceneDomain.Services.Utility;
 using L2Viewer.UnrFile;
 using UnityEngine;
 

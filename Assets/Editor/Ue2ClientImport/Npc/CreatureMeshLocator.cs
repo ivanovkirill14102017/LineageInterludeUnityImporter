@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.CharacterServices;
 
 internal static class CreatureMeshLocator
 {

@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.BSPServices;
 using UnityEngine;
 
 internal static class BspMapImporter

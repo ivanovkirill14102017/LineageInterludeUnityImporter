@@ -176,7 +176,7 @@ internal static class L2AssetManager
         return fallback ?? "ImportedAsset";
     }
 
-    public static void ApplyMaterialTraits(Material material, L2Viewer.SceneDomain.Services.MaterialKnownTraits traits, bool isHdrp)
+    public static void ApplyMaterialTraits(Material material, L2Viewer.SceneDomain.Services.MaterialServices.MaterialKnownTraits traits, bool isHdrp)
     {
         material.enableInstancing = true;
 
@@ -199,7 +199,7 @@ internal static class L2AssetManager
             }
         }
 
-        if (traits == null || traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Unknown)
+        if (traits == null || traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Unknown)
             return;
 
         if (traits.TwoSided == true)
@@ -217,12 +217,12 @@ internal static class L2AssetManager
             material.doubleSidedGI = true;
         }
 
-        if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Masked || traits.HasMaskInput)
+        if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Masked || traits.HasMaskInput)
         {
             L2MaterialUtility.ConfigureCutout(material);
         }
 
-        if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Translucent)
+        if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Translucent)
         {
             L2MaterialUtility.ConfigureTransparent(
                 material,
@@ -230,7 +230,7 @@ internal static class L2AssetManager
                 UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha,
                 premultiplyKeyword: pipeline == L2MaterialUtility.PipelineKind.Legacy);
         }
-        else if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Additive)
+        else if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Additive)
         {
             L2MaterialUtility.ConfigureTransparent(
                 material,
@@ -238,7 +238,7 @@ internal static class L2AssetManager
                 UnityEngine.Rendering.BlendMode.One,
                 premultiplyKeyword: pipeline == L2MaterialUtility.PipelineKind.Legacy);
         }
-        else if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Modulated)
+        else if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Modulated)
         {
             L2MaterialUtility.ConfigureTransparent(
                 material,
@@ -250,13 +250,13 @@ internal static class L2AssetManager
 
         if (pipeline == L2MaterialUtility.PipelineKind.HighDefinition)
         {
-            if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Translucent ||
-                traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Modulated)
+            if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Translucent ||
+                traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Modulated)
             {
                 material.SetFloat("_BlendMode", 0f);
             }
 
-            if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Additive)
+            if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Additive)
             {
                 material.SetFloat("_BlendMode", 2f);
                 material.EnableKeyword("_BLENDMODE_ADD");

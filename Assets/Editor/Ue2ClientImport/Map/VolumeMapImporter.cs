@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using L2Viewer.UnrFile;
 using UnityEngine;
 
@@ -54,7 +55,7 @@ internal static class VolumeMapImporter
             .Where(w => w.TextureReference?.PackageName != null && !string.IsNullOrWhiteSpace(w.TextureReference.ObjectName))
             .Select(w => new { Ref = w.TextureReference, Key = $"{w.TextureReference.PackageName}.{w.TextureReference.ObjectName}" })
             .GroupBy(x => x.Key)
-            .Select(g => new L2Viewer.SceneDomain.Services.SceneTextureRequest(g.First().Ref.PackageName, g.First().Ref.ObjectName))
+            .Select(g => new L2Viewer.SceneDomain.Services.MaterialServices.SceneTextureRequest(g.First().Ref.PackageName, g.First().Ref.ObjectName))
             .ToList();
 
         var resolvedDict = textureManager.ResolveMany(refs);

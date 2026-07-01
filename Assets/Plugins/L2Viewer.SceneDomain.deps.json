@@ -1,0 +1,178 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.1/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.1": {},
+    ".NETStandard,Version=v2.1/": {
+      "L2Viewer.SceneDomain/1.0.0": {
+        "dependencies": {
+          "L2Viewer.DatFile": "1.0.0",
+          "L2Viewer.DbFile": "1.0.0",
+          "L2Viewer.PackageCore": "1.0.0",
+          "L2Viewer.SceneDTO": "1.0.0",
+          "L2Viewer.UkxFile": "1.0.0",
+          "L2Viewer.UnrFile": "1.0.0",
+          "L2Viewer.UsxFile": "1.0.0",
+          "L2Viewer.UtxFile": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.SceneDomain.dll": {}
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {
+        "runtime": {
+          "lib/netstandard2.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.1.25517"
+          }
+        }
+      },
+      "L2Viewer.DatFile/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.DatFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.DbFile/1.0.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1"
+        },
+        "runtime": {
+          "L2Viewer.DbFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.PackageCore/1.0.0": {
+        "runtime": {
+          "L2Viewer.PackageCore.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.SceneDTO/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0",
+          "L2Viewer.UkxFile": "1.0.0",
+          "L2Viewer.UnrFile": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.SceneDTO.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.UkxFile/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0",
+          "L2Viewer.UtxFile": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.UkxFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.UnrFile/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.UnrFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.UsxFile/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0",
+          "L2Viewer.UtxFile": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.UsxFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "L2Viewer.UtxFile/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.UtxFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "L2Viewer.SceneDomain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Newtonsoft.Json/13.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A==",
+      "path": "newtonsoft.json/13.0.1",
+      "hashPath": "newtonsoft.json.13.0.1.nupkg.sha512"
+    },
+    "L2Viewer.DatFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.DbFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.PackageCore/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.SceneDTO/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UkxFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UnrFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UsxFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UtxFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

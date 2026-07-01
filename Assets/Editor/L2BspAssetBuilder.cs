@@ -49,8 +49,8 @@ internal static class L2BspAssetBuilder
         var shader = L2MaterialUtility.FindBestLitShader();
 
         var clientPath = ConstInfo.L2GameClientPath;
-        var textureManager = new L2Viewer.SceneDomain.Services.BspTextureManager(clientPath);
-        var materialResolver = new L2Viewer.SceneDomain.Services.SceneMaterialResolver(clientPath, textureManager);
+        var textureManager = new L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager(clientPath);
+        var materialResolver = new L2Viewer.SceneDomain.Services.MaterialServices.SceneMaterialResolver(clientPath, textureManager);
 
         log($"Building {assetSubdirName} BSP with {bspScene.Models.Length} models...");
 
@@ -126,7 +126,7 @@ internal static class L2BspAssetBuilder
 
     private static Dictionary<string, Mesh> BuildMeshAssets(
         IReadOnlyList<BspSectionEntry> sectionEntries,
-        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch)
+        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch)
     {
         var meshAssets = new Dictionary<string, Mesh>(StringComparer.OrdinalIgnoreCase);
 
@@ -145,7 +145,7 @@ internal static class L2BspAssetBuilder
 
     private static Dictionary<string, Material> BuildMaterialAssets(
         IReadOnlyList<BspSectionEntry> sectionEntries,
-        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
+        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
         string mapKey,
         string materialDir,
         string textureDir,
@@ -302,9 +302,9 @@ internal static class L2BspAssetBuilder
         return entries;
     }
 
-    private static List<L2Viewer.SceneDomain.Services.SceneMaterialRequest> CollectMaterialRequests(L2Viewer.SceneDomain.Models.SceneBspScene bspScene)
+    private static List<L2Viewer.SceneDomain.Services.MaterialServices.SceneMaterialRequest> CollectMaterialRequests(L2Viewer.SceneDomain.Models.SceneBspScene bspScene)
     {
-        var materialRefs = new List<L2Viewer.SceneDomain.Services.SceneMaterialRequest>();
+        var materialRefs = new List<L2Viewer.SceneDomain.Services.MaterialServices.SceneMaterialRequest>();
 
         foreach (var model in bspScene.Models)
         {
@@ -324,7 +324,7 @@ internal static class L2BspAssetBuilder
                 {
                     if (!string.IsNullOrEmpty(section.MaterialPackageName) || !string.IsNullOrEmpty(section.MaterialObjectName))
                     {
-                        materialRefs.Add(new L2Viewer.SceneDomain.Services.SceneMaterialRequest(section.MaterialPackageName, section.MaterialObjectName));
+                        materialRefs.Add(new L2Viewer.SceneDomain.Services.MaterialServices.SceneMaterialRequest(section.MaterialPackageName, section.MaterialObjectName));
                     }
                 }
             }
@@ -333,10 +333,10 @@ internal static class L2BspAssetBuilder
         return materialRefs;
     }
 
-    private static List<L2Viewer.SceneDomain.Services.SceneTextureRequest> CollectTextureRequests(
+    private static List<L2Viewer.SceneDomain.Services.MaterialServices.SceneTextureRequest> CollectTextureRequests(
         IReadOnlyDictionary<string, L2Viewer.UtxFile.ResolvedMaterialGraph> resolvedMaterialsBatch)
     {
-        var textureRefs = new List<L2Viewer.SceneDomain.Services.SceneTextureRequest>();
+        var textureRefs = new List<L2Viewer.SceneDomain.Services.MaterialServices.SceneTextureRequest>();
         if (resolvedMaterialsBatch == null)
         {
             return textureRefs;
@@ -353,7 +353,7 @@ internal static class L2BspAssetBuilder
             {
                 if (!string.IsNullOrEmpty(slot.PackageName) || !string.IsNullOrEmpty(slot.ObjectName))
                 {
-                    textureRefs.Add(new L2Viewer.SceneDomain.Services.SceneTextureRequest(slot.PackageName, slot.ObjectName));
+                    textureRefs.Add(new L2Viewer.SceneDomain.Services.MaterialServices.SceneTextureRequest(slot.PackageName, slot.ObjectName));
                 }
             }
         }
@@ -366,7 +366,7 @@ internal static class L2BspAssetBuilder
         return $"{meshDir}/{modelName}_{chunkName}_{sectionName}.asset";
     }
 
-    private static Mesh BuildSectionMesh(L2Viewer.SceneDomain.Models.SceneBspMeshSection section, L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial, System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch, string sectionName)
+    private static Mesh BuildSectionMesh(L2Viewer.SceneDomain.Models.SceneBspMeshSection section, L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial, System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch, string sectionName)
     {
         var mesh = new Mesh
         {
@@ -383,7 +383,7 @@ internal static class L2BspAssetBuilder
         return mesh;
     }
 
-    private static Vector2[] BuildSectionUvs(L2Viewer.SceneDomain.Models.SceneBspMeshSection section, L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial, System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch)
+    private static Vector2[] BuildSectionUvs(L2Viewer.SceneDomain.Models.SceneBspMeshSection section, L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial, System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch)
     {
         if (section.TextureCoordinates == null || section.TextureCoordinates.Length == 0)
         {
@@ -432,7 +432,7 @@ internal static class L2BspAssetBuilder
     private static Material BuildSectionMaterial(
         L2Viewer.SceneDomain.Models.SceneBspMeshSection section,
         L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial,
-        System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
+        System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
         string mapKey,
         string materialDir,
         string textureDir,
@@ -444,7 +444,7 @@ internal static class L2BspAssetBuilder
     {
         var traits = resolvedMaterial == null
             ? null
-            : L2Viewer.SceneDomain.Services.MaterialHeuristics.GetKnownTraits(resolvedMaterial);
+            : L2Viewer.SceneDomain.Services.MaterialServices.MaterialHeuristics.GetKnownTraits(resolvedMaterial);
         var blendHint = traits?.BlendModeHint.ToString() ?? "Opaque";
         var materialKey = $"{section.MaterialReference ?? section.StableName}_{blendHint}";
         if (materialCache.TryGetValue(materialKey, out var cached))
@@ -501,11 +501,11 @@ internal static class L2BspAssetBuilder
     private static (Texture2D Texture, string Reference) ResolveDirectGraphTexture(
         L2Viewer.SceneDomain.Models.SceneBspMeshSection section,
         L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial,
-        System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
+        System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
         string mapKey,
         string textureDir,
         Dictionary<string, Texture2D> textureCache,
-        L2Viewer.SceneDomain.Services.MaterialKnownTraits traits,
+        L2Viewer.SceneDomain.Services.MaterialServices.MaterialKnownTraits traits,
         Action<string> log,
         bool reuseExistingMaterialTextureAssets)
     {
@@ -573,16 +573,16 @@ internal static class L2BspAssetBuilder
         return (texture, reference);
     }
 
-    private static bool NeedsAlpha(L2Viewer.SceneDomain.Services.MaterialKnownTraits traits)
+    private static bool NeedsAlpha(L2Viewer.SceneDomain.Services.MaterialServices.MaterialKnownTraits traits)
     {
         if (traits == null)
         {
             return false;
         }
 
-        return traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Translucent ||
-               traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Additive ||
-               traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialBlendModeHint.Modulated ||
+        return traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Translucent ||
+               traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Additive ||
+               traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Modulated ||
                traits.HasOpacityInput ||
                traits.HasMaskInput;
     }

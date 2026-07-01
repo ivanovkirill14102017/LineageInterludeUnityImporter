@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.CharacterServices;
 using UnityEngine;
 
 #if UNITY_EDITOR
