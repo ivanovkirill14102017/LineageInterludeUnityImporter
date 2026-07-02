@@ -72,7 +72,7 @@ internal static class L2LightAssetBuilder
     {
         if (lightData.Directional)
         {
-            return LightType.Directional;
+            return LightType.Point;
         }
 
         if (lightData.Cone is > 0f)

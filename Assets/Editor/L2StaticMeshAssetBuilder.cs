@@ -128,7 +128,7 @@ internal static class L2StaticMeshAssetBuilder
         SceneStaticMeshInstance[] regularTreeInstances;
         if (convertTreeInstancesToTerrainVegetation)
         {
-            var split = TerrainGrassDetailBuilder.SplitTreeInstancesByTerrainSurface(treeInstances, parent, log);
+            var split = TerrainGrassDetailBuilder.SplitTreeInstancesByTerrainSurface(treeInstances, meshCache, parent, log);
             terrainTreeInstances = split.TerrainInstances;
             regularTreeInstances = split.RegularInstances;
         }

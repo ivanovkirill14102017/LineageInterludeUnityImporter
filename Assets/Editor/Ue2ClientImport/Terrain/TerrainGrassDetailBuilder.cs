@@ -20,6 +20,7 @@ internal static class TerrainGrassDetailBuilder
     private const float NoiseContrast = 1.35f;
     private const int BlurRadius = 2;
     private const float MinimumTreeTerrainHeightTolerance = 1f;
+    private const float MaximumTerrainTreeHeightMeters = 10f;
     public static bool IsGrassInstance(SceneStaticMeshInstance instance)
     {
         return StaticMeshImportUtility.IsGrassInstance(instance);
@@ -32,6 +33,7 @@ internal static class TerrainGrassDetailBuilder
 
     public static (SceneStaticMeshInstance[] TerrainInstances, SceneStaticMeshInstance[] RegularInstances) SplitTreeInstancesByTerrainSurface(
         IReadOnlyList<SceneStaticMeshInstance> treeInstances,
+        IReadOnlyDictionary<string, Mesh> meshCache,
         GameObject staticMeshRoot,
         Action<string> log)
     {
@@ -50,6 +52,7 @@ internal static class TerrainGrassDetailBuilder
         var terrainAccepted = new List<SceneStaticMeshInstance>(treeInstances.Count);
         var regularFallback = new List<SceneStaticMeshInstance>();
         var tolerance = ComputeTreeTerrainHeightTolerance(terrain.terrainData);
+        var oversizedTreeCount = 0;
 
         foreach (var instance in treeInstances)
         {
@@ -58,7 +61,12 @@ internal static class TerrainGrassDetailBuilder
                 continue;
             }
 
-            if (IsTreeInstanceOnTerrainSurface(instance, terrain, tolerance))
+            if (IsTreeTooTallForTerrain(instance, meshCache))
+            {
+                oversizedTreeCount++;
+                regularFallback.Add(instance);
+            }
+            else if (IsTreeInstanceOnTerrainSurface(instance, terrain, tolerance))
             {
                 terrainAccepted.Add(instance);
             }
@@ -68,7 +76,7 @@ internal static class TerrainGrassDetailBuilder
             }
         }
 
-        log?.Invoke($"[Terrain/Vegetation] Tree terrain classification: {terrainAccepted.Count} snapped to terrain, {regularFallback.Count} kept as regular meshes. Height tolerance: {tolerance:F2}.");
+        log?.Invoke($"[Terrain/Vegetation] Tree terrain classification: {terrainAccepted.Count} snapped to terrain, {regularFallback.Count} kept as regular meshes. Height tolerance: {tolerance:F2}. Oversized trees forced to regular meshes: {oversizedTreeCount} (height > {MaximumTerrainTreeHeightMeters:F1}m).");
         return (terrainAccepted.ToArray(), regularFallback.ToArray());
     }
 
@@ -489,6 +497,24 @@ internal static class TerrainGrassDetailBuilder
 
         var terrainSurfaceY = terrainPosition.y + terrainData.GetInterpolatedHeight(normalizedX, normalizedZ);
         return Mathf.Abs(worldPosition.y - terrainSurfaceY) <= heightTolerance;
+    }
+
+    private static bool IsTreeTooTallForTerrain(
+        SceneStaticMeshInstance instance,
+        IReadOnlyDictionary<string, Mesh> meshCache)
+    {
+        if (instance == null ||
+            meshCache == null ||
+            string.IsNullOrWhiteSpace(instance.MeshReference) ||
+            !meshCache.TryGetValue(instance.MeshReference, out var mesh) ||
+            mesh == null)
+        {
+            return false;
+        }
+
+        var scaleY = Math.Abs(instance.Scale.Z);
+        var treeHeight = mesh.bounds.size.y * Mathf.Max(0.0001f, scaleY);
+        return treeHeight > MaximumTerrainTreeHeightMeters;
     }
 
     private static float ComputeTreeTerrainHeightTolerance(TerrainData terrainData)
