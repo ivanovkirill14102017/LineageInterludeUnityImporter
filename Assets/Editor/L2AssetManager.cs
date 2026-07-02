@@ -12,6 +12,7 @@ internal static class L2AssetManager
     public static string SharedSkeletalCharactersRoot => SharedPackagesRoot;
     public static string ManagedStaticMeshPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshPrefabs";
     public static string ManagedCreaturePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/CreaturePrefabs";
+    public static string ManagedPlayerCharacterPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/PlayerCharacterPrefabs";
     public static string SharedMaterialsRoot => $"{SharedPackagesRoot}/Materials";
     public static string SharedTexturesRoot => $"{SharedPackagesRoot}/Textures";
     public static string SharedTerrainLayersRoot => $"{SharedPackagesRoot}/TerrainLayers";
