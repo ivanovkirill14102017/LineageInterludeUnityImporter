@@ -44,7 +44,7 @@ internal static class StaticMeshInstancePlacer
             visual.name = instance.StableName;
             visual.isStatic = true;
             visual.transform.localPosition = instance.WorldLocation.TransformFromUnrealToUnityWithScale();
-            visual.transform.localRotation = instance.RotationEulerDegrees.ToEulerAngles();
+            visual.transform.localRotation = instance.UnrealRotationRaw.ToUnityRotationFromUnrealRotator();
             visual.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
             ApplyPrePivotOffset(visual.transform, instance);
 
@@ -84,7 +84,7 @@ internal static class StaticMeshInstancePlacer
         visual.name = instance.StableName;
         visual.isStatic = true;
         visual.transform.localPosition = instance.WorldLocation.TransformFromUnrealToUnityWithScale();
-        visual.transform.localRotation = instance.RotationEulerDegrees.ToEulerAngles();
+        visual.transform.localRotation = instance.UnrealRotationRaw.ToUnityRotationFromUnrealRotator();
         visual.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
 
         log?.Invoke($"[StaticMesh/Override] Replaced '{instance.MeshReference}' with Default_Flame01 override prefab.");
