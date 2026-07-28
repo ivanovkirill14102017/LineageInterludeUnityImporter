@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Services;
 using L2Viewer.SceneDomain.Services.MaterialServices;
@@ -37,6 +38,11 @@ internal static class CreatureSkeletalMaterialImporter
         var errorShader = Shader.Find("Hidden/InternalErrorShader");
         var materialIds = CreatureSkeletalImportUtility.GetMaterialIds(asset);
         var materials = new Material[materialIds.Length];
+        var importedPlans = CollectTextureImportPlans(asset, referenceText, log, context);
+        var traitsByReference = importedPlans
+            .Where(x => x != null && !string.IsNullOrWhiteSpace(x.TextureReference) && x.Traits != null)
+            .GroupBy(x => x.TextureReference, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First().Traits, StringComparer.OrdinalIgnoreCase);
 
         for (var i = 0; i < materialIds.Length; i++)
         {
@@ -54,10 +60,21 @@ internal static class CreatureSkeletalMaterialImporter
             };
 
             var subMeshTexture = ResolveTextureForMaterial(asset, materialId, textures);
+            if (subMeshTexture == null &&
+                TryInferTextureForMaterial(asset, materialId, context.TextureManager, out var inferredReference, out subMeshTexture))
+            {
+                textures[inferredReference] = subMeshTexture;
+            }
+
             if (subMeshTexture != null)
             {
                 L2MaterialUtility.AssignMainTexture(material, subMeshTexture);
                 L2MaterialUtility.SetBaseColor(material, Color.white);
+                var traits = ResolveTraitsForMaterial(asset, materialId, traitsByReference);
+                if (traits != null)
+                {
+                    L2AssetManager.ApplyMaterialTraits(material, traits, L2MaterialUtility.IsHdrp(shader));
+                }
             }
             else
             {
@@ -206,6 +223,142 @@ internal static class CreatureSkeletalMaterialImporter
         PrimeExistingTextureAssets(asset, textureDir, result);
 
         return result;
+    }
+
+    private static MaterialKnownTraits ResolveTraitsForMaterial(
+        L2SkeletalCharacterAsset asset,
+        int materialId,
+        IReadOnlyDictionary<string, MaterialKnownTraits> traitsByReference)
+    {
+        if (asset?.MaterialBindings != null)
+        {
+            var binding = asset.MaterialBindings.FirstOrDefault(
+                x => x != null && x.MaterialId == materialId && !string.IsNullOrWhiteSpace(x.TextureReference));
+            if (binding != null &&
+                traitsByReference != null &&
+                traitsByReference.TryGetValue(binding.TextureReference, out var bindingTraits))
+            {
+                return bindingTraits;
+            }
+        }
+
+        foreach (var textureRef in asset?.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
+        {
+            if (textureRef != null &&
+                !string.IsNullOrWhiteSpace(textureRef.Reference) &&
+                traitsByReference != null &&
+                traitsByReference.TryGetValue(textureRef.Reference, out var usedTraits))
+            {
+                return usedTraits;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryInferTextureForMaterial(
+        L2SkeletalCharacterAsset asset,
+        int materialId,
+        BspTextureManager textureManager,
+        out string textureReference,
+        out Texture2D texture)
+    {
+        textureReference = null;
+        texture = null;
+        if (asset == null || textureManager == null)
+        {
+            return false;
+        }
+
+        var meshName = asset.MeshObjectName ?? asset.CharacterName ?? string.Empty;
+        var normalizedBase = NormalizeMeshBaseName(meshName);
+        if (string.IsNullOrWhiteSpace(normalizedBase))
+        {
+            return false;
+        }
+        var pascalBase = ToPascalCase(normalizedBase);
+        var oneBasedIndex = materialId + 1;
+
+        var packageCandidates = new[]
+        {
+            normalizedBase,
+            pascalBase,
+            $"{normalizedBase}Tex",
+            Path.GetFileNameWithoutExtension(asset.SourcePackagePath ?? string.Empty) + "Tex",
+            "LineageMonstersTex"
+        }
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        var objectCandidates = new[]
+        {
+            $"{normalizedBase}_t{materialId:00}",
+            $"{normalizedBase}_t0{materialId}",
+            $"{normalizedBase}_t00",
+            $"{normalizedBase}_t01",
+            $"{normalizedBase}_t02",
+            $"{normalizedBase}{oneBasedIndex:00}",
+            $"{pascalBase}{oneBasedIndex:00}",
+            $"{meshName}_t{materialId:00}",
+            $"{meshName}_t00",
+            $"{meshName}{oneBasedIndex:00}"
+        }
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+        foreach (var packageName in packageCandidates)
+        {
+            var resolved = textureManager.ResolveMany(objectCandidates.Select(x => new SceneTextureRequest(packageName, x)));
+            foreach (var objectName in objectCandidates)
+            {
+                var key = $"{packageName}.{objectName}";
+                if (!resolved.TryGetValue(key, out var entry) || entry?.Texture == null)
+                {
+                    continue;
+                }
+
+                textureReference = key;
+                texture = ImportedTextureAssetUtility.LoadOrCreateTextureAsset(
+                    textureReference,
+                    entry.Texture,
+                    L2AssetManager.SharedTexturesRoot,
+                    "SkeletalTextures",
+                    traits: null,
+                    reuseExisting: true);
+                if (texture != null)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static string NormalizeMeshBaseName(string meshName)
+    {
+        if (string.IsNullOrWhiteSpace(meshName))
+        {
+            return string.Empty;
+        }
+
+        return Regex.Replace(meshName.Trim(), "_[mf]\\d\\d$", string.Empty, RegexOptions.IgnoreCase);
+    }
+
+    private static string ToPascalCase(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var parts = value
+            .Split(new[] { '_', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Length == 0
+                ? string.Empty
+                : char.ToUpperInvariant(x[0]) + x.Substring(1).ToLowerInvariant());
+        return string.Concat(parts);
     }
 
     private static Texture2D ResolveTextureForMaterial(

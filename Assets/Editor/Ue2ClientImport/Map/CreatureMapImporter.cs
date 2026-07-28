@@ -110,6 +110,7 @@ internal static class CreatureMapImporter
                     log,
                     buildContext,
                     includeMaterials: false);
+                ApplySpawnTextureOverrides(prepared.CharacterAsset, spawn);
                 var texturePlans = CreatureSkeletalMaterialImporter.CollectTextureImportPlans(
                     prepared.CharacterAsset,
                     prepared.ReferenceText,
@@ -193,6 +194,78 @@ internal static class CreatureMapImporter
         log($"[Creatures] Prefab batch complete. RequestedTypes={uniquePrefabs.Length}, loaded={prefabCache.Count} ({buildStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         return prefabCache;
+    }
+
+    private static void ApplySpawnTextureOverrides(L2SkeletalCharacterAsset asset, SceneCreatureSpawnData spawn)
+    {
+        if (asset == null || spawn?.TextureResources == null || spawn.TextureResources.Length == 0)
+        {
+            return;
+        }
+
+        var textureRefs = spawn.TextureResources
+            .Where(x => x != null && !string.IsNullOrWhiteSpace(x.Reference))
+            .Select(x => x.Reference)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (textureRefs.Length == 0)
+        {
+            return;
+        }
+
+        asset.UsedTextures = spawn.TextureResources
+            .Where(x => x != null && !string.IsNullOrWhiteSpace(x.Reference))
+            .Select(x => new L2SkeletalTextureRefData
+            {
+                Reference = x.Reference,
+                ResolvedPackagePath = x.PackagePath ?? string.Empty
+            })
+            .ToArray();
+
+        if (string.IsNullOrWhiteSpace(asset.PrimaryTextureReference))
+        {
+            asset.PrimaryTextureReference = textureRefs[0];
+        }
+
+        var bindings = asset.MaterialBindings ?? Array.Empty<L2SkeletalMaterialBindingData>();
+        for (var i = 0; i < bindings.Length && i < textureRefs.Length; i++)
+        {
+            var binding = bindings[i];
+            if (binding == null || !string.IsNullOrWhiteSpace(binding.TextureReference))
+            {
+                continue;
+            }
+
+            if (!TrySplitReference(textureRefs[i], out var packageName, out var objectName))
+            {
+                continue;
+            }
+
+            binding.PackageName = packageName;
+            binding.ObjectName = objectName;
+            binding.TextureReference = textureRefs[i];
+            binding.ResolvedPackagePath = spawn.TextureResources[i]?.PackagePath ?? string.Empty;
+        }
+    }
+
+    private static bool TrySplitReference(string reference, out string packageName, out string objectName)
+    {
+        packageName = null;
+        objectName = null;
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return false;
+        }
+
+        var dotIndex = reference.LastIndexOf('.');
+        if (dotIndex <= 0 || dotIndex >= reference.Length - 1)
+        {
+            return false;
+        }
+
+        packageName = reference.Substring(0, dotIndex);
+        objectName = reference.Substring(dotIndex + 1);
+        return true;
     }
 
     private static bool ShouldReuseExistingPrefab(GameObject prefab, SceneCreatureSpawnData spawn)

@@ -6,25 +6,21 @@ internal readonly struct MapImportRequest
         string mapRelativePath,
         string mapKey,
         string objectName,
-        string outputDir,
-        bool reuseExistingMaterialTextureAssets = true)
+        string outputDir)
     {
         MapRelativePath = mapRelativePath;
         MapKey = mapKey;
         ObjectName = objectName;
         OutputDir = outputDir;
-        ReuseExistingMaterialTextureAssets = reuseExistingMaterialTextureAssets;
     }
 
     public string MapRelativePath { get; }
     public string MapKey { get; }
     public string ObjectName { get; }
     public string OutputDir { get; }
-    public bool ReuseExistingMaterialTextureAssets { get; }
+    public bool ReuseExistingMaterialTextureAssets => true;
 
-    public static MapImportRequest FromMapRelativePath(
-        string mapRelativePath,
-        bool reuseExistingMaterialTextureAssets = true)
+    public static MapImportRequest FromMapRelativePath(string mapRelativePath)
     {
         var fileName = Path.GetFileNameWithoutExtension(mapRelativePath);
         var mapKey = fileName;
@@ -32,8 +28,7 @@ internal readonly struct MapImportRequest
             mapRelativePath,
             mapKey,
             $"L2Terrain_{mapKey}",
-            $"{MapImportPaths.OutputRoot}/{mapKey}",
-            reuseExistingMaterialTextureAssets);
+            $"{MapImportPaths.OutputRoot}/{mapKey}");
     }
 }
 

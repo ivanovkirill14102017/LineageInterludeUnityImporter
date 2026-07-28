@@ -17,6 +17,7 @@ internal static class CreatureSkinnedMeshBuilder
         var uvs = new List<Vector2>();
         var boneWeights = new List<BoneWeight>();
         var trianglesBySubmesh = new List<int>[Math.Max(1, materials.Length)];
+        var wedgeToVertexIndex = new Dictionary<int, int>();
         for (var i = 0; i < trianglesBySubmesh.Length; i++)
         {
             trianglesBySubmesh[i] = new List<int>();
@@ -34,18 +35,9 @@ internal static class CreatureSkinnedMeshBuilder
                 continue;
             }
 
-            var vertexStart = vertices.Count;
-            vertices.Add(CreatureSkeletalImportUtility.ToUnityPosition(aPoint.Position));
-            vertices.Add(CreatureSkeletalImportUtility.ToUnityPosition(cPoint.Position));
-            vertices.Add(CreatureSkeletalImportUtility.ToUnityPosition(bPoint.Position));
-
-            uvs.Add(new Vector2(aWedge.UV.x, 1f - aWedge.UV.y));
-            uvs.Add(new Vector2(cWedge.UV.x, 1f - cWedge.UV.y));
-            uvs.Add(new Vector2(bWedge.UV.x, 1f - bWedge.UV.y));
-
-            boneWeights.Add(CreatureSkeletalImportUtility.GetBoneWeight(weightsByPoint, aWedge.PointIndex));
-            boneWeights.Add(CreatureSkeletalImportUtility.GetBoneWeight(weightsByPoint, cWedge.PointIndex));
-            boneWeights.Add(CreatureSkeletalImportUtility.GetBoneWeight(weightsByPoint, bWedge.PointIndex));
+            var vertexIndex0 = GetOrCreateVertexIndex(face.WedgeIndex1, aWedge, aPoint);
+            var vertexIndex1 = GetOrCreateVertexIndex(face.WedgeIndex2, cWedge, cPoint);
+            var vertexIndex2 = GetOrCreateVertexIndex(face.WedgeIndex0, bWedge, bPoint);
 
             var materialId = face.MaterialIndex;
             if (!materialIdToSubmesh.TryGetValue(materialId, out var submeshIndex))
@@ -53,9 +45,9 @@ internal static class CreatureSkinnedMeshBuilder
                 submeshIndex = 0;
             }
 
-            trianglesBySubmesh[submeshIndex].Add(vertexStart + 0);
-            trianglesBySubmesh[submeshIndex].Add(vertexStart + 1);
-            trianglesBySubmesh[submeshIndex].Add(vertexStart + 2);
+            trianglesBySubmesh[submeshIndex].Add(vertexIndex0);
+            trianglesBySubmesh[submeshIndex].Add(vertexIndex1);
+            trianglesBySubmesh[submeshIndex].Add(vertexIndex2);
         }
 
         var mesh = new Mesh
@@ -85,6 +77,21 @@ internal static class CreatureSkinnedMeshBuilder
         }
 
         return mesh;
+
+        int GetOrCreateVertexIndex(int wedgeIndex, L2SkeletalWedgeData wedge, L2SkeletalPointData point)
+        {
+            if (wedgeToVertexIndex.TryGetValue(wedgeIndex, out var existingIndex))
+            {
+                return existingIndex;
+            }
+
+            var vertexIndex = vertices.Count;
+            wedgeToVertexIndex[wedgeIndex] = vertexIndex;
+            vertices.Add(CreatureSkeletalImportUtility.ToUnityPosition(point.Position));
+            uvs.Add(new Vector2(wedge.UV.x, 1f - wedge.UV.y));
+            boneWeights.Add(CreatureSkeletalImportUtility.GetBoneWeight(weightsByPoint, wedge.PointIndex));
+            return vertexIndex;
+        }
     }
 
     private static Matrix4x4[] BuildBindPoses(L2SkeletalCharacterAsset asset, out int emptyWeightCount)
