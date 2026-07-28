@@ -5,8 +5,9 @@ using UnityEngine;
 
 internal static class StaticMeshMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log)
+    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
     {
+        context?.Report("Static Meshes", "Scene analysis", 0.12f);
         log("[StaticMesh] START Scene analysis");
         var analysisStopwatch = Stopwatch.StartNew();
         var instancedResult = StaticMeshSceneAnalyzer.BuildInstancedMeshes(source, log);
@@ -22,6 +23,7 @@ internal static class StaticMeshMapImporter
         }
 
         log("[StaticMesh] START Scene root preparation");
+        context?.Report("Static Meshes", "Scene root preparation", 0.18f);
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         UnitySceneObjectUtility.RemoveExistingObject($"{request.ObjectName}_StaticMeshes");
@@ -32,6 +34,7 @@ internal static class StaticMeshMapImporter
 
         log($"Importing {instancedResult.Instances.Count} static meshes using Unity instancing...");
         log("[StaticMesh] START Asset pipeline");
+        context?.Report("Static Meshes", "Asset pipeline", 0.28f);
         var pipelineStopwatch = Stopwatch.StartNew();
         L2StaticMeshAssetBuilder.BuildStaticMeshes(
                 instancedResult,
@@ -40,11 +43,13 @@ internal static class StaticMeshMapImporter
                 request.MapKey,
                 request.OutputDir,
                 log,
-                request.ReuseExistingMaterialTextureAssets);
+                request.ReuseExistingMaterialTextureAssets,
+                context: context);
         pipelineStopwatch.Stop();
         log($"[StaticMesh] DONE Asset pipeline ({pipelineStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         log("[StaticMesh] START Finalize");
+        context?.Report("Static Meshes", "Finalize", 0.96f);
         var finalizeStopwatch = Stopwatch.StartNew();
         MapImportFinalizer.Complete(mapRoot, log);
         finalizeStopwatch.Stop();

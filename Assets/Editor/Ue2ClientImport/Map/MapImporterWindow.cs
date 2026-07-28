@@ -112,7 +112,7 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private void QueueImport(Func<Task> importAction)
+    private void QueueImport(Func<MapImportExecutionContext, Task> importAction)
     {
         if (_isImportRunning)
         {
@@ -124,26 +124,37 @@ public sealed class MapImporterWindow : EditorWindow
 
         async void RunQueuedImport()
         {
+            MapImportExecutionContext context = null;
             try
             {
-                await importAction();
+                context = new MapImportExecutionContext("L2 Map Import");
+                await importAction(context);
+            }
+            catch (OperationCanceledException)
+            {
+                _status = $"{_status}\nImport cancelled by user.";
             }
             finally
             {
+                context?.Dispose();
                 _isImportRunning = false;
                 Repaint();
             }
         }
     }
 
-    private async Task ImportAllAsync()
+    private async Task ImportAllAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import all map content.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportAll(request, AppendStatus);
+            await MapImportOrchestrator.ImportAll(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -152,14 +163,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportTerrainAsync()
+    private async Task ImportTerrainAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import terrain.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportTerrain(request, AppendStatus);
+            await MapImportOrchestrator.ImportTerrain(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -168,14 +183,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportMeshesAsync()
+    private async Task ImportMeshesAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import meshes.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportMeshes(request, AppendStatus);
+            await MapImportOrchestrator.ImportMeshes(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -184,14 +203,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportBspAsync()
+    private async Task ImportBspAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import room-grouped BSP.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportBsp(request, AppendStatus);
+            await MapImportOrchestrator.ImportBsp(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -200,14 +223,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportLightsAsync()
+    private async Task ImportLightsAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import lights.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportLights(request, AppendStatus);
+            await MapImportOrchestrator.ImportLights(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -216,14 +243,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportVolumesAsync()
+    private async Task ImportVolumesAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import volumes.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportVolumes(request, AppendStatus);
+            await MapImportOrchestrator.ImportVolumes(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -232,14 +263,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportParticlesAsync()
+    private async Task ImportParticlesAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import particles.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportParticles(request, AppendStatus);
+            await MapImportOrchestrator.ImportParticles(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {
@@ -248,14 +283,18 @@ public sealed class MapImporterWindow : EditorWindow
         }
     }
 
-    private async Task ImportCreaturesAsync()
+    private async Task ImportCreaturesAsync(MapImportExecutionContext context)
     {
         try
         {
             _status = "Ready to import creatures.";
             ConstInfo.L2DbRootPath = _dbRootPath;
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
-            await MapImportOrchestrator.ImportCreatures(request, AppendStatus);
+            await MapImportOrchestrator.ImportCreatures(request, AppendStatus, context);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (System.Exception exception)
         {

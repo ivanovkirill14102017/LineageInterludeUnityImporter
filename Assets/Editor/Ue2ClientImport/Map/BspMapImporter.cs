@@ -7,8 +7,9 @@ using UnityEngine;
 
 internal static class BspMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log)
+    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
     {
+        context?.Report("BSP", "Build room-grouped BSP scene", 0.12f);
         log("[BSP] START Build room-grouped BSP scene");
         var bspBuilder = new SceneBspRoomBuilder();
         var bspScene = bspBuilder.Build(source.UnrFile);
@@ -21,6 +22,7 @@ internal static class BspMapImporter
         }
 
         log("[BSP] START Scene root preparation");
+        context?.Report("BSP", "Scene root preparation", 0.22f);
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         MapImportAssetPreparation.PrepareBspVariantFolder($"{request.OutputDir}/Bsp", request.ReuseExistingMaterialTextureAssets);
@@ -35,9 +37,11 @@ internal static class BspMapImporter
             includePortalLike: false,
             includeInvisibleLike: false,
             variantLabel: "room-grouped",
-            mapRoot: mapRoot);
+            mapRoot: mapRoot,
+            context: context);
 
         log("[BSP] START Finalize");
+        context?.Report("BSP", "Finalize", 0.96f);
         MapImportFinalizer.Complete(mapRoot, log);
         log("[BSP] DONE Finalize");
         log("BSP import finished.");
@@ -58,7 +62,8 @@ internal static class BspMapImporter
         bool includePortalLike,
         bool includeInvisibleLike,
         string variantLabel,
-        GameObject mapRoot)
+        GameObject mapRoot,
+        MapImportExecutionContext context)
     {
         log($"Importing {scene.Models.Length} {variantLabel} BSP models...");
 
@@ -73,6 +78,7 @@ internal static class BspMapImporter
             request.MapKey,
             request.OutputDir,
             log,
+            context,
             assetSubdirName: assetSubdirName,
             includePortalLike: includePortalLike,
             includeInvisibleLike: includeInvisibleLike,

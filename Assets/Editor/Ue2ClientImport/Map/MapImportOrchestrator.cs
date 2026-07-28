@@ -4,98 +4,143 @@ using System.Threading.Tasks;
 
 internal static class MapImportOrchestrator
 {
-    public static Task ImportTerrain(MapImportRequest request, Action<string> log)
+    public static Task ImportTerrain(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import Terrain", request.MapKey, 0.10f);
             await TerrainMapImporter.ImportAsync(request, source, log);
-        }, "Import Terrain", log);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import Terrain", log, context);
     }
 
-    public static Task ImportMeshes(MapImportRequest request, Action<string> log)
+    public static Task ImportMeshes(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
-            await StaticMeshMapImporter.ImportAsync(request, source, log);
-        }, "Import Meshes", log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import Static Meshes", request.MapKey, 0.10f);
+            await StaticMeshMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import Meshes", log, context);
     }
 
-    public static Task ImportBsp(MapImportRequest request, Action<string> log)
+    public static Task ImportBsp(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
-            await BspMapImporter.ImportAsync(request, source, log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import BSP", request.MapKey, 0.10f);
+            await BspMapImporter.ImportAsync(request, source, log, context);
             MapContextImporter.ImportAsync(request, source, log);
-        }, "Import BSP", log);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import BSP", log, context);
     }
 
-    public static Task ImportLights(MapImportRequest request, Action<string> log)
+    public static Task ImportLights(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
-            await LightingMapImporter.ImportAsync(request, source, log);
-        }, "Import Lights", log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import Lights", request.MapKey, 0.10f);
+            await LightingMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import Lights", log, context);
     }
 
-    public static Task ImportVolumes(MapImportRequest request, Action<string> log)
+    public static Task ImportVolumes(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
-            await VolumeMapImporter.ImportAsync(request, source, log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import Volumes", request.MapKey, 0.10f);
+            await VolumeMapImporter.ImportAsync(request, source, log, context);
             MapContextImporter.ImportAsync(request, source, log);
-        }, "Import Volumes", log);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import Volumes", log, context);
     }
 
-    public static Task ImportParticles(MapImportRequest request, Action<string> log)
+    public static Task ImportParticles(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
-            ParticleMapImporter.ImportAsync(request, source, log);
-        }, "Import Particles", log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import Particles", request.MapKey, 0.10f);
+            ParticleMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import Particles", log, context);
     }
 
-    public static Task ImportCreatures(MapImportRequest request, Action<string> log)
+    public static Task ImportCreatures(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
-            await CreatureMapImporter.ImportAsync(request, source, log);
-        }, "Import Creatures", log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            context?.Report("Import Creatures", request.MapKey, 0.10f);
+            await CreatureMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Finalize", request.MapKey, 1f);
+        }, "Import Creatures", log, context);
     }
 
-    public static Task ImportAll(MapImportRequest request, Action<string> log)
+    public static Task ImportAll(MapImportRequest request, Action<string> log, MapImportExecutionContext context = null)
     {
         return Run(async () =>
         {
-            var source = await Ue2MapLoader.LoadAsync(request, log);
+            context?.Report("Load Map", request.MapRelativePath, 0.02f);
+            var source = await Ue2MapLoader.LoadAsync(request, log, context);
 
+            context?.Report("Import Terrain", request.MapKey, 0.08f);
             await TerrainMapImporter.ImportAsync(request, source, log);
-            await StaticMeshMapImporter.ImportAsync(request, source, log);
-            await BspMapImporter.ImportAsync(request, source, log);
-            await LightingMapImporter.ImportAsync(request, source, log);
-            await VolumeMapImporter.ImportAsync(request, source, log);
-            ParticleMapImporter.ImportAsync(request, source, log);
-            await CreatureMapImporter.ImportAsync(request, source, log);
+            context?.Report("Import Static Meshes", request.MapKey, 0.22f);
+            await StaticMeshMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Import BSP", request.MapKey, 0.38f);
+            await BspMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Import Lights", request.MapKey, 0.54f);
+            await LightingMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Import Volumes", request.MapKey, 0.68f);
+            await VolumeMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Import Particles", request.MapKey, 0.80f);
+            ParticleMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Import Creatures", request.MapKey, 0.88f);
+            await CreatureMapImporter.ImportAsync(request, source, log, context);
+            context?.Report("Finalize", request.MapKey, 0.98f);
             MapContextImporter.ImportAsync(request, source, log);
-        }, "Import All", log);
+            context?.Report("Done", request.MapKey, 1f);
+        }, "Import All", log, context);
     }
 
-    private static async Task Run(Func<Task> action, string operationName, Action<string> log)
+    private static async Task Run(Func<Task> action, string operationName, Action<string> log, MapImportExecutionContext context)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             await action();
+            stopwatch.Stop();
+            log($"{operationName} took {stopwatch.Elapsed.TotalSeconds:F2}s");
+        }
+        catch (OperationCanceledException)
+        {
+            stopwatch.Stop();
+            log($"{operationName} cancelled after {stopwatch.Elapsed.TotalSeconds:F2}s");
+            throw;
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
             log($"Error during {operationName}: {ex.Message}");
             UnityEngine.Debug.LogException(ex);
+        }
+        finally
+        {
+            context?.Dispose();
         }
     }
 }

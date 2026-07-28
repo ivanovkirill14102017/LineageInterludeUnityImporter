@@ -28,6 +28,7 @@ internal static class L2BspAssetBuilder
         string mapKey,
         string outputDir,
         Action<string> log,
+        MapImportExecutionContext context = null,
         string assetSubdirName = "Bsp",
         bool includePortalLike = false,
         bool includeInvisibleLike = false,
@@ -55,6 +56,7 @@ internal static class L2BspAssetBuilder
         log($"Building {assetSubdirName} BSP with {bspScene.Models.Length} models...");
 
         log("[BSP] START Material graph resolve");
+        context?.Report("BSP", "Material graph resolve", 0.32f);
         var materialResolveStopwatch = Stopwatch.StartNew();
         var materialRefs = CollectMaterialRequests(bspScene);
         log($"BSP material requests: {materialRefs.Count}");
@@ -64,6 +66,8 @@ internal static class L2BspAssetBuilder
         log("[BSP] DONE Material graph resolve");
 
         log("[BSP] START Texture resolve");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("BSP", "Texture resolve", 0.42f);
         var textureResolveStopwatch = Stopwatch.StartNew();
         var textureRefs = CollectTextureRequests(resolvedMaterialsBatch);
         log($"BSP texture requests: {textureRefs.Count}");
@@ -73,6 +77,8 @@ internal static class L2BspAssetBuilder
         log("[BSP] DONE Texture resolve");
 
         log("[BSP] START Section preparation");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("BSP", "Section preparation", 0.52f);
         var sectionPreparationStopwatch = Stopwatch.StartNew();
         var sectionEntries = CollectSectionEntries(
             bspScene,
@@ -86,13 +92,17 @@ internal static class L2BspAssetBuilder
         log("[BSP] DONE Section preparation");
 
         log("[BSP] START Geometry asset build");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("BSP", "Geometry asset build", 0.64f);
         var geometryStopwatch = Stopwatch.StartNew();
-        var meshAssets = BuildMeshAssets(sectionEntries, resolvedTexturesBatch);
+        var meshAssets = BuildMeshAssets(sectionEntries, resolvedTexturesBatch, context);
         geometryStopwatch.Stop();
         log($"BSP geometry asset build took {geometryStopwatch.Elapsed.TotalSeconds:F2}s");
         log("[BSP] DONE Geometry asset build");
 
         log("[BSP] START Material asset build");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("BSP", "Material asset build", 0.76f);
         var materialAssetStopwatch = Stopwatch.StartNew();
         var materialAssets = BuildMaterialAssets(
             sectionEntries,
@@ -104,12 +114,15 @@ internal static class L2BspAssetBuilder
             materialCache,
             shader,
             log,
-            reuseExistingMaterialTextureAssets);
+            reuseExistingMaterialTextureAssets,
+            context);
         materialAssetStopwatch.Stop();
         log($"BSP material asset build took {materialAssetStopwatch.Elapsed.TotalSeconds:F2}s");
         log("[BSP] DONE Material asset build");
 
         log("[BSP] START Object placement");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("BSP", "Object placement", 0.88f);
         var placementStopwatch = Stopwatch.StartNew();
         BuildSceneHierarchy(
             bspScene,
@@ -118,7 +131,8 @@ internal static class L2BspAssetBuilder
             meshAssets,
             materialAssets,
             includePortalLike,
-            includeInvisibleLike);
+            includeInvisibleLike,
+            context);
         placementStopwatch.Stop();
         log($"BSP object placement took {placementStopwatch.Elapsed.TotalSeconds:F2}s");
         log("[BSP] DONE Object placement");
@@ -126,7 +140,8 @@ internal static class L2BspAssetBuilder
 
     private static Dictionary<string, Mesh> BuildMeshAssets(
         IReadOnlyList<BspSectionEntry> sectionEntries,
-        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch)
+        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
+        MapImportExecutionContext context = null)
     {
         var meshAssets = new Dictionary<string, Mesh>(StringComparer.OrdinalIgnoreCase);
 
@@ -134,6 +149,7 @@ internal static class L2BspAssetBuilder
         {
             foreach (var entry in sectionEntries)
             {
+                context?.ThrowIfCancellationRequested();
                 var mesh = BuildSectionMesh(entry.Section, entry.ResolvedMaterial, resolvedTexturesBatch, entry.SectionName);
                 mesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(mesh, entry.MeshAssetPath);
                 meshAssets[entry.MeshAssetPath] = mesh;
@@ -153,12 +169,14 @@ internal static class L2BspAssetBuilder
         Dictionary<string, Material> materialCache,
         Shader shader,
         Action<string> log,
-        bool reuseExistingMaterialTextureAssets)
+        bool reuseExistingMaterialTextureAssets,
+        MapImportExecutionContext context = null)
     {
         var materialAssets = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var entry in sectionEntries)
         {
+            context?.ThrowIfCancellationRequested();
             materialAssets[entry.MeshAssetPath] = BuildSectionMaterial(
                 entry.Section,
                 entry.ResolvedMaterial,
@@ -183,10 +201,12 @@ internal static class L2BspAssetBuilder
         IReadOnlyDictionary<string, Mesh> meshAssets,
         IReadOnlyDictionary<string, Material> materialAssets,
         bool includePortalLike,
-        bool includeInvisibleLike)
+        bool includeInvisibleLike,
+        MapImportExecutionContext context = null)
     {
         foreach (var model in bspScene.Models)
         {
+            context?.ThrowIfCancellationRequested();
             if (model.Chunks == null || model.Chunks.Length == 0)
             {
                 continue;
@@ -198,6 +218,7 @@ internal static class L2BspAssetBuilder
 
             foreach (var chunk in model.Chunks)
             {
+                context?.ThrowIfCancellationRequested();
                 if ((!includeInvisibleLike && chunk.IsInvisibleLike) ||
                     (!includePortalLike && chunk.IsPortalLike) ||
                     chunk.MeshSections == null ||

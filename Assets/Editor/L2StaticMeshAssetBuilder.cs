@@ -14,7 +14,8 @@ internal static class L2StaticMeshAssetBuilder
         string clientPath,
         string mapKey,
         Action<string> log,
-        bool reuseExistingMaterialTextureAssets = true)
+        bool reuseExistingMaterialTextureAssets = true,
+        MapImportExecutionContext context = null)
     {
         if (meshDefinitions == null || meshDefinitions.Count == 0)
         {
@@ -31,6 +32,7 @@ internal static class L2StaticMeshAssetBuilder
         var shader = StaticMeshImportUtility.FindDefaultShader();
 
         log($"[StaticMesh/Ensure] Importing {filteredDefinitions.Count} mesh definitions for dependent assets.");
+        context?.Report("Particles/Static Mesh Dependencies", "Texture import", 0.32f);
 
         var textureCatalog = StaticMeshTextureImporter.ImportTextures(
             filteredDefinitions,
@@ -39,6 +41,8 @@ internal static class L2StaticMeshAssetBuilder
             textureDir,
             reuseExistingMaterialTextureAssets,
             log);
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Particles/Static Mesh Dependencies", "Material import", 0.50f);
         var materialCatalog = StaticMeshMaterialImporter.ImportMaterials(
             filteredDefinitions,
             mapKey,
@@ -46,8 +50,12 @@ internal static class L2StaticMeshAssetBuilder
             shader,
             textureCatalog,
             reuseExistingMaterialTextureAssets);
-        var meshCache = BuildMeshAssets(filteredDefinitions, meshDir, mapKey);
-        return BuildPrefabAssets(meshCache, materialCatalog, prefabDir);
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Particles/Static Mesh Dependencies", "Mesh asset build", 0.68f);
+        var meshCache = BuildMeshAssets(filteredDefinitions, meshDir, mapKey, context);
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Particles/Static Mesh Dependencies", "Prefab asset build", 0.86f);
+        return BuildPrefabAssets(meshCache, materialCatalog, prefabDir, context);
     }
 
     public static void BuildStaticMeshes(
@@ -62,7 +70,8 @@ internal static class L2StaticMeshAssetBuilder
         bool placeTerrainDecorations = true,
         bool convertTerrainDecorationsToTerrainVegetation = false,
         bool convertTreeInstancesToTerrainVegetation = true,
-        bool placeTreeInstancesAsRegularInstances = false)
+        bool placeTreeInstancesAsRegularInstances = false,
+        MapImportExecutionContext context = null)
     {
         var meshDir = L2AssetManager.SharedStaticMeshesRoot;
         var prefabDir = L2AssetManager.ManagedStaticMeshPrefabsRoot;
@@ -76,6 +85,7 @@ internal static class L2StaticMeshAssetBuilder
         log($"Building {meshDefinitions.Count} unique mesh assets...");
 
         log("[StaticMesh/Pipeline] START Texture import");
+        context?.Report("Static Meshes", "Texture import", 0.34f);
         var textureStopwatch = Stopwatch.StartNew();
         var textureCatalog = StaticMeshTextureImporter.ImportTextures(
                 meshDefinitions,
@@ -88,6 +98,8 @@ internal static class L2StaticMeshAssetBuilder
         log($"[StaticMesh/Pipeline] DONE Texture import ({textureStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         log("[StaticMesh/Pipeline] START Material import");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Static Meshes", "Material import", 0.46f);
         var materialStopwatch = Stopwatch.StartNew();
         var materialCatalog = StaticMeshMaterialImporter.ImportMaterials(
                 meshDefinitions,
@@ -100,18 +112,24 @@ internal static class L2StaticMeshAssetBuilder
         log($"[StaticMesh/Pipeline] DONE Material import ({materialStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         log("[StaticMesh/Pipeline] START Geometry asset build");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Static Meshes", "Geometry asset build", 0.58f);
         var geometryStopwatch = Stopwatch.StartNew();
-        var meshCache = BuildMeshAssets(meshDefinitions, meshDir, mapKey);
+        var meshCache = BuildMeshAssets(meshDefinitions, meshDir, mapKey, context);
         geometryStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Geometry asset build ({geometryStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         log("[StaticMesh/Pipeline] START Prefab asset build");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Static Meshes", "Prefab asset build", 0.70f);
         var prefabStopwatch = Stopwatch.StartNew();
-        var prefabCache = BuildPrefabAssets(meshCache, materialCatalog, prefabDir);
+        var prefabCache = BuildPrefabAssets(meshCache, materialCatalog, prefabDir, context);
         prefabStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Prefab asset build ({prefabStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         log("[StaticMesh/Pipeline] START Instance placement");
+        context?.ThrowIfCancellationRequested();
+        context?.Report("Static Meshes", "Instance placement", 0.82f);
         var placementStopwatch = Stopwatch.StartNew();
         var regularInstances = instancedResult.Instances
             .Where(instance =>
@@ -144,6 +162,7 @@ internal static class L2StaticMeshAssetBuilder
 
         if (placeRegularInstances)
         {
+            context?.ThrowIfCancellationRequested();
             StaticMeshInstancePlacer.PlaceInstances(regularInstances, parent, prefabCache, log);
         }
 
@@ -151,9 +170,11 @@ internal static class L2StaticMeshAssetBuilder
                                               (placeTreeInstancesAsRegularInstances || convertTreeInstancesToTerrainVegetation);
         if (shouldPlaceRegularTreeInstances)
         {
+            context?.ThrowIfCancellationRequested();
             StaticMeshInstancePlacer.PlaceInstances(regularTreeInstances, parent, prefabCache, log);
         }
 
+        context?.ThrowIfCancellationRequested();
         TerrainGrassDetailBuilder.PopulateTerrainVegetation(
             grassInstances,
             terrainTreeInstances,
@@ -167,6 +188,7 @@ internal static class L2StaticMeshAssetBuilder
 
         if (placeTerrainDecorations)
         {
+            context?.ThrowIfCancellationRequested();
             TerrainDecorationInstancePlacer.PlaceDecorations(instancedResult.TerrainDecorations, parent, prefabCache, clientPath, log);
         }
         placementStopwatch.Stop();
@@ -184,12 +206,14 @@ internal static class L2StaticMeshAssetBuilder
     private static Dictionary<string, GameObject> BuildPrefabAssets(
         IReadOnlyDictionary<string, Mesh> meshCache,
         StaticMeshMaterialCatalog materialCatalog,
-        string prefabDir)
+        string prefabDir,
+        MapImportExecutionContext context = null)
     {
         var prefabCache = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var pair in meshCache)
         {
+            context?.ThrowIfCancellationRequested();
             var meshReference = pair.Key;
             var mesh = pair.Value;
             if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
@@ -224,7 +248,8 @@ internal static class L2StaticMeshAssetBuilder
     private static Dictionary<string, Mesh> BuildMeshAssets(
         IReadOnlyDictionary<string, SceneStaticMeshDefinition> meshDefinitions,
         string meshDir,
-        string mapKey)
+        string mapKey,
+        MapImportExecutionContext context = null)
     {
         var meshCache = new Dictionary<string, Mesh>(StringComparer.OrdinalIgnoreCase);
 
@@ -232,6 +257,7 @@ internal static class L2StaticMeshAssetBuilder
         {
             foreach (var pair in meshDefinitions)
             {
+                context?.ThrowIfCancellationRequested();
                 var meshReference = pair.Key;
                 var definition = pair.Value;
                 if (definition.RenderGeometry == null || definition.RenderGeometry.Triangles == null || definition.RenderGeometry.Triangles.Count == 0)

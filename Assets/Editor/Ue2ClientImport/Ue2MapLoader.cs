@@ -5,7 +5,7 @@ using L2Viewer.UnrFile;
 
 internal static class Ue2MapLoader
 {
-    public static Task<Ue2MapSource> LoadAsync(MapImportRequest request, System.Action<string> log)
+    public static Task<Ue2MapSource> LoadAsync(MapImportRequest request, System.Action<string> log, MapImportExecutionContext context = null)
     {
         var stopwatch = Stopwatch.StartNew();
         try
@@ -14,6 +14,7 @@ internal static class Ue2MapLoader
             var mapFullPath = Path.Combine(clientPath, request.MapRelativePath);
 
             ValidateInputs(clientPath, mapFullPath);
+            context?.Report("Load Map", Path.GetFileName(mapFullPath), 0.03f);
             log($"Loading map: {mapFullPath}");
 
             var unrFile = UnrFileReader.Read(mapFullPath);
