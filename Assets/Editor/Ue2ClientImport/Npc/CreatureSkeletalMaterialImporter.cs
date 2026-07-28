@@ -185,6 +185,7 @@ internal static class CreatureSkeletalMaterialImporter
                 texturePath,
                 false,
                 StaticMeshImportUtility.NeedsAlpha(plan.Traits));
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         }
     }
 
@@ -204,11 +205,9 @@ internal static class CreatureSkeletalMaterialImporter
         L2AssetManager.EnsureFolderExists(textureDir);
 
         PrimeExistingTextureAssets(asset, textureDir, result);
-        if (result.Count == 0)
-        {
-            CollectTextureImportPlans(asset, referenceText, log, context);
-            PrimeExistingTextureAssets(asset, textureDir, result);
-        }
+        var plans = CollectTextureImportPlans(asset, referenceText, log, context);
+        ImportTexturePlansBatch(plans, textureDir);
+        PrimeExistingTextureAssets(asset, textureDir, result);
 
         foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
         {
@@ -554,7 +553,10 @@ internal static class CreatureSkeletalMaterialImporter
             return null;
         }
 
-        if (!string.IsNullOrWhiteSpace(binding.TextureReference))
+        var directReference = !string.IsNullOrWhiteSpace(binding.TextureReference)
+            ? binding.TextureReference
+            : $"{binding.PackageName}.{binding.ObjectName}";
+        if (!string.IsNullOrWhiteSpace(directReference))
         {
             var resolvedDirectTexture = textureManager.ResolveMany(new[]
             {
@@ -564,7 +566,7 @@ internal static class CreatureSkeletalMaterialImporter
             if (resolvedDirectTexture.TryGetValue(directKey, out var directTexture) && directTexture?.Texture != null)
             {
                 return new ResolvedSkeletalTextureBinding(
-                    binding.TextureReference,
+                    directReference,
                     binding.ResolvedPackagePath,
                     directTexture.Texture,
                     traits: null);

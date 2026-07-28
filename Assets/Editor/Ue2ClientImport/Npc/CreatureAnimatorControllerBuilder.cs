@@ -58,11 +58,14 @@ internal static class CreatureAnimatorControllerBuilder
         AnimatorState defaultState = null;
         foreach (var clipInfo in clips.Where(x => x.Clip != null))
         {
-            var state = layer.stateMachine.AddState(clipInfo.Clip.name);
+            var sequence = FindSequenceForClip(asset, clipInfo.Clip);
+            var stateName = !string.IsNullOrWhiteSpace(sequence?.Name)
+                ? sequence.Name
+                : clipInfo.Clip.name;
+            var state = layer.stateMachine.AddState(stateName);
             state.motion = clipInfo.Clip;
             state.writeDefaultValues = true;
 
-            var sequence = FindSequenceForClip(asset, clipInfo.Clip);
             if (sequence != null)
             {
                 if (!string.IsNullOrWhiteSpace(sequence.Name))
