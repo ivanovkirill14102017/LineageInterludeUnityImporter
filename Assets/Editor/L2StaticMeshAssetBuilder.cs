@@ -160,6 +160,23 @@ internal static class L2StaticMeshAssetBuilder
         var treeAsRegularCount = regularTreeInstances.Length;
         log($"[StaticMesh/Pipeline] Regular instances: {regularInstances.Length}, grass-to-terrain instances: {grassInstances.Length}, tree-to-terrain instances: {treeToTerrainCount}, tree-as-regular instances: {treeAsRegularCount}.");
 
+        SceneTerrainDecorationLayer[] terrainDecorationTerrainLayers = Array.Empty<SceneTerrainDecorationLayer>();
+        SceneTerrainDecorationLayer[] terrainDecorationRegularLayers = Array.Empty<SceneTerrainDecorationLayer>();
+        if (convertTerrainDecorationsToTerrainVegetation)
+        {
+            var split = TerrainGrassDetailBuilder.SplitTerrainDecorationLayersByTerrainSurface(
+                instancedResult.TerrainDecorations,
+                parent,
+                clientPath,
+                log);
+            terrainDecorationTerrainLayers = split.TerrainLayers;
+            terrainDecorationRegularLayers = split.RegularLayers;
+        }
+        else
+        {
+            terrainDecorationRegularLayers = instancedResult.TerrainDecorations?.ToArray() ?? Array.Empty<SceneTerrainDecorationLayer>();
+        }
+
         if (placeRegularInstances)
         {
             context?.ThrowIfCancellationRequested();
@@ -178,18 +195,19 @@ internal static class L2StaticMeshAssetBuilder
         TerrainGrassDetailBuilder.PopulateTerrainVegetation(
             grassInstances,
             terrainTreeInstances,
-            convertTerrainDecorationsToTerrainVegetation ? instancedResult.TerrainDecorations : null,
+            convertTerrainDecorationsToTerrainVegetation ? terrainDecorationTerrainLayers : null,
             parent,
             meshCache,
             materialCatalog,
+            clientPath,
             outputDir,
             mapKey,
             log);
 
-        if (placeTerrainDecorations)
+        if (placeTerrainDecorations || (convertTerrainDecorationsToTerrainVegetation && terrainDecorationRegularLayers.Length > 0))
         {
             context?.ThrowIfCancellationRequested();
-            TerrainDecorationInstancePlacer.PlaceDecorations(instancedResult.TerrainDecorations, parent, prefabCache, clientPath, log);
+            TerrainDecorationInstancePlacer.PlaceDecorations(terrainDecorationRegularLayers, parent, prefabCache, clientPath, log);
         }
         placementStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Instance placement ({placementStopwatch.Elapsed.TotalSeconds:F2}s)");
