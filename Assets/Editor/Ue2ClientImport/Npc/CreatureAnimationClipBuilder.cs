@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 
 internal static class CreatureAnimationClipBuilder
@@ -54,7 +55,7 @@ internal static class CreatureAnimationClipBuilder
             var clip = new AnimationClip
             {
                 name = $"{asset.CharacterName}_{CreatureSkeletalImportUtility.SanitizeName(sequence.Name)}",
-                wrapMode = WrapMode.Loop
+                wrapMode = sequence.SuggestedLoop ? WrapMode.Loop : WrapMode.Once
             };
 
             var keyframesByBone = new Dictionary<int, BoneCurves>();
@@ -112,7 +113,8 @@ internal static class CreatureAnimationClipBuilder
             }
 
             clip.EnsureQuaternionContinuity();
-            CreatureSkeletalImportUtility.SetClipLoop(clip, true);
+            CreatureSkeletalImportUtility.SetClipLoop(clip, sequence.SuggestedLoop);
+            AttachAnimationEvents(clip, sequence);
 
             var clipPath = L2AssetManager.BuildClientPackageAssetPath(
                 clipFolder,
@@ -129,5 +131,58 @@ internal static class CreatureAnimationClipBuilder
             ? $"clips baked from SceneDomain skeletal samples for sequences: {string.Join(", ", clipInfos.Select(x => x.Clip.name))}."
             : "no clips were baked on Unity side.";
         return clipInfos.ToArray();
+    }
+
+    private static void AttachAnimationEvents(AnimationClip clip, L2SkeletalAnimationSequenceData sequence)
+    {
+        if (clip == null)
+        {
+            return;
+        }
+
+        var events = (sequence?.Notifies ?? Array.Empty<L2SkeletalAnimationNotifyData>())
+            .Select((notify, index) => BuildAnimationEvent(notify, index))
+            .Where(x => x != null)
+            .ToArray();
+
+        AnimationUtility.SetAnimationEvents(clip, events);
+    }
+
+    private static AnimationEvent BuildAnimationEvent(L2SkeletalAnimationNotifyData notify, int index)
+    {
+        if (notify == null)
+        {
+            return null;
+        }
+
+        return new AnimationEvent
+        {
+            time = Mathf.Max(0f, notify.Time),
+            functionName = nameof(L2AnimationNotifyReceiver.OnL2AnimationNotify),
+            stringParameter = BuildNotifyPayload(notify, index)
+        };
+    }
+
+    private static string BuildNotifyPayload(L2SkeletalAnimationNotifyData notify, int index)
+    {
+        return string.Join("|", new[]
+        {
+            index.ToString(),
+            notify.Time.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+            SanitizePayloadSegment(notify.FunctionName),
+            SanitizePayloadSegment(notify.NotifyClassName),
+            SanitizePayloadSegment(notify.NotifyObjectName),
+            SanitizePayloadSegment(notify.ExtraText),
+            notify.IsCombatImpact ? "1" : "0",
+            notify.IsProjectileRelease ? "1" : "0",
+            notify.IsSoundCue ? "1" : "0"
+        });
+    }
+
+    private static string SanitizePayloadSegment(string value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace("|", "/").Replace("\r", " ").Replace("\n", " ");
     }
 }

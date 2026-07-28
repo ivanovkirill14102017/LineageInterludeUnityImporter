@@ -34,6 +34,7 @@ internal static class CreatureSkeletalPrefabFactory
             animator.runtimeAnimatorController = controller;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            root.AddComponent<L2AnimationNotifyReceiver>();
 
             CreatureSkeletalImportUtility.CreateLabel(root.transform, mesh, displayLabel);
 

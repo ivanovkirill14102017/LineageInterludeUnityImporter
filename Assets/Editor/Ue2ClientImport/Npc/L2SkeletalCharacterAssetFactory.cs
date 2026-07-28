@@ -97,11 +97,30 @@ internal static class L2SkeletalCharacterAssetFactory
             .Select(x => new L2SkeletalAnimationSequenceData
             {
                 Name = x.Name,
+                NormalizedName = x.NormalizedName,
+                Category = x.Category,
                 TotalBones = x.TotalBones,
                 TrackTime = x.TrackTime,
                 AnimRate = x.AnimRate,
                 FirstRawFrame = x.FirstRawFrame,
-                NumRawFrames = x.NumRawFrames
+                NumRawFrames = x.NumRawFrames,
+                SuggestedLoop = x.SuggestedLoop,
+                IsOneShot = x.IsOneShot,
+                RequiresExplicitRouting = x.RequiresExplicitRouting,
+                SuggestedNextSequenceNames = x.SuggestedNextSequenceNames?.ToArray() ?? new string[0],
+                Notifies = x.Notifies
+                    .Select(notify => new L2SkeletalAnimationNotifyData
+                    {
+                        Time = notify.Time,
+                        FunctionName = notify.FunctionName,
+                        NotifyClassName = notify.NotifyClassName,
+                        NotifyObjectName = notify.NotifyObjectName,
+                        ExtraText = notify.ExtraText,
+                        IsCombatImpact = notify.IsCombatImpact,
+                        IsProjectileRelease = notify.IsProjectileRelease,
+                        IsSoundCue = notify.IsSoundCue
+                    })
+                    .ToArray()
             })
             .ToArray();
         asset.AnimationKeys = source.AnimationSet.Keys
@@ -112,6 +131,32 @@ internal static class L2SkeletalCharacterAssetFactory
                 Time = x.Time
             })
             .ToArray();
+        asset.RoutingProfiles = source.RoutingProfiles
+            .Select(x => new L2SkeletalAnimationRoutingProfileData
+            {
+                NpcId = x.NpcId,
+                NpcServerName = x.NpcServerName,
+                NpcDisplayName = x.NpcDisplayName,
+                NpcClass = x.NpcClass,
+                MeshReference = x.MeshReference,
+                NpcSpeed = x.NpcSpeed,
+                SuggestedDefaultSequenceNames = x.SuggestedDefaultSequenceNames?.ToArray() ?? new string[0],
+                SuggestedCombatIdleSequenceNames = x.SuggestedCombatIdleSequenceNames?.ToArray() ?? new string[0],
+                SuggestedSkillIdleSequenceNames = x.SuggestedSkillIdleSequenceNames?.ToArray() ?? new string[0],
+                SkillTriggers = x.SkillTriggers
+                    .Select(trigger => new L2SkeletalSkillAnimationTriggerData
+                    {
+                        SkillId = trigger.SkillId,
+                        SkillName = trigger.SkillName,
+                        SequenceName = trigger.SequenceName,
+                        SequenceCategory = trigger.SequenceCategory,
+                        IsSocialLikeSequence = trigger.IsSocialLikeSequence
+                    })
+                    .ToArray()
+            })
+            .ToArray();
+        asset.ConsumerWarnings = source.ConsumerWarnings?.ToArray() ?? new string[0];
+        asset.RequiresExplicitConsumerRouting = source.RequiresExplicitConsumerRouting;
         return asset;
     }
 }

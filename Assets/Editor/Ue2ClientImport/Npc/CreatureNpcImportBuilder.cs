@@ -431,7 +431,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
 
         var sequenceNames = CreatureSkeletalImportUtility.GetAllSequenceNames(characterAsset);
         var clips = CreatureAnimationClipBuilder.Build(characterAsset, prepared.ReferenceText, prepared.AssetRoot, sequenceNames, log, out _);
-        var controller = CreatureAnimatorControllerBuilder.Build(prepared.ReferenceText, prepared.PrefabRoot, clips, log, out _);
+        var controller = CreatureAnimatorControllerBuilder.Build(characterAsset, prepared.ReferenceText, prepared.PrefabRoot, clips, log, out _);
         var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
             prepared.PrefabRoot,
             prepared.ReferenceText,

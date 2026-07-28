@@ -23,6 +23,9 @@ public sealed class L2SkeletalCharacterAsset : ScriptableObject
     public L2SkeletalAnimationBoneData[] AnimationBones = Array.Empty<L2SkeletalAnimationBoneData>();
     public L2SkeletalAnimationSequenceData[] AnimationSequences = Array.Empty<L2SkeletalAnimationSequenceData>();
     public L2SkeletalAnimationKeyData[] AnimationKeys = Array.Empty<L2SkeletalAnimationKeyData>();
+    public L2SkeletalAnimationRoutingProfileData[] RoutingProfiles = Array.Empty<L2SkeletalAnimationRoutingProfileData>();
+    public string[] ConsumerWarnings = Array.Empty<string>();
+    public bool RequiresExplicitConsumerRouting = true;
 }
 
 [Serializable]
@@ -105,11 +108,18 @@ public sealed class L2SkeletalAnimationBoneData
 public sealed class L2SkeletalAnimationSequenceData
 {
     public string Name;
+    public string NormalizedName;
+    public string Category;
     public int TotalBones;
     public float TrackTime;
     public float AnimRate;
     public int FirstRawFrame;
     public int NumRawFrames;
+    public bool SuggestedLoop;
+    public bool IsOneShot;
+    public bool RequiresExplicitRouting;
+    public string[] SuggestedNextSequenceNames = Array.Empty<string>();
+    public L2SkeletalAnimationNotifyData[] Notifies = Array.Empty<L2SkeletalAnimationNotifyData>();
 }
 
 [Serializable]
@@ -118,4 +128,42 @@ public sealed class L2SkeletalAnimationKeyData
     public Vector3 Position;
     public Quaternion Orientation = Quaternion.identity;
     public float Time;
+}
+
+[Serializable]
+public sealed class L2SkeletalAnimationNotifyData
+{
+    public float Time;
+    public string FunctionName;
+    public string NotifyClassName;
+    public string NotifyObjectName;
+    public string ExtraText;
+    public bool IsCombatImpact;
+    public bool IsProjectileRelease;
+    public bool IsSoundCue;
+}
+
+[Serializable]
+public sealed class L2SkeletalAnimationRoutingProfileData
+{
+    public int NpcId;
+    public string NpcServerName;
+    public string NpcDisplayName;
+    public string NpcClass;
+    public string MeshReference;
+    public float? NpcSpeed;
+    public string[] SuggestedDefaultSequenceNames = Array.Empty<string>();
+    public string[] SuggestedCombatIdleSequenceNames = Array.Empty<string>();
+    public string[] SuggestedSkillIdleSequenceNames = Array.Empty<string>();
+    public L2SkeletalSkillAnimationTriggerData[] SkillTriggers = Array.Empty<L2SkeletalSkillAnimationTriggerData>();
+}
+
+[Serializable]
+public sealed class L2SkeletalSkillAnimationTriggerData
+{
+    public int SkillId;
+    public string SkillName;
+    public string SequenceName;
+    public string SequenceCategory;
+    public bool IsSocialLikeSequence;
 }

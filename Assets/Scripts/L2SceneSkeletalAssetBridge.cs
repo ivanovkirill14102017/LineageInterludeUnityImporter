@@ -42,12 +42,32 @@ public static class L2SceneSkeletalAssetBridge
             UsedTextures = (asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
                 .Select(x => new MaterialTextureInfo(x.Reference ?? string.Empty, x.ResolvedPackagePath))
                 .ToArray(),
-            RoutingProfiles = Array.Empty<SceneSkeletalAnimationRoutingProfile>(),
-            ConsumerWarnings = new[]
-            {
-                "Routing metadata is not embedded in Unity imported shared skeletal assets."
-            },
-            RequiresExplicitConsumerRouting = true,
+            RoutingProfiles = (asset.RoutingProfiles ?? Array.Empty<L2SkeletalAnimationRoutingProfileData>())
+                .Select(x => new SceneSkeletalAnimationRoutingProfile
+                {
+                    NpcId = x.NpcId,
+                    NpcServerName = x.NpcServerName,
+                    NpcDisplayName = x.NpcDisplayName,
+                    NpcClass = x.NpcClass ?? string.Empty,
+                    MeshReference = x.MeshReference ?? string.Empty,
+                    NpcSpeed = x.NpcSpeed,
+                    SuggestedDefaultSequenceNames = x.SuggestedDefaultSequenceNames ?? Array.Empty<string>(),
+                    SuggestedCombatIdleSequenceNames = x.SuggestedCombatIdleSequenceNames ?? Array.Empty<string>(),
+                    SuggestedSkillIdleSequenceNames = x.SuggestedSkillIdleSequenceNames ?? Array.Empty<string>(),
+                    SkillTriggers = (x.SkillTriggers ?? Array.Empty<L2SkeletalSkillAnimationTriggerData>())
+                        .Select(trigger => new SceneSkeletalSkillAnimationTrigger
+                        {
+                            SkillId = trigger.SkillId,
+                            SkillName = trigger.SkillName ?? string.Empty,
+                            SequenceName = trigger.SequenceName ?? string.Empty,
+                            SequenceCategory = trigger.SequenceCategory ?? string.Empty,
+                            IsSocialLikeSequence = trigger.IsSocialLikeSequence
+                        })
+                        .ToArray()
+                })
+                .ToArray(),
+            ConsumerWarnings = asset.ConsumerWarnings ?? Array.Empty<string>(),
+            RequiresExplicitConsumerRouting = asset.RequiresExplicitConsumerRouting,
             Skeleton = new SceneSkeletalSkeleton
             {
                 Name = asset.MeshObjectName ?? asset.CharacterName ?? "Skeleton",
@@ -126,18 +146,30 @@ public static class L2SceneSkeletalAssetBridge
                     .Select(x => new SceneSkeletalAnimationSequence
                     {
                         Name = x.Name ?? string.Empty,
-                        NormalizedName = NormalizeSequenceName(x.Name),
-                        Category = ClassifySequenceCategory(x.Name),
+                        NormalizedName = string.IsNullOrWhiteSpace(x.NormalizedName) ? NormalizeSequenceName(x.Name) : x.NormalizedName,
+                        Category = string.IsNullOrWhiteSpace(x.Category) ? ClassifySequenceCategory(x.Name) : x.Category,
                         TotalBones = x.TotalBones,
                         TrackTime = x.TrackTime,
                         AnimRate = x.AnimRate,
                         FirstRawFrame = x.FirstRawFrame,
                         NumRawFrames = x.NumRawFrames,
-                        SuggestedLoop = IsSuggestedLoop(x.Name),
-                        IsOneShot = IsOneShot(x.Name),
-                        RequiresExplicitRouting = IsUnknownSequence(x.Name),
-                        SuggestedNextSequenceNames = BuildSuggestedNextSequenceNames(x.Name, asset.AnimationSequences ?? Array.Empty<L2SkeletalAnimationSequenceData>()),
-                        Notifies = Array.Empty<SceneSkeletalAnimationNotify>()
+                        SuggestedLoop = x.SuggestedLoop,
+                        IsOneShot = x.IsOneShot,
+                        RequiresExplicitRouting = x.RequiresExplicitRouting,
+                        SuggestedNextSequenceNames = x.SuggestedNextSequenceNames ?? Array.Empty<string>(),
+                        Notifies = (x.Notifies ?? Array.Empty<L2SkeletalAnimationNotifyData>())
+                            .Select(notify => new SceneSkeletalAnimationNotify
+                            {
+                                Time = notify.Time,
+                                FunctionName = notify.FunctionName,
+                                NotifyClassName = notify.NotifyClassName,
+                                NotifyObjectName = notify.NotifyObjectName,
+                                ExtraText = notify.ExtraText,
+                                IsCombatImpact = notify.IsCombatImpact,
+                                IsProjectileRelease = notify.IsProjectileRelease,
+                                IsSoundCue = notify.IsSoundCue
+                            })
+                            .ToArray()
                     })
                     .ToArray(),
                 Keys = (asset.AnimationKeys ?? Array.Empty<L2SkeletalAnimationKeyData>())
@@ -302,78 +334,6 @@ public static class L2SceneSkeletalAssetBridge
         }
 
         return "unknown";
-    }
-
-    private static bool IsSuggestedLoop(string name)
-    {
-        switch (ClassifySequenceCategory(name))
-        {
-            case "idle":
-            case "walk":
-            case "run":
-            case "combat_idle":
-            case "combat_skill_idle":
-            case "death_hold":
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static bool IsOneShot(string name)
-    {
-        switch (ClassifySequenceCategory(name))
-        {
-            case "attack":
-            case "skill":
-            case "social":
-            case "death":
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static bool IsUnknownSequence(string name)
-    {
-        return string.Equals(ClassifySequenceCategory(name), "unknown", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static IReadOnlyList<string> BuildSuggestedNextSequenceNames(string name, IReadOnlyList<L2SkeletalAnimationSequenceData> sequences)
-    {
-        var sequenceNames = sequences
-            .Select(x => x?.Name)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .ToArray();
-
-        switch (ClassifySequenceCategory(name))
-        {
-            case "attack":
-                return PreferSequences(sequenceNames, "atkwait", "wait");
-            case "skill":
-                return PreferSequences(sequenceNames, "spwait01", "atkwait", "wait");
-            case "social":
-                return PreferSequences(sequenceNames, "wait");
-            case "death":
-                return PreferSequences(sequenceNames, "deathwait");
-            default:
-                return Array.Empty<string>();
-        }
-    }
-
-    private static string[] PreferSequences(IReadOnlyList<string> sequenceNames, params string[] candidates)
-    {
-        var result = new List<string>(candidates.Length);
-        foreach (var candidate in candidates)
-        {
-            var match = sequenceNames.FirstOrDefault(x => string.Equals(x, candidate, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrWhiteSpace(match))
-            {
-                result.Add(match);
-            }
-        }
-
-        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public static void ApplyMeshData(Mesh mesh, MeshData meshData)
