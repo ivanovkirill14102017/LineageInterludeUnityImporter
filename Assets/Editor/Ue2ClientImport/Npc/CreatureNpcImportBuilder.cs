@@ -115,6 +115,59 @@ internal static class CreatureNpcImportBuilder
     }
 }
 
+public static class CreatureNpcBatchImportCommand
+{
+    public static void ImportByIdentifier()
+    {
+        var creatureId = GetArgumentValue("-creatureId");
+        if (string.IsNullOrWhiteSpace(creatureId))
+        {
+            throw new InvalidOperationException("Missing required -creatureId argument for batch creature import.");
+        }
+
+        var clientRoot = ConstInfo.L2GameClientPath;
+        var resolved = CreatureMeshLocator.ResolveByIdentifier(clientRoot, creatureId, Debug.Log);
+        var characterName = string.IsNullOrWhiteSpace(creatureId)
+            ? resolved.SharedAsset.MeshObjectName
+            : CreatureIdentifierUtility.NormalizeCreatureIdentifier(creatureId);
+        characterName = string.IsNullOrWhiteSpace(characterName)
+            ? resolved.SharedAsset.MeshObjectName
+            : characterName;
+
+        var referenceText = L2AssetManager.BuildReferenceText(
+            Path.GetFileNameWithoutExtension(resolved.PackagePath),
+            resolved.SharedAsset.MeshObjectName ?? characterName,
+            characterName);
+
+        L2SkeletalAnimatorPrefabBuilder.BuildFromResolvedAsset(
+            clientRoot,
+            resolved.SharedAsset,
+            CreatureNpcImportBuilder.PrefabOutputRoot,
+            CreatureNpcImportBuilder.AssetOutputRoot,
+            referenceText,
+            prefabNameSuffix: null,
+            displayLabel: characterName,
+            Debug.Log);
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[CreatureNpcBatchImportCommand] Imported '{characterName}'.");
+    }
+
+    private static string GetArgumentValue(string argumentName)
+    {
+        var arguments = Environment.GetCommandLineArgs();
+        for (var i = 0; i < arguments.Length - 1; i++)
+        {
+            if (string.Equals(arguments[i], argumentName, StringComparison.OrdinalIgnoreCase))
+            {
+                return arguments[i + 1];
+            }
+        }
+
+        return null;
+    }
+}
+
 internal static class L2SkeletalAnimatorPrefabBuilder
 {
     internal sealed class PreparedBuildData
