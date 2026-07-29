@@ -8,14 +8,7 @@ using UnityEngine;
 
 public sealed class PlayerCharacterImporterWindow : EditorWindow
 {
-    private SceneCharacterBaseClass _baseClass = SceneCharacterBaseClass.HumanFighter;
-    private SceneCharacterGender _gender = SceneCharacterGender.Male;
-    private string _status = "Ready to import a player-character wardrobe archetype prefab.";
-    private Vector2 _scroll;
-    private SceneCharacterAppearanceOptionsData _appearanceOptions;
-    private SceneCharacterEquipmentCatalogData _equipmentCatalog;
-    private SceneCharacterBaseClass _loadedBaseClass;
-    private SceneCharacterGender _loadedGender;
+    private PlayerCharacterImporterPanel _panel;
 
     [MenuItem("L2/Import Player Character Archetype")]
     private static void OpenWindow()
@@ -25,7 +18,36 @@ public sealed class PlayerCharacterImporterWindow : EditorWindow
         window.Show();
     }
 
+    private void OnEnable()
+    {
+        _panel = new PlayerCharacterImporterPanel(Repaint);
+    }
+
     private void OnGUI()
+    {
+        _panel ??= new PlayerCharacterImporterPanel(Repaint);
+        _panel.OnGUI();
+    }
+}
+
+internal sealed class PlayerCharacterImporterPanel
+{
+    private readonly Action _repaint;
+    private SceneCharacterBaseClass _baseClass = SceneCharacterBaseClass.HumanFighter;
+    private SceneCharacterGender _gender = SceneCharacterGender.Male;
+    private string _status = "Ready to import a player-character wardrobe archetype prefab.";
+    private Vector2 _scroll;
+    private SceneCharacterAppearanceOptionsData _appearanceOptions;
+    private SceneCharacterEquipmentCatalogData _equipmentCatalog;
+    private SceneCharacterBaseClass _loadedBaseClass;
+    private SceneCharacterGender _loadedGender;
+
+    public PlayerCharacterImporterPanel(Action repaint)
+    {
+        _repaint = repaint;
+    }
+
+    public void OnGUI()
     {
         EditorGUILayout.LabelField("Import a player-character wardrobe archetype prefab", EditorStyles.boldLabel);
         EditorGUILayout.Space();
@@ -57,7 +79,7 @@ public sealed class PlayerCharacterImporterWindow : EditorWindow
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll))
+        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
         {
             _scroll = scroll.scrollPosition;
             EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
@@ -129,7 +151,7 @@ public sealed class PlayerCharacterImporterWindow : EditorWindow
     private void AppendStatus(string message)
     {
         _status = $"{_status}\n{message}";
-        Repaint();
+        _repaint?.Invoke();
     }
 
     private static string NormalizeDbRoot(string dbRoot)

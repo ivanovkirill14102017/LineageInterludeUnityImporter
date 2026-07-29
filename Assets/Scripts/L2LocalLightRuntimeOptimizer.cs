@@ -9,21 +9,21 @@ using UnityEditor;
 public sealed class L2LocalLightRuntimeOptimizer : MonoBehaviour
 {
     [Header("Budgets")]
-    public int MaxActiveLights = 24;
+    public int MaxActiveLights = 70;
     public int MaxShadowLights = 2;
 
     [Header("Distances")]
-    public float MaxLightDistance = 28f;
+    public float MaxLightDistance = 200f;
     public float MaxShadowDistance = 12f;
 
     [Header("Refresh")]
-    public float EvaluationIntervalSeconds = 0.25f;
+    public float EvaluationIntervalSeconds = 2f;
     public float DiscoveryIntervalSeconds = 4f;
     public bool AffectBakedLights = false;
 
     [Header("Editor Preview")]
     public bool PreviewInEditMode = true;
-    public float EditorEvaluationIntervalSeconds = 0.5f;
+    public float EditorEvaluationIntervalSeconds = 2f;
     public float EditorDiscoveryIntervalSeconds = 4f;
 
     private readonly List<ManagedLight> _managedLights = new List<ManagedLight>(128);
@@ -197,7 +197,7 @@ public sealed class L2LocalLightRuntimeOptimizer : MonoBehaviour
                 continue;
             }
 
-            var distanceSqr = (light.transform.position - origin).sqrMagnitude;
+            var distanceSqr = HorizontalDistanceSqr(light.transform.position, origin);
             if (distanceSqr > maxLightDistanceSqr)
             {
                 continue;
@@ -291,6 +291,13 @@ public sealed class L2LocalLightRuntimeOptimizer : MonoBehaviour
         {
             light.shadows = shadows;
         }
+    }
+
+    private static float HorizontalDistanceSqr(Vector3 left, Vector3 right)
+    {
+        var dx = left.x - right.x;
+        var dz = left.z - right.z;
+        return (dx * dx) + (dz * dz);
     }
 
     private readonly struct ManagedLight

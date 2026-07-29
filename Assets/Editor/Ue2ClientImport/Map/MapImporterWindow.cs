@@ -1,19 +1,12 @@
+using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
-using System.Collections.Concurrent;
-using System;
-using System.Threading.Tasks;
 
 public sealed class MapImporterWindow : EditorWindow
 {
-    private const string DefaultMapRelativePath = @"Maps\20_20.unr";
-
-    private string _mapRelativePath = DefaultMapRelativePath;
-    private string _dbRootPath = ConstInfo.L2DbRootPath;
-    private bool _isImportRunning;
-    private string _status = "Ready to import.";
-    private Vector2 _scroll;
-    private ConcurrentQueue<string> _logQueue = new ConcurrentQueue<string>();
+    private MapImporterPanel _panel;
 
     [MenuItem("L2/Import Terrain")]
     private static void OpenWindow()
@@ -25,30 +18,46 @@ public sealed class MapImporterWindow : EditorWindow
 
     private void OnEnable()
     {
-        EditorApplication.update += OnEditorUpdate;
+        _panel = new MapImporterPanel(Repaint);
     }
 
     private void OnDisable()
     {
-        EditorApplication.update -= OnEditorUpdate;
-    }
-
-    private void OnEditorUpdate()
-    {
-        bool hasMessages = false;
-        while (_logQueue.TryDequeue(out var message))
-        {
-            _status = $"{_status}\n{message}";
-            hasMessages = true;
-        }
-
-        if (hasMessages)
-        {
-            Repaint();
-        }
+        _panel?.Dispose();
+        _panel = null;
     }
 
     private void OnGUI()
+    {
+        _panel ??= new MapImporterPanel(Repaint);
+        _panel.OnGUI();
+    }
+}
+
+internal sealed class MapImporterPanel : IDisposable
+{
+    private const string DefaultMapRelativePath = @"Maps\20_20.unr";
+
+    private readonly Action _repaint;
+    private readonly ConcurrentQueue<string> _logQueue = new ConcurrentQueue<string>();
+    private string _mapRelativePath = DefaultMapRelativePath;
+    private string _dbRootPath = ConstInfo.L2DbRootPath;
+    private bool _isImportRunning;
+    private string _status = "Ready to import.";
+    private Vector2 _scroll;
+
+    public MapImporterPanel(Action repaint)
+    {
+        _repaint = repaint;
+        EditorApplication.update += OnEditorUpdate;
+    }
+
+    public void Dispose()
+    {
+        EditorApplication.update -= OnEditorUpdate;
+    }
+
+    public void OnGUI()
     {
         EditorGUILayout.LabelField("Import map content from the Lineage II client", EditorStyles.boldLabel);
         EditorGUILayout.Space();
@@ -69,32 +78,39 @@ public sealed class MapImporterWindow : EditorWindow
             {
                 QueueImport(ImportAllAsync);
             }
+
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Import Terrain Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportTerrainAsync);
                 }
+
                 if (GUILayout.Button("Import Meshes Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportMeshesAsync);
                 }
+
                 if (GUILayout.Button("Import BSP Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportBspAsync);
                 }
+
                 if (GUILayout.Button("Import Lights Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportLightsAsync);
                 }
+
                 if (GUILayout.Button("Import Volumes Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportVolumesAsync);
                 }
+
                 if (GUILayout.Button("Import Particles Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportParticlesAsync);
                 }
+
                 if (GUILayout.Button("Import Creatures Only", GUILayout.Height(24f)))
                 {
                     QueueImport(ImportCreaturesAsync);
@@ -105,10 +121,25 @@ public sealed class MapImporterWindow : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
 
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll))
+        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
         {
             _scroll = scroll.scrollPosition;
             EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
+        }
+    }
+
+    private void OnEditorUpdate()
+    {
+        var hasMessages = false;
+        while (_logQueue.TryDequeue(out var message))
+        {
+            _status = $"{_status}\n{message}";
+            hasMessages = true;
+        }
+
+        if (hasMessages)
+        {
+            _repaint?.Invoke();
         }
     }
 
@@ -138,7 +169,7 @@ public sealed class MapImporterWindow : EditorWindow
             {
                 context?.Dispose();
                 _isImportRunning = false;
-                Repaint();
+                _repaint?.Invoke();
             }
         }
     }
@@ -156,7 +187,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -176,7 +207,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -196,7 +227,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -216,7 +247,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -236,7 +267,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -256,7 +287,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -276,7 +307,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);
@@ -296,7 +327,7 @@ public sealed class MapImporterWindow : EditorWindow
         {
             throw;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             _status = exception.ToString();
             Debug.LogException(exception);

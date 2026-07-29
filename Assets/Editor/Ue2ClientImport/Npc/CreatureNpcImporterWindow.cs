@@ -4,11 +4,7 @@ using UnityEngine;
 
 public sealed class CreatureNpcImporterWindow : EditorWindow
 {
-    private static readonly string DefaultCreatureId = string.Empty;
-
-    private string _creatureId = DefaultCreatureId;
-    private string _status = "Ready to import a SceneDomain creature prefab.";
-    private Vector2 _scroll;
+    private CreatureNpcImporterPanel _panel;
 
     [MenuItem("L2/Import Creature Prefab")]
     private static void OpenWindow()
@@ -18,7 +14,33 @@ public sealed class CreatureNpcImporterWindow : EditorWindow
         window.Show();
     }
 
+    private void OnEnable()
+    {
+        _panel = new CreatureNpcImporterPanel(Repaint);
+    }
+
     private void OnGUI()
+    {
+        _panel ??= new CreatureNpcImporterPanel(Repaint);
+        _panel.OnGUI();
+    }
+}
+
+internal sealed class CreatureNpcImporterPanel
+{
+    private static readonly string DefaultCreatureId = string.Empty;
+
+    private readonly Action _repaint;
+    private string _creatureId = DefaultCreatureId;
+    private string _status = "Ready to import a SceneDomain creature prefab.";
+    private Vector2 _scroll;
+
+    public CreatureNpcImporterPanel(Action repaint)
+    {
+        _repaint = repaint;
+    }
+
+    public void OnGUI()
     {
         EditorGUILayout.LabelField("Import a SceneDomain creature prefab", EditorStyles.boldLabel);
         EditorGUILayout.Space();
@@ -37,18 +59,15 @@ public sealed class CreatureNpcImporterWindow : EditorWindow
 
         using (new EditorGUI.DisabledScope(EditorApplication.isCompiling))
         {
-            using (new EditorGUILayout.HorizontalScope())
+            if (GUILayout.Button("Import Creature", GUILayout.Height(34f)))
             {
-                if (GUILayout.Button("Import Creature", GUILayout.Height(34f)))
-                {
-                    ImportCurrentMesh();
-                }
+                ImportCurrentMesh();
             }
         }
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll))
+        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
         {
             _scroll = scroll.scrollPosition;
             EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
@@ -73,6 +92,6 @@ public sealed class CreatureNpcImporterWindow : EditorWindow
     private void AppendStatus(string message)
     {
         _status = $"{_status}\n{message}";
-        Repaint();
+        _repaint?.Invoke();
     }
 }
