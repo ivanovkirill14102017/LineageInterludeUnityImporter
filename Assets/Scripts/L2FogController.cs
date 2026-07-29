@@ -15,16 +15,27 @@ public sealed class L2FogController : MonoBehaviour
     public bool AdjustFog = true;
     public float IndoorFogAttenuationDistance = 50f;
     public float IndoorVolumetricFogDistance = 2f;
+    public float IndoorFogDistanceMultiplier = 2.5f;
+    public float GlobalFogDistanceMultiplier = 1.6f;
+    public bool UseFullDistanceFogGradient = true;
     public bool UseMapAverageFogCalibration = true;
     public float FallbackAverageSourceFogEnd = 12000f;
     public float FogSourceScaleMin = 0.35f;
     public float FogSourceScaleMax = 2.5f;
+
+    [Header("Fog Color")]
+    public bool AdjustFogColor = true;
+    public Color IndoorFogColor = new Color(0.40f, 0.43f, 0.46f, 1f);
+    public Color OutdoorFogColor = new Color(0.58f, 0.66f, 0.74f, 1f);
+    [Range(0f, 1f)] public float SceneAmbientFogColorBlend = 0.35f;
+    public float FogColorIntensity = 0.82f;
 
     [Header("Outdoor Zone Override")]
     public bool UseOutdoorZoneFogOverride = true;
     public float OutdoorZoneSourceFogEnd = 15000f;
     public float OutdoorZoneSourceFogEndTolerance = 1f;
     public float OutdoorZoneFogAttenuationDistance = 300f;
+    public float OutdoorFogDistanceMultiplier = 1.4285715f;
 
     [Header("Debug")]
     [SerializeField] private bool fogAvailable;
@@ -214,21 +225,24 @@ public sealed class L2FogController : MonoBehaviour
         }
 
         var worldScale = Mathf.Max(0.0001f, Probe.WorldScaleFactor);
-        effectiveIndoorFogAttenuationDistance = IndoorFogAttenuationDistance * fogSourceScale * worldScale;
-        effectiveIndoorVolumetricFogDistance = IndoorVolumetricFogDistance * fogSourceScale * worldScale;
+        var indoorFogDistanceMultiplier = Mathf.Max(0.01f, IndoorFogDistanceMultiplier);
+        effectiveIndoorFogAttenuationDistance = IndoorFogAttenuationDistance * indoorFogDistanceMultiplier * fogSourceScale * worldScale;
+        effectiveIndoorVolumetricFogDistance = IndoorVolumetricFogDistance * indoorFogDistanceMultiplier * fogSourceScale * worldScale;
 
         var blend = Probe.IndoorWeight;
-        var outdoorFogAttenuation = _capturedOutdoorFogValues ? _outdoorFogAttenuationDistance : IndoorFogAttenuationDistance;
-        var outdoorVolumetricDistance = _capturedOutdoorFogValues ? _outdoorVolumetricFogDistance : IndoorVolumetricFogDistance;
+        var outdoorFogDistanceMultiplier = Mathf.Max(0.01f, OutdoorFogDistanceMultiplier);
+        var outdoorFogAttenuation = (_capturedOutdoorFogValues ? _outdoorFogAttenuationDistance : IndoorFogAttenuationDistance) * outdoorFogDistanceMultiplier;
+        var outdoorVolumetricDistance = (_capturedOutdoorFogValues ? _outdoorVolumetricFogDistance : IndoorVolumetricFogDistance) * outdoorFogDistanceMultiplier;
 
         if (ShouldUseOutdoorZoneFogOverride(activeSourceFogEnd))
         {
-            outdoorFogAttenuation = OutdoorZoneFogAttenuationDistance * worldScale;
+            outdoorFogAttenuation = OutdoorZoneFogAttenuationDistance * outdoorFogDistanceMultiplier * worldScale;
             usingOutdoorZoneOverride = true;
         }
 
-        resolvedTargetFogEnd = Mathf.Lerp(outdoorFogAttenuation, effectiveIndoorFogAttenuationDistance, blend);
-        resolvedTargetFogRange = Mathf.Lerp(outdoorVolumetricDistance, effectiveIndoorVolumetricFogDistance, blend);
+        var globalFogDistanceMultiplier = Mathf.Max(0.01f, GlobalFogDistanceMultiplier);
+        resolvedTargetFogEnd = Mathf.Lerp(outdoorFogAttenuation, effectiveIndoorFogAttenuationDistance, blend) * globalFogDistanceMultiplier;
+        resolvedTargetFogRange = Mathf.Lerp(outdoorVolumetricDistance, effectiveIndoorVolumetricFogDistance, blend) * globalFogDistanceMultiplier;
     }
 
     private void StartTransition(float targetFogEnd, float targetFogRange, float durationSeconds)
@@ -287,15 +301,46 @@ public sealed class L2FogController : MonoBehaviour
     {
         var clampedFogEnd = Mathf.Max(0.01f, fogEndDistance);
         var clampedFogRange = Mathf.Max(0.01f, fogRange);
-        var fogStartDistance = Mathf.Max(0f, clampedFogEnd - clampedFogRange);
+        var fogStartDistance = UseFullDistanceFogGradient
+            ? 0f
+            : Mathf.Max(0f, clampedFogEnd - clampedFogRange);
 
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogStartDistance = fogStartDistance;
         RenderSettings.fogEndDistance = Mathf.Max(fogStartDistance + 0.01f, clampedFogEnd);
+        ApplyFogColor();
 
         currentFogAttenuationDistance = RenderSettings.fogEndDistance;
         currentVolumetricFogDistance = RenderSettings.fogEndDistance - RenderSettings.fogStartDistance;
+    }
+
+    private void ApplyFogColor()
+    {
+        if (!AdjustFogColor)
+        {
+            return;
+        }
+
+        var indoorWeight = Probe != null ? Probe.IndoorWeight : 0f;
+        var targetColor = Color.Lerp(OutdoorFogColor, IndoorFogColor, indoorWeight);
+        var ambientColor = ResolveSceneAmbientColor();
+        targetColor = Color.Lerp(targetColor, ambientColor, Mathf.Clamp01(SceneAmbientFogColorBlend));
+        targetColor *= Mathf.Max(0f, FogColorIntensity);
+        targetColor.a = 1f;
+        RenderSettings.fogColor = targetColor;
+    }
+
+    private static Color ResolveSceneAmbientColor()
+    {
+        if (RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Trilight)
+        {
+            return Color.Lerp(RenderSettings.ambientEquatorColor, RenderSettings.ambientSkyColor, 0.5f);
+        }
+
+        return RenderSettings.ambientLight.maxColorComponent > 0.001f
+            ? RenderSettings.ambientLight
+            : RenderSettings.fogColor;
     }
 
     private void ResetDebugState()

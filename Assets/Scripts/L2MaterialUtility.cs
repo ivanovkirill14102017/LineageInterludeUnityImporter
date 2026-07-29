@@ -176,6 +176,11 @@ public static class L2MaterialUtility
             material.SetFloat("_Surface", 1f);
         }
 
+        if (material.HasProperty("_EnableBlendModePreserveSpecularLighting"))
+        {
+            material.SetFloat("_EnableBlendModePreserveSpecularLighting", 0f);
+        }
+
         if (material.HasProperty("_AlphaClip"))
         {
             material.SetFloat("_AlphaClip", 0f);
