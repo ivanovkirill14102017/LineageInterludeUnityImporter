@@ -7,7 +7,12 @@ using UnityEngine;
 
 internal static class BspMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
+    public static Task ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        MapImportExecutionContext context = null,
+        bool finalizeScene = true)
     {
         context?.Report("BSP", "Build room-grouped BSP scene", 0.12f);
         log("[BSP] START Build room-grouped BSP scene");
@@ -40,10 +45,13 @@ internal static class BspMapImporter
             mapRoot: mapRoot,
             context: context);
 
-        log("[BSP] START Finalize");
-        context?.Report("BSP", "Finalize", 0.96f);
-        MapImportFinalizer.Complete(mapRoot, log);
-        log("[BSP] DONE Finalize");
+        if (finalizeScene)
+        {
+            log("[BSP] START Finalize");
+            context?.Report("BSP", "Finalize", 0.96f);
+            MapImportFinalizer.Complete(mapRoot, log);
+            log("[BSP] DONE Finalize");
+        }
         log("BSP import finished.");
         return Task.CompletedTask;
     }

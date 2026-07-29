@@ -12,7 +12,12 @@ using UnityEngine;
 
 internal static class ParticleMapImporter
 {
-    public static void ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
+    public static void ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        MapImportExecutionContext context = null,
+        bool finalizeScene = true)
     {
         context?.Report("Particles", "Build emitter data", 0.18f);
         var buildStopwatch = Stopwatch.StartNew();
@@ -55,12 +60,15 @@ internal static class ParticleMapImporter
         objectStopwatch.Stop();
         log($"[Particles] Build particle objects took {objectStopwatch.Elapsed.TotalSeconds:F2}s");
 
-        context?.ThrowIfCancellationRequested();
-        context?.Report("Particles", "Finalize", 0.96f);
-        var finalizeStopwatch = Stopwatch.StartNew();
-        MapImportFinalizer.Complete(mapRoot, log);
-        finalizeStopwatch.Stop();
-        log($"[Particles] Finalize took {finalizeStopwatch.Elapsed.TotalSeconds:F2}s");
+        if (finalizeScene)
+        {
+            context?.ThrowIfCancellationRequested();
+            context?.Report("Particles", "Finalize", 0.96f);
+            var finalizeStopwatch = Stopwatch.StartNew();
+            MapImportFinalizer.Complete(mapRoot, log);
+            finalizeStopwatch.Stop();
+            log($"[Particles] Finalize took {finalizeStopwatch.Elapsed.TotalSeconds:F2}s");
+        }
     }
 
     private static void EnsureParticleMeshDependencies(

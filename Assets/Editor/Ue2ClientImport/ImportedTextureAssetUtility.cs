@@ -1,3 +1,4 @@
+using System.IO;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Services;
 using L2Viewer.SceneDomain.Services.MaterialServices;
@@ -39,5 +40,41 @@ internal static class ImportedTextureAssetUtility
         }
 
         return texture;
+    }
+
+    public static bool PrepareTextureAssetFile(
+        string textureReference,
+        TextureData textureData,
+        string textureDir,
+        string fallbackCategory,
+        MaterialKnownTraits traits,
+        bool reuseExisting,
+        out string texturePath,
+        out Texture2D loadedTexture)
+    {
+        texturePath = BuildTextureAssetPath(textureDir, textureReference, fallbackCategory);
+        loadedTexture = reuseExisting
+            ? AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
+            : null;
+        if (loadedTexture != null)
+        {
+            return false;
+        }
+
+        if (textureData == null)
+        {
+            return File.Exists(texturePath);
+        }
+
+        if (!reuseExisting || !File.Exists(texturePath))
+        {
+            L2AssetManager.WriteTextureAssetFile(
+                textureData,
+                texturePath,
+                false,
+                StaticMeshImportUtility.NeedsAlpha(traits));
+        }
+
+        return true;
     }
 }

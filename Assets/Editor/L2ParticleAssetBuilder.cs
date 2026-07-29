@@ -37,7 +37,7 @@ internal static class L2ParticleAssetBuilder
 
         var textureManager = new BspTextureManager(clientPath);
         var resolvedTextures = ResolveTextures(emitters, textureManager);
-        var textureAssets = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        var textureAssets = PrepareParticleTextureAssets(outputDir, resolvedTextures);
         var materialAssets = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
 
         var missingTextureReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -51,7 +51,7 @@ internal static class L2ParticleAssetBuilder
 
             foreach (var layer in emitter.Layers.OrderBy(x => x.ExportIndex))
             {
-               BuildSpriteLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, missingTextureReferences);               
+                BuildSpriteLayer(layer, outputDir, resolvedTextures, textureAssets, materialAssets, emitterRoot.transform, missingTextureReferences);
             }
 
             foreach (var layer in emitter.MeshLayers.OrderBy(x => x.ExportIndex))
@@ -74,7 +74,59 @@ internal static class L2ParticleAssetBuilder
                 }
             }
         }
-  }
+    }
+
+    private static Dictionary<string, Texture2D> PrepareParticleTextureAssets(
+        string outputDir,
+        IReadOnlyDictionary<string, BspTextureManager.ResolvedTexture> resolvedTextures)
+    {
+        var textureAssets = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        var pendingTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var resolvedTexture in resolvedTextures)
+        {
+            if (string.IsNullOrWhiteSpace(resolvedTexture.Key) || resolvedTexture.Value?.Texture == null)
+            {
+                continue;
+            }
+
+            var needsRefresh = ImportedTextureAssetUtility.PrepareTextureAssetFile(
+                resolvedTexture.Key,
+                resolvedTexture.Value.Texture,
+                $"{outputDir}/Particles/Textures",
+                "Particles/Textures",
+                traits: null,
+                reuseExisting: true,
+                out var texturePath,
+                out var loadedTexture);
+            if (loadedTexture != null)
+            {
+                textureAssets[resolvedTexture.Key] = loadedTexture;
+                continue;
+            }
+
+            if (needsRefresh)
+            {
+                pendingTexturePaths[resolvedTexture.Key] = texturePath;
+            }
+        }
+
+        if (pendingTexturePaths.Count > 0)
+        {
+            AssetDatabase.Refresh();
+        }
+
+        foreach (var pendingTexture in pendingTexturePaths)
+        {
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(pendingTexture.Value);
+            if (texture != null)
+            {
+                textureAssets[pendingTexture.Key] = texture;
+            }
+        }
+
+        return textureAssets;
+    }
 
     private static bool BuildSpriteLayer(
         SceneSpriteEmitterLayerData layer,
@@ -394,10 +446,6 @@ internal static class L2ParticleAssetBuilder
 
         var texturePath = BuildParticleTexturePath(outputDir, textureReference);
         var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
-        if (texture == null)
-        {
-            texture = L2AssetManager.CreateTextureAsset(resolved.Texture, texturePath, false, true);
-        }
 
         textureAssets[textureReference] = texture;
         return texture;

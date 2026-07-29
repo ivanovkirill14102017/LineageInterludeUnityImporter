@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using L2Viewer.SceneDomain.Models;
-using UnityEditor;
 using UnityEngine;
 
 internal static class StaticMeshInstancePlacer
@@ -35,7 +34,7 @@ internal static class StaticMeshInstancePlacer
                 continue;
             }
 
-            var visual = PrefabUtility.InstantiatePrefab(prefab, parent.transform) as GameObject;
+            var visual = InstantiateSceneObject(prefab, parent.transform);
             if (visual == null)
             {
                 continue;
@@ -75,7 +74,7 @@ internal static class StaticMeshInstancePlacer
             throw new InvalidOperationException("Could not load Default_Flame01 override prefab.");
         }
 
-        var visual = PrefabUtility.InstantiatePrefab(prefab, parent.transform) as GameObject;
+        var visual = InstantiateSceneObject(prefab, parent.transform);
         if (visual == null)
         {
             throw new InvalidOperationException("Unity failed to instantiate Default_Flame01 override prefab.");
@@ -123,6 +122,13 @@ internal static class StaticMeshInstancePlacer
     private static float SafeScale(float value)
     {
         return Math.Abs(value) < 0.0001f ? 1f : value;
+    }
+
+    private static GameObject InstantiateSceneObject(GameObject prefab, Transform parent)
+    {
+        return prefab == null
+            ? null
+            : UnityEngine.Object.Instantiate(prefab, parent, false);
     }
 
 }

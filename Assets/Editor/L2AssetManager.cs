@@ -12,6 +12,9 @@ internal static class L2AssetManager
     public static string SharedStaticMeshesRoot => $"{SharedPackagesRoot}/StaticMeshes";
     public static string SharedSkeletalCharactersRoot => SharedAnimationsRoot;
     public static string ManagedStaticMeshPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshPrefabs";
+    public static string ManagedTerrainDetailPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/TerrainDetailPrefabs";
+    public static string ManagedTerrainTreePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/TerrainTreePrefabs";
+    public static string ManagedTerrainTreeMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/TerrainTreeMaterials";
     public static string ManagedCreaturePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/CreaturePrefabs";
     public static string ManagedPlayerCharacterPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/PlayerCharacterPrefabs";
     public static string SharedMaterialsRoot => $"{SharedPackagesRoot}/Materials";
@@ -196,7 +199,7 @@ internal static class L2AssetManager
         }
 
         EnsureFolderExists(directory);
-        var suffixPart = string.IsNullOrWhiteSpace(suffix) ? string.Empty : $"_{suffix}";
+        var suffixPart = string.IsNullOrWhiteSpace(suffix) ? string.Empty : $"_{SanitizePathSegment(suffix)}";
         return $"{directory}/{prefix}_{fileStem}{suffixPart}.{extension.TrimStart('.')}";
     }
 

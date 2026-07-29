@@ -502,24 +502,6 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         if (finalizeAssets)
         {
             AssetDatabase.SaveAssets();
-            AssetDatabase.ImportAsset(prepared.CharacterAssetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-            AssetDatabase.ImportAsset(archetypeAssetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-            AssetDatabase.ImportAsset(meshPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-            foreach (var clip in clips)
-            {
-                AssetDatabase.ImportAsset(clip.Path, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-            }
-
-            if (controller != null)
-            {
-                var controllerPath = AssetDatabase.GetAssetPath(controller);
-                if (!string.IsNullOrWhiteSpace(controllerPath))
-                {
-                    AssetDatabase.ImportAsset(controllerPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-                }
-            }
-
-            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         }
 
         var prefab = finalizeAssets ? AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) : null;

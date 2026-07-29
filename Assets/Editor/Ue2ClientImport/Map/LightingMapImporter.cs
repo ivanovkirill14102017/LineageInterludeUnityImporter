@@ -6,7 +6,12 @@ using UnityEngine;
 
 internal static class LightingMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
+    public static Task ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        MapImportExecutionContext context = null,
+        bool finalizeScene = true)
     {
         context?.Report("Lights", "Build light data", 0.18f);
         log("[Lighting] START Build light data");
@@ -51,14 +56,17 @@ internal static class LightingMapImporter
         log("[Lighting] DONE Build light objects");
         log($"[Lighting] Build light objects took {objectStopwatch.Elapsed.TotalSeconds:F2}s");
 
-        log("[Lighting] START Finalize");
-        context?.ThrowIfCancellationRequested();
-        context?.Report("Lights", "Finalize", 0.96f);
-        var finalizeStopwatch = Stopwatch.StartNew();
-        MapImportFinalizer.Complete(mapRoot, log);
-        finalizeStopwatch.Stop();
-        log("[Lighting] DONE Finalize");
-        log($"[Lighting] Finalize took {finalizeStopwatch.Elapsed.TotalSeconds:F2}s");
+        if (finalizeScene)
+        {
+            log("[Lighting] START Finalize");
+            context?.ThrowIfCancellationRequested();
+            context?.Report("Lights", "Finalize", 0.96f);
+            var finalizeStopwatch = Stopwatch.StartNew();
+            MapImportFinalizer.Complete(mapRoot, log);
+            finalizeStopwatch.Stop();
+            log("[Lighting] DONE Finalize");
+            log($"[Lighting] Finalize took {finalizeStopwatch.Elapsed.TotalSeconds:F2}s");
+        }
         log("Light import finished.");
         return Task.CompletedTask;
     }

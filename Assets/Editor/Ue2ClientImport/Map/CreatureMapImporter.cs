@@ -14,7 +14,12 @@ internal static class CreatureMapImporter
 {
     private const float UnrealUnitsToDegrees = 360f / 65536f;
 
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
+    public static Task ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        MapImportExecutionContext context = null,
+        bool finalizeScene = true)
     {
         var importStopwatch = Stopwatch.StartNew();
         var dbRootPath = ConstInfo.L2DbRootPath?.Trim() ?? string.Empty;
@@ -68,8 +73,11 @@ internal static class CreatureMapImporter
         PlaceSpawns(selectedSpawns, creatureRoot, prefabCache, log);
         placementStopwatch.Stop();
         log($"[Creatures/Timing] Spawn placement took {placementStopwatch.Elapsed.TotalSeconds:F2}s");
-        context?.Report("Creatures", "Finalize scene objects", 0.98f);
-        MapImportFinalizer.Complete(mapRoot, log);
+        if (finalizeScene)
+        {
+            context?.Report("Creatures", "Finalize scene objects", 0.98f);
+            MapImportFinalizer.Complete(mapRoot, log);
+        }
         importStopwatch.Stop();
         log($"[Creatures/Timing] Total creature import took {importStopwatch.Elapsed.TotalSeconds:F2}s");
         log("[Creatures] Import finished.");
@@ -171,18 +179,20 @@ internal static class CreatureMapImporter
 
         context?.Report("Creatures", $"Import {texturePlansByReference.Count} texture plans", 0.56f);
         var textureImportStopwatch = Stopwatch.StartNew();
-        CreatureSkeletalMaterialImporter.ImportTexturePlansBatch(
+        var createdTextureAssets = CreatureSkeletalMaterialImporter.ImportTexturePlansBatch(
             texturePlansByReference.Values.ToArray(),
             L2AssetManager.SharedTexturesRoot);
         textureImportStopwatch.Stop();
         log($"[Creatures/Timing] Texture asset import batch took {textureImportStopwatch.Elapsed.TotalSeconds:F2}s");
 
-        context?.Report("Creatures", "Save and refresh texture assets", 0.60f);
+        context?.Report("Creatures", "Refresh texture assets", 0.60f);
         var textureRefreshStopwatch = Stopwatch.StartNew();
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
+        if (createdTextureAssets > 0)
+        {
+            AssetDatabase.Refresh();
+        }
         textureRefreshStopwatch.Stop();
-        log($"[Creatures/Timing] Save/refresh after texture import took {textureRefreshStopwatch.Elapsed.TotalSeconds:F2}s");
+        log($"[Creatures/Timing] Refresh after texture import took {textureRefreshStopwatch.Elapsed.TotalSeconds:F2}s");
 
         context?.Report("Creatures", $"Build materials for {preparedBuilds.Count} prefabs", 0.66f);
         var materialBatchStopwatch = Stopwatch.StartNew();
@@ -206,13 +216,6 @@ internal static class CreatureMapImporter
         });
         materialBatchStopwatch.Stop();
         log($"[Creatures/Timing] Material asset batch took {materialBatchStopwatch.Elapsed.TotalSeconds:F2}s");
-
-        context?.Report("Creatures", "Save and refresh material assets", 0.72f);
-        var materialRefreshStopwatch = Stopwatch.StartNew();
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        materialRefreshStopwatch.Stop();
-        log($"[Creatures/Timing] Save/refresh after material batch took {materialRefreshStopwatch.Elapsed.TotalSeconds:F2}s");
 
         context?.Report("Creatures", $"Build meshes/clips/controllers/prefabs for {preparedBuilds.Count} prefabs", 0.78f);
         var finalizePrefabBatchStopwatch = Stopwatch.StartNew();
@@ -240,12 +243,11 @@ internal static class CreatureMapImporter
         finalizePrefabBatchStopwatch.Stop();
         log($"[Creatures/Timing] Final skeletal asset batch (mesh/clip/controller/prefab) took {finalizePrefabBatchStopwatch.Elapsed.TotalSeconds:F2}s");
 
-        context?.Report("Creatures", "Save and refresh prefab assets", 0.86f);
+        context?.Report("Creatures", "Save prefab assets", 0.86f);
         var prefabRefreshStopwatch = Stopwatch.StartNew();
         AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
         prefabRefreshStopwatch.Stop();
-        log($"[Creatures/Timing] Save/refresh after prefab batch took {prefabRefreshStopwatch.Elapsed.TotalSeconds:F2}s");
+        log($"[Creatures/Timing] Save after prefab batch took {prefabRefreshStopwatch.Elapsed.TotalSeconds:F2}s");
 
         context?.Report("Creatures", $"Load {prefabPaths.Count} prefab assets", 0.90f);
         var prefabLoadStopwatch = Stopwatch.StartNew();
@@ -441,7 +443,7 @@ internal static class CreatureMapImporter
                 continue;
             }
 
-            var visual = PrefabUtility.InstantiatePrefab(prefab, parent.transform) as GameObject;
+            var visual = InstantiateSceneObject(prefab, parent.transform);
             if (visual == null)
             {
                 continue;
@@ -472,6 +474,13 @@ internal static class CreatureMapImporter
     {
         var yawDegrees = heading * UnrealUnitsToDegrees;
         return Quaternion.Euler(0f, -yawDegrees, 0f);
+    }
+
+    private static GameObject InstantiateSceneObject(GameObject prefab, Transform parent)
+    {
+        return prefab == null
+            ? null
+            : UnityEngine.Object.Instantiate(prefab, parent, false);
     }
 
     private static string BuildPrefabKey(SceneCreatureSpawnData spawn)

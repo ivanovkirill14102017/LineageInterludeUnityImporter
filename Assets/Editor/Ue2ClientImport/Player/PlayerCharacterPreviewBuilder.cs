@@ -12,6 +12,9 @@ using UnityEngine;
 
 internal static class PlayerCharacterPreviewBuilder
 {
+    private static readonly Dictionary<string, Dictionary<string, string>> SkeletalPackageIndexCache =
+        new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+
     internal readonly struct ImportResult
     {
         public ImportResult(string prefabPath, string characterAssetPath)
@@ -120,8 +123,6 @@ internal static class PlayerCharacterPreviewBuilder
         CreatePreviewPrefab(baseAsset, renderParts, controller, prefabPath, characterName, appearance, log);
 
         AssetDatabase.SaveAssets();
-        AssetDatabase.ImportAsset(characterAssetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-        AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
 
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (prefab != null)
@@ -451,6 +452,11 @@ internal static class PlayerCharacterPreviewBuilder
 
     private static Dictionary<string, string> BuildSkeletalPackageIndex(string clientRoot)
     {
+        if (SkeletalPackageIndexCache.TryGetValue(clientRoot, out var cached))
+        {
+            return cached;
+        }
+
         var searchRoot = Path.Combine(clientRoot, "animations");
         if (!Directory.Exists(searchRoot))
         {
@@ -467,6 +473,7 @@ internal static class PlayerCharacterPreviewBuilder
             }
         }
 
+        SkeletalPackageIndexCache[clientRoot] = index;
         return index;
     }
 

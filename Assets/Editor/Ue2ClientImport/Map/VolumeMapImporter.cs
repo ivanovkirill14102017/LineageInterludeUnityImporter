@@ -11,7 +11,12 @@ using UnityEngine;
 
 internal static class VolumeMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
+    public static Task ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        MapImportExecutionContext context = null,
+        bool finalizeScene = true)
     {
         context?.Report("Volumes", "Build volume data", 0.18f);
         log("[Volumes] START Build volume data");
@@ -54,14 +59,17 @@ internal static class VolumeMapImporter
         log("[Volumes] DONE Build volume objects");
         log($"[Volumes] Build volume objects took {objectStopwatch.Elapsed.TotalSeconds:F2}s");
 
-        log("[Volumes] START Finalize");
-        context?.ThrowIfCancellationRequested();
-        context?.Report("Volumes", "Finalize", 0.96f);
-        var finalizeStopwatch = Stopwatch.StartNew();
-        MapImportFinalizer.Complete(mapRoot, log);
-        finalizeStopwatch.Stop();
-        log("[Volumes] DONE Finalize");
-        log($"[Volumes] Finalize took {finalizeStopwatch.Elapsed.TotalSeconds:F2}s");
+        if (finalizeScene)
+        {
+            log("[Volumes] START Finalize");
+            context?.ThrowIfCancellationRequested();
+            context?.Report("Volumes", "Finalize", 0.96f);
+            var finalizeStopwatch = Stopwatch.StartNew();
+            MapImportFinalizer.Complete(mapRoot, log);
+            finalizeStopwatch.Stop();
+            log("[Volumes] DONE Finalize");
+            log($"[Volumes] Finalize took {finalizeStopwatch.Elapsed.TotalSeconds:F2}s");
+        }
         log("Volume import finished.");
         return Task.CompletedTask;
     }

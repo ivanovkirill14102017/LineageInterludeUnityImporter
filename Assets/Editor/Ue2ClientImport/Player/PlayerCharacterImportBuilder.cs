@@ -80,8 +80,6 @@ internal static class PlayerCharacterImportBuilder
         CreateDebugPrefab(characterAsset, characterName, prefabPath, appearance, log);
 
         AssetDatabase.SaveAssets();
-        AssetDatabase.ImportAsset(characterAssetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-        AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
 
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (prefab != null)

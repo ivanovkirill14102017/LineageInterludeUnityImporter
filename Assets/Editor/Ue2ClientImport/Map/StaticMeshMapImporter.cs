@@ -1,11 +1,19 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using L2Viewer.SceneDomain.Models;
+using L2Viewer.SceneDomain.Services;
 using UnityEngine;
 
 internal static class StaticMeshMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, MapImportExecutionContext context = null)
+    public static Task ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        MapImportExecutionContext context = null,
+        bool finalizeScene = true,
+        bool convertTerrainDecorationsToTerrainVegetation = true)
     {
         context?.Report("Static Meshes", "Scene analysis", 0.12f);
         log("[StaticMesh] START Scene analysis");
@@ -32,6 +40,8 @@ internal static class StaticMeshMapImporter
         staticMeshRoot.transform.SetParent(mapRoot.transform, false);
         log("[StaticMesh] DONE Scene root preparation");
 
+        var terrainImport = TryLoadTerrainImportData(source, log);
+
         log($"Importing {instancedResult.Instances.Count} static meshes using Unity instancing...");
         log("[StaticMesh] START Asset pipeline");
         context?.Report("Static Meshes", "Asset pipeline", 0.28f);
@@ -44,17 +54,43 @@ internal static class StaticMeshMapImporter
                 request.OutputDir,
                 log,
                 request.ReuseExistingMaterialTextureAssets,
+                convertTerrainDecorationsToTerrainVegetation: convertTerrainDecorationsToTerrainVegetation,
+                terrainImport: terrainImport,
+                populateTerrainVegetation: false,
                 context: context);
         pipelineStopwatch.Stop();
         log($"[StaticMesh] DONE Asset pipeline ({pipelineStopwatch.Elapsed.TotalSeconds:F2}s)");
 
-        log("[StaticMesh] START Finalize");
-        context?.Report("Static Meshes", "Finalize", 0.96f);
-        var finalizeStopwatch = Stopwatch.StartNew();
-        MapImportFinalizer.Complete(mapRoot, log);
-        finalizeStopwatch.Stop();
-        log($"[StaticMesh] DONE Finalize ({finalizeStopwatch.Elapsed.TotalSeconds:F2}s)");
+        if (finalizeScene)
+        {
+            log("[StaticMesh] START Finalize");
+            context?.Report("Static Meshes", "Finalize", 0.96f);
+            var finalizeStopwatch = Stopwatch.StartNew();
+            MapImportFinalizer.Complete(mapRoot, log);
+            finalizeStopwatch.Stop();
+            log($"[StaticMesh] DONE Finalize ({finalizeStopwatch.Elapsed.TotalSeconds:F2}s)");
+        }
         log("Mesh import finished.");
         return Task.CompletedTask;
+    }
+
+    private static TerrainImportData TryLoadTerrainImportData(Ue2MapSource source, Action<string> log)
+    {
+        try
+        {
+            var terrains = new TerrainImportBuilder(new BspTextureManager(source.ClientPath)).Build(source.UnrFile);
+            if (terrains == null || terrains.Length == 0)
+            {
+                return null;
+            }
+
+            log("[StaticMesh] Terrain surface data loaded for vegetation filtering.");
+            return terrains[0];
+        }
+        catch (Exception ex)
+        {
+            log($"[StaticMesh] Terrain surface data could not be loaded for vegetation filtering: {ex.Message}");
+            return null;
+        }
     }
 }

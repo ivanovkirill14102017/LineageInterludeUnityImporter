@@ -6,7 +6,12 @@ using L2Viewer.SceneDomain.Services.MaterialServices;
 
 internal static class TerrainMapImporter
 {
-    public static Task ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log)
+    public static Task ImportAsync(
+        MapImportRequest request,
+        Ue2MapSource source,
+        Action<string> log,
+        bool finalizeScene = true,
+        bool buildTerrainVegetation = true)
     {
         log("[Terrain] START Build terrain import data");
         var terrainBuilder = new TerrainImportBuilder(new BspTextureManager(source.ClientPath));
@@ -31,33 +36,46 @@ internal static class TerrainMapImporter
         TerrainAssetBuilder.BuildTerrain(terrainImport, request, mapRoot);
         log("[Terrain] DONE Build terrain assets and object");
 
-        log("[Terrain] START Terrain vegetation analysis");
-        var analysisStopwatch = Stopwatch.StartNew();
-        var instancedResult = StaticMeshSceneAnalyzer.BuildInstancedMeshes(source, log);
-        analysisStopwatch.Stop();
-        log($"[Terrain] DONE Terrain vegetation analysis ({analysisStopwatch.Elapsed.TotalSeconds:F2}s)");
+        if (buildTerrainVegetation)
+        {
+            log("[Terrain] START Terrain vegetation analysis");
+            var analysisStopwatch = Stopwatch.StartNew();
+            var instancedResult = StaticMeshSceneAnalyzer.BuildInstancedMeshes(source, log);
+            analysisStopwatch.Stop();
+            log($"[Terrain] DONE Terrain vegetation analysis ({analysisStopwatch.Elapsed.TotalSeconds:F2}s)");
 
-        log("[Terrain] START Terrain vegetation build");
-        var vegetationStopwatch = Stopwatch.StartNew();
-        L2StaticMeshAssetBuilder.BuildStaticMeshes(
-            instancedResult,
-            mapRoot,
-            source.ClientPath,
-            request.MapKey,
-            request.OutputDir,
+            log("[Terrain] START Terrain vegetation build");
+            var vegetationStopwatch = Stopwatch.StartNew();
+            L2StaticMeshAssetBuilder.BuildStaticMeshes(
+                instancedResult,
+                mapRoot,
+                source.ClientPath,
+                request.MapKey,
+                request.OutputDir,
             log,
             request.ReuseExistingMaterialTextureAssets,
             placeRegularInstances: false,
             placeTerrainDecorations: false,
             convertTerrainDecorationsToTerrainVegetation: true,
             convertTreeInstancesToTerrainVegetation: true,
-            placeTreeInstancesAsRegularInstances: false);
-        vegetationStopwatch.Stop();
-        log($"[Terrain] DONE Terrain vegetation build ({vegetationStopwatch.Elapsed.TotalSeconds:F2}s)");
+            placeTreeInstancesAsRegularInstances: false,
+            terrainImport: terrainImport,
+            populateTerrainVegetation: true,
+            removeExistingConvertedTerrainVegetationFallback: true);
+            vegetationStopwatch.Stop();
+            log($"[Terrain] DONE Terrain vegetation build ({vegetationStopwatch.Elapsed.TotalSeconds:F2}s)");
+        }
+        else
+        {
+            log("[Terrain] Skipping terrain vegetation build in this pass. It will be handled by the static-mesh stage.");
+        }
 
-        log("[Terrain] START Finalize");
-        MapImportFinalizer.Complete(mapRoot, log);
-        log("[Terrain] DONE Finalize");
+        if (finalizeScene)
+        {
+            log("[Terrain] START Finalize");
+            MapImportFinalizer.Complete(mapRoot, log);
+            log("[Terrain] DONE Finalize");
+        }
         log("Import finished.");
         return Task.CompletedTask;
     }

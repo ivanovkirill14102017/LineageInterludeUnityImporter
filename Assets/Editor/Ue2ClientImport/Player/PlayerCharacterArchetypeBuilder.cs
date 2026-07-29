@@ -147,8 +147,6 @@ internal static class PlayerCharacterArchetypeBuilder
         CreateWardrobePrefab(baseAsset, archetype, prefabPath, characterName, log);
 
         AssetDatabase.SaveAssets();
-        AssetDatabase.ImportAsset(archetypeAssetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-        AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
 
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (prefab != null)

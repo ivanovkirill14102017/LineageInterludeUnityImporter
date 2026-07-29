@@ -71,6 +71,9 @@ internal static class L2StaticMeshAssetBuilder
         bool convertTerrainDecorationsToTerrainVegetation = false,
         bool convertTreeInstancesToTerrainVegetation = true,
         bool placeTreeInstancesAsRegularInstances = false,
+        TerrainImportData terrainImport = null,
+        bool populateTerrainVegetation = true,
+        bool removeExistingConvertedTerrainVegetationFallback = false,
         MapImportExecutionContext context = null)
     {
         var meshDir = L2AssetManager.SharedStaticMeshesRoot;
@@ -146,7 +149,7 @@ internal static class L2StaticMeshAssetBuilder
         SceneStaticMeshInstance[] regularTreeInstances;
         if (convertTreeInstancesToTerrainVegetation)
         {
-            var split = TerrainGrassDetailBuilder.SplitTreeInstancesByTerrainSurface(treeInstances, meshCache, parent, log);
+            var split = TerrainGrassDetailBuilder.SplitTreeInstancesByTerrainSurface(treeInstances, meshCache, parent, terrainImport, log);
             terrainTreeInstances = split.TerrainInstances;
             regularTreeInstances = split.RegularInstances;
         }
@@ -167,6 +170,7 @@ internal static class L2StaticMeshAssetBuilder
             var split = TerrainGrassDetailBuilder.SplitTerrainDecorationLayersByTerrainSurface(
                 instancedResult.TerrainDecorations,
                 parent,
+                terrainImport,
                 clientPath,
                 log);
             terrainDecorationTerrainLayers = split.TerrainLayers;
@@ -177,6 +181,12 @@ internal static class L2StaticMeshAssetBuilder
             terrainDecorationRegularLayers = instancedResult.TerrainDecorations?.ToArray() ?? Array.Empty<SceneTerrainDecorationLayer>();
         }
 
+        if (removeExistingConvertedTerrainVegetationFallback)
+        {
+            context?.ThrowIfCancellationRequested();
+            RemoveExistingTerrainVegetationFallback(parent, terrainTreeInstances, terrainDecorationTerrainLayers, log);
+        }
+
         if (placeRegularInstances)
         {
             context?.ThrowIfCancellationRequested();
@@ -184,33 +194,163 @@ internal static class L2StaticMeshAssetBuilder
         }
 
         var shouldPlaceRegularTreeInstances = regularTreeInstances.Length > 0 &&
-                                              (placeTreeInstancesAsRegularInstances || convertTreeInstancesToTerrainVegetation);
+                                              (placeRegularInstances || placeTreeInstancesAsRegularInstances);
         if (shouldPlaceRegularTreeInstances)
         {
             context?.ThrowIfCancellationRequested();
             StaticMeshInstancePlacer.PlaceInstances(regularTreeInstances, parent, prefabCache, log);
         }
 
-        context?.ThrowIfCancellationRequested();
-        TerrainGrassDetailBuilder.PopulateTerrainVegetation(
-            grassInstances,
-            terrainTreeInstances,
-            convertTerrainDecorationsToTerrainVegetation ? terrainDecorationTerrainLayers : null,
-            parent,
-            meshCache,
-            materialCatalog,
-            clientPath,
-            outputDir,
-            mapKey,
-            log);
+        if (populateTerrainVegetation)
+        {
+            context?.ThrowIfCancellationRequested();
+            TerrainGrassDetailBuilder.PopulateTerrainVegetation(
+                grassInstances,
+                terrainTreeInstances,
+                convertTerrainDecorationsToTerrainVegetation ? terrainDecorationTerrainLayers : null,
+                parent,
+                meshCache,
+                materialCatalog,
+                clientPath,
+                outputDir,
+                mapKey,
+                log);
+        }
 
-        if (placeTerrainDecorations || (convertTerrainDecorationsToTerrainVegetation && terrainDecorationRegularLayers.Length > 0))
+        if (placeTerrainDecorations)
         {
             context?.ThrowIfCancellationRequested();
             TerrainDecorationInstancePlacer.PlaceDecorations(terrainDecorationRegularLayers, parent, prefabCache, clientPath, log);
         }
         placementStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Instance placement ({placementStopwatch.Elapsed.TotalSeconds:F2}s)");
+    }
+
+    private static void RemoveExistingTerrainVegetationFallback(
+        GameObject parent,
+        IReadOnlyList<SceneStaticMeshInstance> terrainTreeInstances,
+        IReadOnlyList<SceneTerrainDecorationLayer> terrainDecorationTerrainLayers,
+        Action<string> log)
+    {
+        var staticMeshRoot = FindExistingStaticMeshRoot(parent);
+        if (staticMeshRoot == null)
+        {
+            return;
+        }
+
+        var removedTreeCount = RemoveChildrenByExactName(
+            staticMeshRoot.transform,
+            terrainTreeInstances?
+                .Where(instance => instance != null && !string.IsNullOrWhiteSpace(instance.StableName))
+                .Select(instance => instance.StableName));
+        var removedDecorationCount = RemoveTerrainDecorationChildren(staticMeshRoot.transform, terrainDecorationTerrainLayers);
+
+        if (removedTreeCount > 0 || removedDecorationCount > 0)
+        {
+            log?.Invoke($"[Terrain/Vegetation] Removed {removedTreeCount} terrain-tree fallback instances and {removedDecorationCount} terrain-decoration fallback instances from '{staticMeshRoot.name}'.");
+        }
+    }
+
+    private static GameObject FindExistingStaticMeshRoot(GameObject parent)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        if (parent.name.EndsWith("_StaticMeshes", StringComparison.OrdinalIgnoreCase))
+        {
+            return parent;
+        }
+
+        var root = parent.transform.root;
+        if (root == null)
+        {
+            return null;
+        }
+
+        var expectedRoot = root.Find($"{root.name}_StaticMeshes");
+        return expectedRoot != null ? expectedRoot.gameObject : null;
+    }
+
+    private static int RemoveChildrenByExactName(Transform parent, IEnumerable<string> names)
+    {
+        if (parent == null || names == null)
+        {
+            return 0;
+        }
+
+        var targets = new HashSet<string>(names.Where(name => !string.IsNullOrWhiteSpace(name)), StringComparer.Ordinal);
+        if (targets.Count == 0)
+        {
+            return 0;
+        }
+
+        var toRemove = new List<GameObject>();
+        foreach (Transform child in parent)
+        {
+            if (child != null && targets.Contains(child.name))
+            {
+                toRemove.Add(child.gameObject);
+            }
+        }
+
+        for (var i = 0; i < toRemove.Count; i++)
+        {
+            UnityEngine.Object.DestroyImmediate(toRemove[i]);
+        }
+
+        return toRemove.Count;
+    }
+
+    private static int RemoveTerrainDecorationChildren(Transform staticMeshRoot, IReadOnlyList<SceneTerrainDecorationLayer> layers)
+    {
+        if (staticMeshRoot == null || layers == null || layers.Count == 0)
+        {
+            return 0;
+        }
+
+        var terrainDecorationRoot = staticMeshRoot.Find("TerrainDecorations");
+        if (terrainDecorationRoot == null)
+        {
+            return 0;
+        }
+
+        var prefixes = layers
+            .Where(layer => layer != null && !string.IsNullOrWhiteSpace(layer.TerrainActorName))
+            .Select(layer => $"{layer.TerrainActorName}:Deco{layer.LayerIndex:D2}:")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (prefixes.Length == 0)
+        {
+            return 0;
+        }
+
+        var toRemove = new List<GameObject>();
+        foreach (Transform child in terrainDecorationRoot)
+        {
+            if (child == null)
+            {
+                continue;
+            }
+
+            if (prefixes.Any(prefix => child.name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            {
+                toRemove.Add(child.gameObject);
+            }
+        }
+
+        for (var i = 0; i < toRemove.Count; i++)
+        {
+            UnityEngine.Object.DestroyImmediate(toRemove[i]);
+        }
+
+        if (terrainDecorationRoot.childCount == 0)
+        {
+            UnityEngine.Object.DestroyImmediate(terrainDecorationRoot.gameObject);
+        }
+
+        return toRemove.Count;
     }
 
     private static void EnsureStaticMeshAssetFolders(string meshDir, string prefabDir, string materialDir, string textureDir)
@@ -423,7 +563,6 @@ internal static class L2StaticMeshAssetBuilder
 
             L2AssetManager.EnsureParentFolderExists(prefabPath);
             var prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
-            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
             return prefab;
         }
         finally

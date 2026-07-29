@@ -35,8 +35,9 @@ internal static class MapImportOrchestrator
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
             context?.Report("Import BSP", request.MapKey, 0.10f);
-            await BspMapImporter.ImportAsync(request, source, log, context);
-            MapContextImporter.ImportAsync(request, source, log);
+            await BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+            MapImportFinalizer.Complete(UnitySceneObjectUtility.CreateMapRoot(request.ObjectName), log);
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import BSP", log, context);
     }
@@ -60,8 +61,9 @@ internal static class MapImportOrchestrator
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
             context?.Report("Import Volumes", request.MapKey, 0.10f);
-            await VolumeMapImporter.ImportAsync(request, source, log, context);
-            MapContextImporter.ImportAsync(request, source, log);
+            await VolumeMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+            MapImportFinalizer.Complete(UnitySceneObjectUtility.CreateMapRoot(request.ObjectName), log);
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Volumes", log, context);
     }
@@ -98,21 +100,22 @@ internal static class MapImportOrchestrator
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
 
             context?.Report("Import Terrain", request.MapKey, 0.08f);
-            await TerrainMapImporter.ImportAsync(request, source, log);
+            await TerrainMapImporter.ImportAsync(request, source, log, finalizeScene: false, buildTerrainVegetation: true);
             context?.Report("Import Static Meshes", request.MapKey, 0.22f);
-            await StaticMeshMapImporter.ImportAsync(request, source, log, context);
+            await StaticMeshMapImporter.ImportAsync(request, source, log, context, finalizeScene: false, convertTerrainDecorationsToTerrainVegetation: true);
             context?.Report("Import BSP", request.MapKey, 0.38f);
-            await BspMapImporter.ImportAsync(request, source, log, context);
+            await BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
             context?.Report("Import Lights", request.MapKey, 0.54f);
-            await LightingMapImporter.ImportAsync(request, source, log, context);
+            await LightingMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
             context?.Report("Import Volumes", request.MapKey, 0.68f);
-            await VolumeMapImporter.ImportAsync(request, source, log, context);
+            await VolumeMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
             context?.Report("Import Particles", request.MapKey, 0.80f);
-            ParticleMapImporter.ImportAsync(request, source, log, context);
+            ParticleMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
             context?.Report("Import Creatures", request.MapKey, 0.88f);
-            await CreatureMapImporter.ImportAsync(request, source, log, context);
+            await CreatureMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
             context?.Report("Finalize", request.MapKey, 0.98f);
-            MapContextImporter.ImportAsync(request, source, log);
+            MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+            MapImportFinalizer.Complete(UnitySceneObjectUtility.CreateMapRoot(request.ObjectName), log);
             context?.Report("Done", request.MapKey, 1f);
         }, "Import All", log, context);
     }

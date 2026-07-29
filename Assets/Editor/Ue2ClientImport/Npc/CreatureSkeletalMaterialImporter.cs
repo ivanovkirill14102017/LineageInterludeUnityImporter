@@ -168,16 +168,17 @@ internal static class CreatureSkeletalMaterialImporter
         return plans;
     }
 
-    public static void ImportTexturePlansBatch(
+    public static int ImportTexturePlansBatch(
         IReadOnlyCollection<TextureImportPlan> plans,
         string textureDir)
     {
         if (plans == null || plans.Count == 0)
         {
-            return;
+            return 0;
         }
 
         L2AssetManager.EnsureFolderExists(textureDir);
+        var createdTextureCount = 0;
         foreach (var plan in plans)
         {
             if (plan == null || string.IsNullOrWhiteSpace(plan.TextureReference) || plan.TextureData == null)
@@ -192,13 +193,19 @@ internal static class CreatureSkeletalMaterialImporter
                 continue;
             }
 
-            L2AssetManager.WriteTextureAssetFile(
-                plan.TextureData,
-                texturePath,
-                false,
-                StaticMeshImportUtility.NeedsAlpha(plan.Traits));
-            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            if (!File.Exists(texturePath))
+            {
+                L2AssetManager.WriteTextureAssetFile(
+                    plan.TextureData,
+                    texturePath,
+                    false,
+                    StaticMeshImportUtility.NeedsAlpha(plan.Traits));
+            }
+
+            createdTextureCount++;
         }
+
+        return createdTextureCount;
     }
 
     public static void PreloadTextureReferences(
@@ -224,7 +231,11 @@ internal static class CreatureSkeletalMaterialImporter
         }
 
         var textureDir = L2AssetManager.SharedTexturesRoot;
-        ImportTexturePlansBatch(plans, textureDir);
+        var createdTextureCount = ImportTexturePlansBatch(plans, textureDir);
+        if (createdTextureCount > 0)
+        {
+            AssetDatabase.Refresh();
+        }
 
         var primed = 0;
         var loaded = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
@@ -271,7 +282,11 @@ internal static class CreatureSkeletalMaterialImporter
         L2AssetManager.EnsureFolderExists(textureDir);
 
         CreatureSkeletalTextureResolver.PrimeExistingTextureAssets(asset, textureDir, result, context);
-        ImportTexturePlansBatch(plans, textureDir);
+        var createdTextureCount = ImportTexturePlansBatch(plans, textureDir);
+        if (createdTextureCount > 0)
+        {
+            AssetDatabase.Refresh();
+        }
         CreatureSkeletalTextureResolver.PrimeExistingTextureAssets(asset, textureDir, result, context);
 
         foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())

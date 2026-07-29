@@ -11,9 +11,29 @@ using UnityEngine;
 
 internal static class TerrainGrassDetailBuilder
 {
+    private readonly struct TerrainSurfaceDescriptor
+    {
+        public TerrainSurfaceDescriptor(Vector3 position, Vector3 size, int width, int height, IReadOnlyList<float> heightSamples, float heightTolerance)
+        {
+            Position = position;
+            Size = size;
+            Width = width;
+            Height = height;
+            HeightSamples = heightSamples;
+            HeightTolerance = heightTolerance;
+        }
+
+        public Vector3 Position { get; }
+        public Vector3 Size { get; }
+        public int Width { get; }
+        public int Height { get; }
+        public IReadOnlyList<float> HeightSamples { get; }
+        public float HeightTolerance { get; }
+    }
+
     private const float UnrealToUnityScale = L2WorldScale.UnrealToUnityScale;
-    private const string ManagedPrefabPrefix = "GrassDetail_";
-    private const string ManagedTreePrefabPrefix = "TerrainTree_";
+    private const string TerrainDetailPrefabSuffix = "grass_detail";
+    private const string TerrainTreePrefabSuffix = "terrain_tree";
     private const int DefaultDetailResolution = 512;
     private const int DefaultResolutionPerPatch = 16;
     private const int MaxDensityPerCell = 256;
@@ -42,6 +62,7 @@ internal static class TerrainGrassDetailBuilder
     public static (SceneTerrainDecorationLayer[] TerrainLayers, SceneTerrainDecorationLayer[] RegularLayers) SplitTerrainDecorationLayersByTerrainSurface(
         IReadOnlyList<SceneTerrainDecorationLayer> terrainDecorationLayers,
         GameObject staticMeshRoot,
+        TerrainImportData terrainImport,
         string clientPath,
         Action<string> log)
     {
@@ -53,8 +74,13 @@ internal static class TerrainGrassDetailBuilder
         var terrain = FindTerrain(staticMeshRoot);
         if (terrain == null || terrain.terrainData == null)
         {
-            log?.Invoke("[Terrain/Vegetation] Terrain not found while classifying terrain decoration layers. All layers will be placed as regular decorations.");
-            return (Array.Empty<SceneTerrainDecorationLayer>(), terrainDecorationLayers.Where(layer => layer != null).ToArray());
+            if (!TryBuildTerrainSurface(terrainImport, out var terrainSurface))
+            {
+                log?.Invoke("[Terrain/Vegetation] Terrain surface not found while classifying terrain decoration layers. All layers will be kept as regular decorations.");
+                return (Array.Empty<SceneTerrainDecorationLayer>(), terrainDecorationLayers.Where(layer => layer != null).ToArray());
+            }
+
+            return SplitTerrainDecorationLayersByRawTerrainSurface(terrainDecorationLayers, terrainSurface, clientPath, log);
         }
 
         var tolerance = ComputeTreeTerrainHeightTolerance(terrain.terrainData);
@@ -93,6 +119,7 @@ internal static class TerrainGrassDetailBuilder
         IReadOnlyList<SceneStaticMeshInstance> treeInstances,
         IReadOnlyDictionary<string, Mesh> meshCache,
         GameObject staticMeshRoot,
+        TerrainImportData terrainImport,
         Action<string> log)
     {
         if (treeInstances == null || treeInstances.Count == 0)
@@ -103,8 +130,13 @@ internal static class TerrainGrassDetailBuilder
         var terrain = FindTerrain(staticMeshRoot);
         if (terrain == null || terrain.terrainData == null)
         {
-            log?.Invoke("[Terrain/Vegetation] Terrain not found while classifying trees. All tree instances will be placed as regular static meshes.");
-            return (Array.Empty<SceneStaticMeshInstance>(), treeInstances.Where(instance => instance != null).ToArray());
+            if (!TryBuildTerrainSurface(terrainImport, out var terrainSurface))
+            {
+                log?.Invoke("[Terrain/Vegetation] Terrain surface not found while classifying trees. All tree instances will be kept as regular static meshes.");
+                return (Array.Empty<SceneStaticMeshInstance>(), treeInstances.Where(instance => instance != null).ToArray());
+            }
+
+            return SplitTreeInstancesByRawTerrainSurface(treeInstances, meshCache, terrainSurface, log);
         }
 
         var terrainAccepted = new List<SceneStaticMeshInstance>(treeInstances.Count);
@@ -128,6 +160,73 @@ internal static class TerrainGrassDetailBuilder
         }
 
         log?.Invoke($"[Terrain/Vegetation] Tree terrain classification: {terrainAccepted.Count} snapped to terrain, {regularFallback.Count} kept as regular meshes. Height tolerance: {tolerance:F2}. Classification uses mesh base point against terrain surface.");
+        return (terrainAccepted.ToArray(), regularFallback.ToArray());
+    }
+
+    private static (SceneTerrainDecorationLayer[] TerrainLayers, SceneTerrainDecorationLayer[] RegularLayers) SplitTerrainDecorationLayersByRawTerrainSurface(
+        IReadOnlyList<SceneTerrainDecorationLayer> terrainDecorationLayers,
+        TerrainSurfaceDescriptor terrainSurface,
+        string clientPath,
+        Action<string> log)
+    {
+        var textureManager = new BspTextureManager(clientPath);
+        var heightTextureRequests = terrainDecorationLayers
+            .Where(layer => layer?.HeightMapResource != null)
+            .Select(layer => new SceneTextureRequest(layer.HeightMapResource.PackageName, layer.HeightMapResource.ObjectName))
+            .Distinct()
+            .ToArray();
+        var resolvedHeightTextures = ResolveTerrainDecorationHeightTextures(textureManager, heightTextureRequests);
+        var terrainLayers = new List<SceneTerrainDecorationLayer>(terrainDecorationLayers.Count);
+        var regularLayers = new List<SceneTerrainDecorationLayer>();
+
+        foreach (var layer in terrainDecorationLayers)
+        {
+            if (layer == null)
+            {
+                continue;
+            }
+
+            if (IsTerrainDecorationLayerOnTerrainSurface(layer, terrainSurface, resolvedHeightTextures, terrainSurface.HeightTolerance))
+            {
+                terrainLayers.Add(layer);
+            }
+            else
+            {
+                regularLayers.Add(layer);
+            }
+        }
+
+        log?.Invoke($"[Terrain/Vegetation] Terrain decoration classification (raw terrain): {terrainLayers.Count} layers to terrain vegetation, {regularLayers.Count} layers kept as regular decorations. Height tolerance: {terrainSurface.HeightTolerance:F2}.");
+        return (terrainLayers.ToArray(), regularLayers.ToArray());
+    }
+
+    private static (SceneStaticMeshInstance[] TerrainInstances, SceneStaticMeshInstance[] RegularInstances) SplitTreeInstancesByRawTerrainSurface(
+        IReadOnlyList<SceneStaticMeshInstance> treeInstances,
+        IReadOnlyDictionary<string, Mesh> meshCache,
+        TerrainSurfaceDescriptor terrainSurface,
+        Action<string> log)
+    {
+        var terrainAccepted = new List<SceneStaticMeshInstance>(treeInstances.Count);
+        var regularFallback = new List<SceneStaticMeshInstance>();
+
+        foreach (var instance in treeInstances)
+        {
+            if (instance == null)
+            {
+                continue;
+            }
+
+            if (IsTreeInstanceOnTerrainSurface(instance, terrainSurface, meshCache, terrainSurface.HeightTolerance))
+            {
+                terrainAccepted.Add(instance);
+            }
+            else
+            {
+                regularFallback.Add(instance);
+            }
+        }
+
+        log?.Invoke($"[Terrain/Vegetation] Tree terrain classification (raw terrain): {terrainAccepted.Count} snapped to terrain, {regularFallback.Count} kept as regular meshes. Height tolerance: {terrainSurface.HeightTolerance:F2}. Classification uses mesh base point against terrain surface.");
         return (terrainAccepted.ToArray(), regularFallback.ToArray());
     }
 
@@ -163,15 +262,12 @@ internal static class TerrainGrassDetailBuilder
         EnsureDetailResolution(terrainData);
         ClearManagedVegetation(terrainData);
 
-        var detailsRootDir = $"{outputDir}/Terrain/Details";
-        var detailPrefabDir = $"{detailsRootDir}/Prefabs";
-        var detailPreviewDir = $"{detailsRootDir}/Previews";
-        var treePrefabDir = $"{outputDir}/Terrain/Trees/Prefabs";
-        var treeMaterialDir = $"{outputDir}/Terrain/Trees/Materials";
-        L2AssetManager.EnsureFolderExists(detailsRootDir);
-        L2AssetManager.EnsureFolderExists(detailPrefabDir);
+        var detailPreviewDir = $"{outputDir}/Terrain/Details/Previews";
+        var detailPrefabDir = L2AssetManager.ManagedTerrainDetailPrefabsRoot;
+        var treePrefabDir = L2AssetManager.ManagedTerrainTreePrefabsRoot;
+        var treeMaterialDir = L2AssetManager.ManagedTerrainTreeMaterialsRoot;
         L2AssetManager.EnsureFolderExists(detailPreviewDir);
-        L2AssetManager.EnsureFolderExists($"{outputDir}/Terrain/Trees");
+        L2AssetManager.EnsureFolderExists(detailPrefabDir);
         L2AssetManager.EnsureFolderExists(treePrefabDir);
         L2AssetManager.EnsureFolderExists(treeMaterialDir);
 
@@ -347,14 +443,35 @@ internal static class TerrainGrassDetailBuilder
 
     private static string BuildDetailPrefabPath(string detailPrefabDir, string meshReference)
     {
-        var fileName = $"{ManagedPrefabPrefix}{meshReference}.prefab";
-        return $"{detailPrefabDir}/{fileName}";
+        return L2AssetManager.BuildClientPackageAssetPath(
+            detailPrefabDir,
+            meshReference,
+            "PF",
+            "prefab",
+            "TerrainDetailPrefabs",
+            TerrainDetailPrefabSuffix);
     }
 
     private static string BuildTreePrefabPath(string treePrefabDir, string meshReference)
     {
-        var fileName = $"{ManagedTreePrefabPrefix}{meshReference}.prefab";
-        return $"{treePrefabDir}/{fileName}";
+        return L2AssetManager.BuildClientPackageAssetPath(
+            treePrefabDir,
+            meshReference,
+            "PF",
+            "prefab",
+            "TerrainTreePrefabs",
+            TerrainTreePrefabSuffix);
+    }
+
+    private static string BuildTreeMaterialPath(string treeMaterialDir, string meshReference, int index, string sourceName)
+    {
+        return L2AssetManager.BuildClientPackageAssetPath(
+            treeMaterialDir,
+            meshReference,
+            $"MAT{index:D2}",
+            "mat",
+            "TerrainTreeMaterials",
+            sourceName);
     }
 
     private static GameObject CreateOrUpdateDetailPrefab(string prefabPath, Mesh mesh, Material[] materials)
@@ -373,8 +490,8 @@ internal static class TerrainGrassDetailBuilder
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             renderer.receiveShadows = true;
 
+            L2AssetManager.EnsureParentFolderExists(prefabPath);
             var prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
-            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
             return prefab;
         }
         finally
@@ -418,21 +535,15 @@ internal static class TerrainGrassDetailBuilder
         Action<string> log)
     {
         var sourceName = source != null ? source.name : $"TreeMaterial_{index}";
-        var assetPath = $"{treeMaterialDir}/{meshReference}_{index:D2}_{sourceName}.mat";
+        var assetPath = BuildTreeMaterialPath(treeMaterialDir, meshReference, index, sourceName);
         var assetName = Path.GetFileNameWithoutExtension(assetPath);
-        var material = AssetDatabase.LoadAssetAtPath<Material>(assetPath);
-        if (material == null)
-        {
-            material = source != null
-                ? new Material(source)
-                : new Material(ResolveCompatibleTreeShader(source));
-            material.name = assetName;
-            AssetDatabase.CreateAsset(material, assetPath);
-        }
+        var material = source != null
+            ? new Material(source)
+            : new Material(ResolveCompatibleTreeShader(source));
 
         ConfigureTreeMaterial(material, source, index, assetName);
+        material = UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, assetPath);
         EditorUtility.SetDirty(material);
-        AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         log?.Invoke($"[Terrain/Vegetation] Tree material '{sourceName}' on '{meshReference}' uses compatible shader '{material.shader?.name ?? "<null>"}' -> '{assetPath}'.");
         return material;
     }
@@ -669,6 +780,21 @@ internal static class TerrainGrassDetailBuilder
         return Mathf.Abs(baseWorldPosition.y - terrainSurfaceY) <= heightTolerance;
     }
 
+    private static bool IsTreeInstanceOnTerrainSurface(
+        SceneStaticMeshInstance instance,
+        TerrainSurfaceDescriptor terrainSurface,
+        IReadOnlyDictionary<string, Mesh> meshCache,
+        float heightTolerance)
+    {
+        if (!TryGetTreeBaseWorldPosition(instance, meshCache, out var baseWorldPosition))
+        {
+            return false;
+        }
+
+        return TrySampleTerrainSurfaceY(baseWorldPosition, terrainSurface, out var terrainSurfaceY) &&
+               Mathf.Abs(baseWorldPosition.y - terrainSurfaceY) <= heightTolerance;
+    }
+
     private static bool IsTerrainDecorationLayerOnTerrainSurface(
         SceneTerrainDecorationLayer layer,
         Terrain terrain,
@@ -724,6 +850,61 @@ internal static class TerrainGrassDetailBuilder
         return total > 0 && ((matched / (float)total) >= TerrainDecorationTerrainAcceptanceThreshold);
     }
 
+    private static bool IsTerrainDecorationLayerOnTerrainSurface(
+        SceneTerrainDecorationLayer layer,
+        TerrainSurfaceDescriptor terrainSurface,
+        IReadOnlyDictionary<string, TextureData> resolvedHeightTextures,
+        float heightTolerance)
+    {
+        if (layer == null)
+        {
+            return false;
+        }
+
+        if (!TryGetTerrainDecorationHeightTexture(layer, resolvedHeightTextures, out var heightTexture))
+        {
+            return false;
+        }
+
+        var densityTexture = layer.DensityMapTexture;
+        if (densityTexture == null || densityTexture.Width <= 0 || densityTexture.Height <= 0)
+        {
+            return false;
+        }
+
+        var heightField = BuildHeightField(heightTexture);
+        var stepX = Math.Max(1, (int)Math.Ceiling(densityTexture.Width / (double)MaxTerrainDecorationSampleResolution));
+        var stepY = Math.Max(1, (int)Math.Ceiling(densityTexture.Height / (double)MaxTerrainDecorationSampleResolution));
+        var matched = 0;
+        var total = 0;
+
+        for (var y = 0; y < densityTexture.Height; y += stepY)
+        {
+            for (var x = 0; x < densityTexture.Width; x += stepX)
+            {
+                var density = SampleGray01(densityTexture, x, y);
+                if (density <= 0.05f)
+                {
+                    continue;
+                }
+
+                var u = x / (float)Math.Max(1, densityTexture.Width - 1);
+                var v = y / (float)Math.Max(1, densityTexture.Height - 1);
+                var worldPosition = SampleTerrainDecorationWorldPosition(heightTexture, heightField, layer.TerrainScale, layer.TerrainLocation, u, v)
+                    .TransformFromUnrealToUnityWithScale();
+                if (TrySampleTerrainSurfaceY(worldPosition, terrainSurface, out var terrainSurfaceY) &&
+                    Mathf.Abs(worldPosition.y - terrainSurfaceY) <= heightTolerance)
+                {
+                    matched++;
+                }
+
+                total++;
+            }
+        }
+
+        return total > 0 && ((matched / (float)total) >= TerrainDecorationTerrainAcceptanceThreshold);
+    }
+
     private static bool TryGetTreeBaseWorldPosition(
         SceneStaticMeshInstance instance,
         IReadOnlyDictionary<string, Mesh> meshCache,
@@ -757,6 +938,55 @@ internal static class TerrainGrassDetailBuilder
         var heightmapScale = terrainData.heightmapScale;
         var adaptiveTolerance = Mathf.Max(heightmapScale.x, heightmapScale.z) * 0.5f;
         return Mathf.Max(MinimumTreeTerrainHeightTolerance, adaptiveTolerance);
+    }
+
+    private static float ComputeTreeTerrainHeightTolerance(TerrainImportData terrainImport)
+    {
+        if (terrainImport == null)
+        {
+            return MinimumTreeTerrainHeightTolerance;
+        }
+
+        var scaleX = terrainImport.SampleSpacingX * UnrealToUnityScale;
+        var scaleZ = terrainImport.SampleSpacingY * UnrealToUnityScale;
+        var adaptiveTolerance = Mathf.Max(scaleX, scaleZ) * 0.5f;
+        return Mathf.Max(MinimumTreeTerrainHeightTolerance, adaptiveTolerance);
+    }
+
+    private static bool TryBuildTerrainSurface(TerrainImportData terrainImport, out TerrainSurfaceDescriptor terrainSurface)
+    {
+        terrainSurface = default;
+        if (terrainImport == null ||
+            terrainImport.HeightSamples == null ||
+            terrainImport.HeightWidth <= 1 ||
+            terrainImport.HeightHeight <= 1 ||
+            terrainImport.HeightSamples.Length < (terrainImport.HeightWidth * terrainImport.HeightHeight))
+        {
+            return false;
+        }
+
+        var raw = terrainImport.WorldMinCorner ?? System.Numerics.Vector3.Zero;
+        var position = new Vector3(
+            raw.X * UnrealToUnityScale,
+            (raw.Z - (terrainImport.HeightValueScale * 0.5f)) * UnrealToUnityScale,
+            raw.Y * UnrealToUnityScale);
+        var size = new Vector3(
+            terrainImport.SampleSpacingX * (terrainImport.HeightWidth - 1) * UnrealToUnityScale,
+            terrainImport.HeightValueScale * UnrealToUnityScale,
+            terrainImport.SampleSpacingY * (terrainImport.HeightHeight - 1) * UnrealToUnityScale);
+        if (size.x <= 0f || size.y <= 0f || size.z <= 0f)
+        {
+            return false;
+        }
+
+        terrainSurface = new TerrainSurfaceDescriptor(
+            position,
+            size,
+            terrainImport.HeightWidth,
+            terrainImport.HeightHeight,
+            terrainImport.HeightSamples,
+            ComputeTreeTerrainHeightTolerance(terrainImport));
+        return true;
     }
 
     private static bool TryGetTerrainDecorationHeightTexture(
@@ -1278,6 +1508,21 @@ internal static class TerrainGrassDetailBuilder
         return true;
     }
 
+    private static bool TrySampleTerrainSurfaceY(Vector3 worldPosition, TerrainSurfaceDescriptor terrainSurface, out float terrainSurfaceY)
+    {
+        terrainSurfaceY = 0f;
+        if (!TryProjectWorldPositionToTerrain(worldPosition, terrainSurface.Position, terrainSurface.Size, out var normalizedX, out var normalizedZ))
+        {
+            return false;
+        }
+
+        var sampleX = normalizedX * (terrainSurface.Width - 1);
+        var sampleY = normalizedZ * (terrainSurface.Height - 1);
+        var sample = SampleHeight(terrainSurface.HeightSamples, terrainSurface.Width, terrainSurface.Height, sampleX, sampleY);
+        terrainSurfaceY = terrainSurface.Position.y + (sample * terrainSurface.Size.y);
+        return true;
+    }
+
     private static bool TryProjectWorldPositionToTerrain(Vector3 worldPosition, Terrain terrain, out float normalizedX, out float normalizedZ)
     {
         normalizedX = 0f;
@@ -1289,6 +1534,21 @@ internal static class TerrainGrassDetailBuilder
 
         var terrainPosition = terrain.transform.position;
         var terrainSize = terrain.terrainData.size;
+        if (terrainSize.x <= 0f || terrainSize.z <= 0f)
+        {
+            return false;
+        }
+
+        var localPosition = worldPosition - terrainPosition;
+        normalizedX = localPosition.x / terrainSize.x;
+        normalizedZ = localPosition.z / terrainSize.z;
+        return normalizedX >= 0f && normalizedX <= 1f && normalizedZ >= 0f && normalizedZ <= 1f;
+    }
+
+    private static bool TryProjectWorldPositionToTerrain(Vector3 worldPosition, Vector3 terrainPosition, Vector3 terrainSize, out float normalizedX, out float normalizedZ)
+    {
+        normalizedX = 0f;
+        normalizedZ = 0f;
         if (terrainSize.x <= 0f || terrainSize.z <= 0f)
         {
             return false;

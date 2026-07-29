@@ -4,7 +4,6 @@ using System.Linq;
 using L2Viewer.PackageCore;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services.MaterialServices;
-using UnityEditor;
 using UnityEngine;
 using L2Viewer.SceneDomain.Services;
 using NumericsVector3 = System.Numerics.Vector3;
@@ -96,7 +95,7 @@ internal static class TerrainDecorationInstancePlacer
                         var scale = ResolveScale(layer, jitterU, jitterV, rng);
                         var yawDegrees = layer.RandomYaw ? (float)(rng.NextDouble() * 360.0) : 0f;
 
-                        var visual = PrefabUtility.InstantiatePrefab(prefab, terrainDecorationRoot.transform) as GameObject;
+                        var visual = InstantiateSceneObject(prefab, terrainDecorationRoot.transform);
                         if (visual == null)
                         {
                             continue;
@@ -271,6 +270,13 @@ internal static class TerrainDecorationInstancePlacer
     private static float Lerp(float a, float b, float t)
     {
         return a + ((b - a) * t);
+    }
+
+    private static GameObject InstantiateSceneObject(GameObject prefab, Transform parent)
+    {
+        return prefab == null
+            ? null
+            : UnityEngine.Object.Instantiate(prefab, parent, false);
     }
 
 }

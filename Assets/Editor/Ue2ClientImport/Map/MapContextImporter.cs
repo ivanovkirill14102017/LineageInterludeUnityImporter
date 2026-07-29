@@ -5,7 +5,7 @@ using UnityEngine;
 
 internal static class MapContextImporter
 {
-    public static void ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log)
+    public static void ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, bool finalizeScene = true)
     {
         var mapContextBuilder = new SceneMapContextBuilder();
         var mapContext = mapContextBuilder.Build(source.UnrFile);
@@ -30,6 +30,9 @@ internal static class MapContextImporter
         contextVolume.Context = contextAsset;
         contextVolume.RefreshContext();
 
-        MapImportFinalizer.Complete(mapRoot, log);
+        if (finalizeScene)
+        {
+            MapImportFinalizer.Complete(mapRoot, log);
+        }
     }
 }

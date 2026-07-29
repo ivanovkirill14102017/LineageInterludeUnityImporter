@@ -174,6 +174,15 @@ internal static class L2BspAssetBuilder
     {
         var materialAssets = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
 
+        PrepareTextureAssets(
+            sectionEntries,
+            resolvedTexturesBatch,
+            mapKey,
+            textureDir,
+            textureCache,
+            reuseExistingMaterialTextureAssets,
+            log);
+
         foreach (var entry in sectionEntries)
         {
             context?.ThrowIfCancellationRequested();
@@ -192,6 +201,83 @@ internal static class L2BspAssetBuilder
         }
 
         return materialAssets;
+    }
+
+    private static void PrepareTextureAssets(
+        IReadOnlyList<BspSectionEntry> sectionEntries,
+        IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
+        string mapKey,
+        string textureDir,
+        Dictionary<string, Texture2D> textureCache,
+        bool reuseExistingMaterialTextureAssets,
+        Action<string> log)
+    {
+        var pendingTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in sectionEntries)
+        {
+            var firstSlot = entry.ResolvedMaterial?.TextureSlots?.FirstOrDefault();
+            if (firstSlot == null)
+            {
+                continue;
+            }
+
+            var reference = firstSlot.Reference ?? BuildReference(firstSlot.PackageName, firstSlot.ObjectName);
+            if (string.IsNullOrWhiteSpace(reference) || textureCache.ContainsKey(reference) || pendingTexturePaths.ContainsKey(reference))
+            {
+                continue;
+            }
+
+            var textureData = firstSlot.Texture;
+            if (textureData == null && resolvedTexturesBatch != null)
+            {
+                var lookup = $"{firstSlot.PackageName}.{firstSlot.ObjectName}";
+                if (resolvedTexturesBatch.TryGetValue(lookup, out var resolvedTexture))
+                {
+                    textureData = resolvedTexture?.Texture;
+                }
+            }
+
+            var traits = entry.ResolvedMaterial == null
+                ? null
+                : L2Viewer.SceneDomain.Services.MaterialServices.MaterialHeuristics.GetKnownTraits(entry.ResolvedMaterial);
+            var needsRefresh = ImportedTextureAssetUtility.PrepareTextureAssetFile(
+                reference,
+                textureData,
+                textureDir,
+                $"{mapKey}/BspTextures",
+                traits,
+                reuseExistingMaterialTextureAssets,
+                out var texturePath,
+                out var loadedTexture);
+            if (loadedTexture != null)
+            {
+                textureCache[reference] = loadedTexture;
+                continue;
+            }
+
+            if (needsRefresh)
+            {
+                pendingTexturePaths[reference] = texturePath;
+            }
+        }
+
+        if (pendingTexturePaths.Count > 0)
+        {
+            AssetDatabase.Refresh();
+        }
+
+        foreach (var pendingTexture in pendingTexturePaths)
+        {
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(pendingTexture.Value);
+            if (texture != null)
+            {
+                textureCache[pendingTexture.Key] = texture;
+            }
+            else
+            {
+                log($"BSP texture asset load failed after refresh: ref={pendingTexture.Key} path={pendingTexture.Value}");
+            }
+        }
     }
 
     private static void BuildSceneHierarchy(
@@ -497,7 +583,7 @@ internal static class L2BspAssetBuilder
         var material = new Material(shader);
         material = UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, materialPath);
 
-        var textureChoice = ResolveDirectGraphTexture(section, resolvedMaterial, resolvedTexturesBatch, mapKey, textureDir, textureCache, traits, log, reuseExistingMaterialTextureAssets);
+        var textureChoice = ResolveDirectGraphTexture(section, resolvedMaterial, mapKey, textureDir, textureCache, log);
         if (textureChoice.Texture != null)
         {
             L2MaterialUtility.AssignMainTexture(material, textureChoice.Texture);
@@ -522,13 +608,10 @@ internal static class L2BspAssetBuilder
     private static (Texture2D Texture, string Reference) ResolveDirectGraphTexture(
         L2Viewer.SceneDomain.Models.SceneBspMeshSection section,
         L2Viewer.UtxFile.ResolvedMaterialGraph resolvedMaterial,
-        System.Collections.Generic.IReadOnlyDictionary<string, L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager.ResolvedTexture> resolvedTexturesBatch,
         string mapKey,
         string textureDir,
         Dictionary<string, Texture2D> textureCache,
-        L2Viewer.SceneDomain.Services.MaterialServices.MaterialKnownTraits traits,
-        Action<string> log,
-        bool reuseExistingMaterialTextureAssets)
+        Action<string> log)
     {
         if (resolvedMaterial?.TextureSlots == null || resolvedMaterial.TextureSlots.Count == 0)
         {
@@ -551,36 +634,12 @@ internal static class L2BspAssetBuilder
                 "TEX",
                 "png",
                 $"{mapKey}/BspTextures");
-            if (reuseExistingMaterialTextureAssets)
+            texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (texture != null)
             {
-                texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
-                if (texture != null)
-                {
-                    textureCache[reference] = texture;
-                    log($"BSP texture reused: section={section.StableName} ref={reference}");
-                    return (texture, reference);
-                }
-            }
-
-            L2Viewer.PackageCore.TextureData textureData = null;
-            if (firstSlotWithTexture.Texture != null) {
-                 textureData = firstSlotWithTexture.Texture;
-            } else if (resolvedTexturesBatch != null) {
-                var texKeyLookup = $"{firstSlotWithTexture.PackageName}.{firstSlotWithTexture.ObjectName}";
-                if (resolvedTexturesBatch.ContainsKey(texKeyLookup)) {
-                    var resolvedTex = resolvedTexturesBatch[texKeyLookup];
-                    if (resolvedTex != null) textureData = resolvedTex.Texture;
-                }
-            }
-
-            if (textureData != null)
-            {
-                var needsAlpha = NeedsAlpha(traits);
-                texture = L2AssetManager.CreateTextureAsset(textureData, texturePath, false, needsAlpha);
-                if (texture != null)
-                {
-                    textureCache[reference] = texture;
-                }
+                textureCache[reference] = texture;
+                log($"BSP texture reused: section={section.StableName} ref={reference}");
+                return (texture, reference);
             }
         }
 
