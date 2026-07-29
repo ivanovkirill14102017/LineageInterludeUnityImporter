@@ -965,15 +965,11 @@ internal static class TerrainGrassDetailBuilder
             return false;
         }
 
-        var raw = terrainImport.WorldMinCorner ?? System.Numerics.Vector3.Zero;
-        var position = new Vector3(
-            raw.X * UnrealToUnityScale,
-            (raw.Z - (terrainImport.HeightValueScale * 0.5f)) * UnrealToUnityScale,
-            raw.Y * UnrealToUnityScale);
-        var size = new Vector3(
-            terrainImport.SampleSpacingX * (terrainImport.HeightWidth - 1) * UnrealToUnityScale,
-            terrainImport.HeightValueScale * UnrealToUnityScale,
-            terrainImport.SampleSpacingY * (terrainImport.HeightHeight - 1) * UnrealToUnityScale);
+        var heightmapResolution = TerrainHeightMapBuilder.ToUnityHeightmapResolution(
+            terrainImport.HeightWidth,
+            terrainImport.HeightHeight);
+        var position = TerrainAssetBuilder.ConvertTerrainPosition(terrainImport, heightmapResolution);
+        var size = TerrainAssetBuilder.BuildTerrainSize(terrainImport, heightmapResolution);
         if (size.x <= 0f || size.y <= 0f || size.z <= 0f)
         {
             return false;

@@ -53,10 +53,7 @@ internal static class TerrainAssetBuilder
             ? terrainImport.Layers.Max(layer => Mathf.Max(1, layer.MaskWidth))
             : 256;
         terrainData.baseMapResolution = 1024;
-        terrainData.size = new Vector3(
-            terrainImport.SampleSpacingX * (terrainImport.HeightWidth - 1) * UnrealToUnityScale,
-            terrainImport.HeightValueScale * UnrealToUnityScale,
-            terrainImport.SampleSpacingY * (terrainImport.HeightHeight - 1) * UnrealToUnityScale);
+        terrainData.size = BuildTerrainSize(terrainImport, heightmapResolution);
 
         terrainData.terrainLayers = layers;
         terrainData.SetHeights(0, 0, heights);
@@ -73,14 +70,30 @@ internal static class TerrainAssetBuilder
         return terrainData;
     }
 
+    public static Vector3 BuildTerrainSize(TerrainImportData terrainImport, int heightmapResolution)
+    {
+        var quadCount = Mathf.Max(0, heightmapResolution - 1);
+        return new Vector3(
+            terrainImport.SampleSpacingX * quadCount * UnrealToUnityScale,
+            terrainImport.HeightValueScale * UnrealToUnityScale,
+            terrainImport.SampleSpacingY * quadCount * UnrealToUnityScale);
+    }
+
     public static Vector3 ConvertTerrainPosition(TerrainImportData terrainImport, TerrainData terrainData)
     {
+        return ConvertTerrainPosition(terrainImport, terrainData != null ? terrainData.heightmapResolution : 0);
+    }
+
+    public static Vector3 ConvertTerrainPosition(TerrainImportData terrainImport, int heightmapResolution)
+    {
         var raw = terrainImport.WorldMinCorner ?? System.Numerics.Vector3.Zero;
+        var extraWidthSamples = Mathf.Max(0, heightmapResolution - terrainImport.HeightWidth);
+        var extraDepthSamples = Mathf.Max(0, heightmapResolution - terrainImport.HeightHeight);
         var baseZ = raw.Z - (terrainImport.HeightValueScale * 0.5f);
         return new Vector3(
-            raw.X * UnrealToUnityScale,
+            (raw.X - (extraWidthSamples * terrainImport.SampleSpacingX * 0.5f)) * UnrealToUnityScale,
             baseZ * UnrealToUnityScale,
-            raw.Y * UnrealToUnityScale);
+            (raw.Y - (extraDepthSamples * terrainImport.SampleSpacingY * 0.5f)) * UnrealToUnityScale);
     }
 
     private static bool[,] BuildUnityHoles(TerrainBitMaskData quadMask)
