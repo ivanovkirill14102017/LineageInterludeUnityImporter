@@ -14,7 +14,6 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     public string DayNightNodeName = "DayNight";
     public string SunNodeName = "SunControl";
     public string FogNodeName = "FogControl";
-    public float EditorSyncIntervalSeconds = 0.1f;
 
     [Header("References")]
     [SerializeField] private L2CameraAtmosphereProbe probe;
@@ -23,7 +22,6 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     [SerializeField] private L2FogController fog;
     [SerializeField] private L2LocalLightRuntimeOptimizer localLightOptimizer;
 
-    private double _nextEditorSyncTime;
 
     public L2CameraAtmosphereProbe Probe { get { return probe; } }
     public L2DayNightController DayNight { get { return dayNight; } }
@@ -33,51 +31,24 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
 
     private void OnEnable()
     {
-#if UNITY_EDITOR
-        EditorApplication.update -= EditorTick;
-        EditorApplication.update += EditorTick;
-#endif
         EnsureRig();
-        SyncToSceneViewCamera();
-    }
-
-    private void OnDisable()
-    {
-#if UNITY_EDITOR
-        EditorApplication.update -= EditorTick;
-#endif
     }
 
     private void OnValidate()
     {
         EnsureRig();
-        SyncToSceneViewCamera();
     }
-
-#if UNITY_EDITOR
-    private void EditorTick()
-    {
-        if (Application.isPlaying || this == null || !isActiveAndEnabled)
-        {
-            return;
-        }
-
-        var now = EditorApplication.timeSinceStartup;
-        if (now < _nextEditorSyncTime)
-        {
-            return;
-        }
-
-        _nextEditorSyncTime = now + Mathf.Max(0.01f, EditorSyncIntervalSeconds);
-        EnsureRig();
-        SyncToSceneViewCamera();
-    }
-#endif
 
     [ContextMenu("Rebuild Atmosphere Rig")]
     public void RebuildRig()
     {
         EnsureRig();
+    }
+
+    [ContextMenu("Sync To Scene View Camera")]
+    public void SyncRigToSceneViewCamera()
+    {
+        SyncToSceneViewCamera();
     }
 
     private void EnsureRig()
@@ -105,12 +76,11 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
         dayNight.Probe = probe;
         sun.Probe = probe;
         sun.DayNight = dayNight;
-        fog.Probe = probe;
+        fog.BindToProbe(probe);
 
         dayNight.enabled = false;
         dayNight.AutoFindDirectionalLights = true;
         sun.AutoFindReferences = false;
-        fog.AutoFindReferences = true;
     }
 
     private void SyncToSceneViewCamera()

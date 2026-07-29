@@ -40,7 +40,14 @@ public sealed class L2FogController : MonoBehaviour
     private bool _capturedOutdoorFogValues;
     private float _outdoorFogAttenuationDistance = -1f;
     private float _outdoorVolumetricFogDistance = -1f;
-    private double _lastUpdateTime = -1d;
+    private L2CameraAtmosphereProbe _boundProbe;
+    private bool _transitionActive;
+    private double _transitionStartTime;
+    private float _transitionDurationSeconds;
+    private float _transitionStartFogEndDistance;
+    private float _transitionStartFogRange;
+    private float _transitionTargetFogEndDistance;
+    private float _transitionTargetFogRange;
 
     public bool FogAvailable { get { return fogAvailable; } }
     public bool UsingOutdoorZoneOverride { get { return usingOutdoorZoneOverride; } }
@@ -48,19 +55,51 @@ public sealed class L2FogController : MonoBehaviour
     private void OnEnable()
     {
         EnsureReferences();
-        UpdateFog();
+        RebindProbe();
+        RefreshFogFromContext(immediate: true);
+    }
+
+    private void OnDisable()
+    {
+        UnbindProbe();
+        StopTransition();
     }
 
     private void OnValidate()
     {
         EnsureReferences();
-        UpdateFog();
+        RebindProbe();
+        RefreshFogFromContext(immediate: true);
     }
 
     private void Update()
     {
-        EnsureReferences();
-        UpdateFog();
+        if (!Application.isPlaying || !_transitionActive)
+        {
+            return;
+        }
+
+        TickTransition();
+    }
+
+#if UNITY_EDITOR
+    private void EditorTick()
+    {
+        if (Application.isPlaying || this == null || !_transitionActive)
+        {
+            return;
+        }
+
+        TickTransition();
+    }
+#endif
+
+    public void BindToProbe(L2CameraAtmosphereProbe probe)
+    {
+        Probe = probe;
+        AutoFindReferences = false;
+        RebindProbe();
+        RefreshFogFromContext(immediate: true);
     }
 
     private void EnsureReferences()
@@ -76,27 +115,92 @@ public sealed class L2FogController : MonoBehaviour
         }
     }
 
-    private void UpdateFog()
+    private void RebindProbe()
     {
-        fogAvailable = false;
-        targetFogAttenuationDistance = 0f;
-        currentFogAttenuationDistance = 0f;
-        targetVolumetricFogDistance = 0f;
-        currentVolumetricFogDistance = 0f;
-
-        if (!AdjustFog || Probe == null)
+        if (ReferenceEquals(_boundProbe, Probe))
         {
             return;
         }
 
-        fogAvailable = true;
-        if (!_capturedOutdoorFogValues)
+        if (_boundProbe != null)
         {
-            _outdoorFogAttenuationDistance = Mathf.Max(1f, RenderSettings.fogEndDistance);
-            _outdoorVolumetricFogDistance = Mathf.Max(0.01f, RenderSettings.fogEndDistance - RenderSettings.fogStartDistance);
-            _capturedOutdoorFogValues = true;
+            _boundProbe.ProbeStateChanged -= OnProbeStateChanged;
         }
 
+        _boundProbe = Probe;
+        if (_boundProbe != null)
+        {
+            _boundProbe.ProbeStateChanged += OnProbeStateChanged;
+        }
+    }
+
+    private void UnbindProbe()
+    {
+        if (_boundProbe == null)
+        {
+            return;
+        }
+
+        _boundProbe.ProbeStateChanged -= OnProbeStateChanged;
+        _boundProbe = null;
+    }
+
+    private void OnProbeStateChanged(L2CameraAtmosphereProbe probe)
+    {
+        if (!ReferenceEquals(probe, Probe))
+        {
+            return;
+        }
+
+        RefreshFogFromContext(immediate: false);
+    }
+
+    private void RefreshFogFromContext(bool immediate)
+    {
+        EnsureReferences();
+        ResetDebugState();
+
+        if (!AdjustFog || Probe == null)
+        {
+            StopTransition();
+            return;
+        }
+
+        fogAvailable = true;
+        CaptureOutdoorFogValuesIfNeeded();
+
+        float resolvedTargetFogEnd;
+        float resolvedTargetFogRange;
+        ResolveFogTargets(out resolvedTargetFogEnd, out resolvedTargetFogRange);
+
+        targetFogAttenuationDistance = resolvedTargetFogEnd;
+        targetVolumetricFogDistance = resolvedTargetFogRange;
+
+        if (immediate)
+        {
+            StopTransition();
+            ApplyFogSettings(resolvedTargetFogEnd, resolvedTargetFogRange);
+            RepaintSceneView();
+            return;
+        }
+
+        StartTransition(resolvedTargetFogEnd, resolvedTargetFogRange, Probe.GetAtmosphereBlendDurationSeconds());
+    }
+
+    private void CaptureOutdoorFogValuesIfNeeded()
+    {
+        if (_capturedOutdoorFogValues)
+        {
+            return;
+        }
+
+        _outdoorFogAttenuationDistance = Mathf.Max(1f, RenderSettings.fogEndDistance);
+        _outdoorVolumetricFogDistance = Mathf.Max(0.01f, RenderSettings.fogEndDistance - RenderSettings.fogStartDistance);
+        _capturedOutdoorFogValues = true;
+    }
+
+    private void ResolveFogTargets(out float resolvedTargetFogEnd, out float resolvedTargetFogRange)
+    {
         var averageFogEnd = Probe.MapAverageIndoorFogEnd > 0f ? Probe.MapAverageIndoorFogEnd : Mathf.Max(1f, FallbackAverageSourceFogEnd);
         var activeSourceFogEnd = Probe.ActiveSourceFogEnd > 0f ? Probe.ActiveSourceFogEnd : averageFogEnd;
         fogSourceScale = 1f;
@@ -123,28 +227,88 @@ public sealed class L2FogController : MonoBehaviour
             usingOutdoorZoneOverride = true;
         }
 
-        targetFogAttenuationDistance = Mathf.Lerp(outdoorFogAttenuation, effectiveIndoorFogAttenuationDistance, blend);
-        targetVolumetricFogDistance = Mathf.Lerp(outdoorVolumetricDistance, effectiveIndoorVolumetricFogDistance, blend);
+        resolvedTargetFogEnd = Mathf.Lerp(outdoorFogAttenuation, effectiveIndoorFogAttenuationDistance, blend);
+        resolvedTargetFogRange = Mathf.Lerp(outdoorVolumetricDistance, effectiveIndoorVolumetricFogDistance, blend);
+    }
 
-        var deltaTime = GetDeltaTime();
-        var blendDuration = Probe.GetAtmosphereBlendDurationSeconds();
-        var blendFactor = blendDuration <= 0.0001f
-            ? 1f
-            : Mathf.Clamp01(deltaTime / blendDuration);
-
-        var currentFogEnd = RenderSettings.fogEndDistance > 0f ? RenderSettings.fogEndDistance : targetFogAttenuationDistance;
+    private void StartTransition(float targetFogEnd, float targetFogRange, float durationSeconds)
+    {
+        var currentFogEnd = RenderSettings.fogEndDistance > 0f ? RenderSettings.fogEndDistance : targetFogEnd;
         var currentFogRange = Mathf.Max(0.01f, currentFogEnd - RenderSettings.fogStartDistance);
-        var nextFogEnd = Mathf.Lerp(currentFogEnd, targetFogAttenuationDistance, blendFactor);
-        var nextFogRange = Mathf.Lerp(currentFogRange, targetVolumetricFogDistance, blendFactor);
-        var nextFogStart = Mathf.Max(0f, nextFogEnd - Mathf.Max(0.01f, nextFogRange));
+
+        if (Approximately(currentFogEnd, targetFogEnd) && Approximately(currentFogRange, targetFogRange))
+        {
+            StopTransition();
+            ApplyFogSettings(targetFogEnd, targetFogRange);
+            RepaintSceneView();
+            return;
+        }
+
+        _transitionStartFogEndDistance = currentFogEnd;
+        _transitionStartFogRange = currentFogRange;
+        _transitionTargetFogEndDistance = targetFogEnd;
+        _transitionTargetFogRange = targetFogRange;
+        _transitionDurationSeconds = Mathf.Max(0.0001f, durationSeconds);
+        _transitionStartTime = GetCurrentTime();
+        _transitionActive = true;
+
+        BeginTransition();
+        ApplyTransitionState(0f);
+        RepaintSceneView();
+    }
+
+    private void TickTransition()
+    {
+        if (!_transitionActive)
+        {
+            return;
+        }
+
+        var elapsed = Mathf.Max(0f, (float)(GetCurrentTime() - _transitionStartTime));
+        var normalizedTime = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, _transitionDurationSeconds));
+        ApplyTransitionState(normalizedTime);
+
+        if (normalizedTime >= 1f)
+        {
+            StopTransition();
+        }
+
+        RepaintSceneView();
+    }
+
+    private void ApplyTransitionState(float normalizedTime)
+    {
+        var fogEnd = Mathf.Lerp(_transitionStartFogEndDistance, _transitionTargetFogEndDistance, normalizedTime);
+        var fogRange = Mathf.Lerp(_transitionStartFogRange, _transitionTargetFogRange, normalizedTime);
+        ApplyFogSettings(fogEnd, fogRange);
+    }
+
+    private void ApplyFogSettings(float fogEndDistance, float fogRange)
+    {
+        var clampedFogEnd = Mathf.Max(0.01f, fogEndDistance);
+        var clampedFogRange = Mathf.Max(0.01f, fogRange);
+        var fogStartDistance = Mathf.Max(0f, clampedFogEnd - clampedFogRange);
 
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogStartDistance = nextFogStart;
-        RenderSettings.fogEndDistance = Mathf.Max(nextFogStart + 0.01f, nextFogEnd);
+        RenderSettings.fogStartDistance = fogStartDistance;
+        RenderSettings.fogEndDistance = Mathf.Max(fogStartDistance + 0.01f, clampedFogEnd);
 
         currentFogAttenuationDistance = RenderSettings.fogEndDistance;
         currentVolumetricFogDistance = RenderSettings.fogEndDistance - RenderSettings.fogStartDistance;
+    }
+
+    private void ResetDebugState()
+    {
+        fogAvailable = false;
+        usingOutdoorZoneOverride = false;
+        fogSourceScale = 1f;
+        effectiveIndoorFogAttenuationDistance = 0f;
+        effectiveIndoorVolumetricFogDistance = 0f;
+        targetFogAttenuationDistance = 0f;
+        currentFogAttenuationDistance = 0f;
+        targetVolumetricFogDistance = 0f;
+        currentVolumetricFogDistance = 0f;
     }
 
     private bool ShouldUseOutdoorZoneFogOverride(float activeSourceFogEnd)
@@ -162,26 +326,48 @@ public sealed class L2FogController : MonoBehaviour
         return Mathf.Abs(activeSourceFogEnd - OutdoorZoneSourceFogEnd) <= Mathf.Max(0f, OutdoorZoneSourceFogEndTolerance);
     }
 
-    private float GetDeltaTime()
+    private void BeginTransition()
     {
-        if (Application.isPlaying)
-        {
-            return Time.unscaledDeltaTime;
-        }
-
 #if UNITY_EDITOR
-        var now = EditorApplication.timeSinceStartup;
-        if (_lastUpdateTime < 0d)
+        if (!Application.isPlaying)
         {
-            _lastUpdateTime = now;
-            return 0f;
+            EditorApplication.update -= EditorTick;
+            EditorApplication.update += EditorTick;
         }
+#endif
+    }
 
-        var delta = (float)(now - _lastUpdateTime);
-        _lastUpdateTime = now;
-        return Mathf.Max(0f, delta);
-#else
-        return 0f;
+    private void StopTransition()
+    {
+        _transitionActive = false;
+#if UNITY_EDITOR
+        EditorApplication.update -= EditorTick;
+#endif
+    }
+
+    private double GetCurrentTime()
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            return EditorApplication.timeSinceStartup;
+        }
+#endif
+        return Time.unscaledTimeAsDouble;
+    }
+
+    private static bool Approximately(float left, float right)
+    {
+        return Mathf.Abs(left - right) <= 0.0001f;
+    }
+
+    private static void RepaintSceneView()
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            SceneView.RepaintAll();
+        }
 #endif
     }
 }

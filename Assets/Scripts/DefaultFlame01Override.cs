@@ -38,14 +38,14 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         ApplyPreset();
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
         if (_fireLight == null)
         {
             CacheLight();
         }
 
-        if (_fireLight == null)
+        if (_fireLight == null || _fireLight.enabled == false)
         {
             return;
         }

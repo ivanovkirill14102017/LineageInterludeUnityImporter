@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -41,6 +42,8 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
     [SerializeField] private L2MapContextVolume currentContextVolume;
 
     private double _nextAllowedProbeTime;
+
+    public event Action<L2CameraAtmosphereProbe> ProbeStateChanged;
 
     public L2MapContextVolume CurrentContextVolume { get { return currentContextVolume; } }
     public string CurrentMapKey { get { return currentMapKey; } }
@@ -125,14 +128,21 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
             return false;
         }
 
-        UpdateProbe();
-        return true;
+        return UpdateProbe();
     }
 
     private void ForceUpdateProbe()
     {
         _nextAllowedProbeTime = GetCurrentProbeTime() + GetRefreshIntervalSeconds();
-        UpdateProbe();
+        if (UpdateProbe())
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                SceneView.RepaintAll();
+            }
+#endif
+        }
     }
 
     private bool ShouldRefreshProbe()
@@ -173,8 +183,9 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
         return Mathf.Max(OutdoorApproachDistance * 2f, IndoorDepthDistance * 8f, 1f);
     }
 
-    private void UpdateProbe()
+    private bool UpdateProbe()
     {
+        var previousState = CaptureState();
         Vector3 worldPosition;
         probeSource = ResolveProbeWorldPosition(out worldPosition);
 
@@ -196,14 +207,14 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
         if (currentContextVolume == null)
         {
             ResetState();
-            return;
+            return NotifyIfStateChanged(previousState);
         }
 
         L2MapContextVolume.EvaluationResult result;
         if (!currentContextVolume.TryEvaluate(this, worldPosition, out result))
         {
             ResetState();
-            return;
+            return NotifyIfStateChanged(previousState);
         }
 
         currentMapKey = result.MapKey ?? string.Empty;
@@ -221,6 +232,7 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
         worldScaleFactor = result.WorldScaleFactor;
         mapAverageIndoorFogEnd = result.MapAverageIndoorFogEnd;
         activeSourceFogEnd = result.ActiveSourceFogEnd;
+        return NotifyIfStateChanged(previousState);
     }
 
     private string ResolveProbeWorldPosition(out Vector3 worldPosition)
@@ -257,6 +269,125 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
         worldScaleFactor = 1f;
         mapAverageIndoorFogEnd = 0f;
         activeSourceFogEnd = 0f;
+    }
+
+    private ProbeStateSnapshot CaptureState()
+    {
+        return new ProbeStateSnapshot(
+            currentMapKey,
+            currentZone,
+            currentLeaf,
+            currentZoneHasInfo,
+            currentDistanceFogEnabled,
+            currentZoneHasDistanceFogEnd,
+            observedIndoor,
+            isIndoor,
+            indoorWeight,
+            signedTransitionDepth,
+            sunShouldAffect,
+            currentZoneTag,
+            worldScaleFactor,
+            mapAverageIndoorFogEnd,
+            activeSourceFogEnd,
+            probeSource,
+            currentContextVolume);
+    }
+
+    private bool NotifyIfStateChanged(ProbeStateSnapshot previousState)
+    {
+        var changed = CaptureState().DiffersFrom(previousState);
+        if (changed)
+        {
+            var handler = ProbeStateChanged;
+            if (handler != null)
+            {
+                handler(this);
+            }
+        }
+
+        return changed;
+    }
+
+    private readonly struct ProbeStateSnapshot
+    {
+        private const float FloatEpsilon = 0.0001f;
+
+        private readonly string _mapKey;
+        private readonly int _zone;
+        private readonly int _leaf;
+        private readonly bool _zoneHasInfo;
+        private readonly bool _distanceFogEnabled;
+        private readonly bool _zoneHasDistanceFogEnd;
+        private readonly bool _observedIndoor;
+        private readonly bool _isIndoor;
+        private readonly float _indoorWeight;
+        private readonly float _signedTransitionDepth;
+        private readonly bool _sunShouldAffect;
+        private readonly string _zoneTag;
+        private readonly float _worldScaleFactor;
+        private readonly float _mapAverageIndoorFogEnd;
+        private readonly float _activeSourceFogEnd;
+        private readonly string _probeSource;
+        private readonly L2MapContextVolume _contextVolume;
+
+        public ProbeStateSnapshot(
+            string mapKey,
+            int zone,
+            int leaf,
+            bool zoneHasInfo,
+            bool distanceFogEnabled,
+            bool zoneHasDistanceFogEnd,
+            bool observedIndoor,
+            bool isIndoor,
+            float indoorWeight,
+            float signedTransitionDepth,
+            bool sunShouldAffect,
+            string zoneTag,
+            float worldScaleFactor,
+            float mapAverageIndoorFogEnd,
+            float activeSourceFogEnd,
+            string probeSource,
+            L2MapContextVolume contextVolume)
+        {
+            _mapKey = mapKey;
+            _zone = zone;
+            _leaf = leaf;
+            _zoneHasInfo = zoneHasInfo;
+            _distanceFogEnabled = distanceFogEnabled;
+            _zoneHasDistanceFogEnd = zoneHasDistanceFogEnd;
+            _observedIndoor = observedIndoor;
+            _isIndoor = isIndoor;
+            _indoorWeight = indoorWeight;
+            _signedTransitionDepth = signedTransitionDepth;
+            _sunShouldAffect = sunShouldAffect;
+            _zoneTag = zoneTag;
+            _worldScaleFactor = worldScaleFactor;
+            _mapAverageIndoorFogEnd = mapAverageIndoorFogEnd;
+            _activeSourceFogEnd = activeSourceFogEnd;
+            _probeSource = probeSource;
+            _contextVolume = contextVolume;
+        }
+
+        public bool DiffersFrom(ProbeStateSnapshot other)
+        {
+            return !string.Equals(_mapKey, other._mapKey, StringComparison.Ordinal) ||
+                   _zone != other._zone ||
+                   _leaf != other._leaf ||
+                   _zoneHasInfo != other._zoneHasInfo ||
+                   _distanceFogEnabled != other._distanceFogEnabled ||
+                   _zoneHasDistanceFogEnd != other._zoneHasDistanceFogEnd ||
+                   _observedIndoor != other._observedIndoor ||
+                   _isIndoor != other._isIndoor ||
+                   Mathf.Abs(_indoorWeight - other._indoorWeight) > FloatEpsilon ||
+                   Mathf.Abs(_signedTransitionDepth - other._signedTransitionDepth) > FloatEpsilon ||
+                   _sunShouldAffect != other._sunShouldAffect ||
+                   !string.Equals(_zoneTag, other._zoneTag, StringComparison.Ordinal) ||
+                   Mathf.Abs(_worldScaleFactor - other._worldScaleFactor) > FloatEpsilon ||
+                   Mathf.Abs(_mapAverageIndoorFogEnd - other._mapAverageIndoorFogEnd) > FloatEpsilon ||
+                   Mathf.Abs(_activeSourceFogEnd - other._activeSourceFogEnd) > FloatEpsilon ||
+                   !string.Equals(_probeSource, other._probeSource, StringComparison.Ordinal) ||
+                   !ReferenceEquals(_contextVolume, other._contextVolume);
+        }
     }
 
     private void OnGUI()
