@@ -9,6 +9,7 @@ using UnityEngine;
 internal static class L2BspAssetBuilder
 {
     private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
+    private const float MaxBspSectionHorizontalSpanUnity = L2WorldScale.TerrainQuadrantSizeUnity;
     private const uint UnknownPolyFlag02000 = 0x00002000;
     private const uint UnknownPolyFlag08000 = 0x00008000;
 
@@ -685,8 +686,55 @@ internal static class L2BspAssetBuilder
         }
 
         var unknownMask = section.UnknownPolyFlagsMask;
-        return (unknownMask & UnknownPolyFlag02000) != 0 &&
-               (unknownMask & UnknownPolyFlag08000) != 0;
+        if ((unknownMask & UnknownPolyFlag02000) != 0 &&
+            (unknownMask & UnknownPolyFlag08000) != 0)
+        {
+            return true;
+        }
+
+        return HasOversizedHorizontalSpan(section);
+    }
+
+    private static bool HasOversizedHorizontalSpan(SceneBspMeshSection section)
+    {
+        if (section.Positions == null || section.Positions.Length == 0)
+        {
+            return false;
+        }
+
+        var minX = float.PositiveInfinity;
+        var maxX = float.NegativeInfinity;
+        var minY = float.PositiveInfinity;
+        var maxY = float.NegativeInfinity;
+
+        for (var i = 0; i < section.Positions.Length; i++)
+        {
+            var position = section.Positions[i];
+            if (position.X < minX)
+            {
+                minX = position.X;
+            }
+
+            if (position.X > maxX)
+            {
+                maxX = position.X;
+            }
+
+            if (position.Y < minY)
+            {
+                minY = position.Y;
+            }
+
+            if (position.Y > maxY)
+            {
+                maxY = position.Y;
+            }
+        }
+
+        var spanXUnity = (maxX - minX) * UnrealToUnityScale;
+        var spanZUnity = (maxY - minY) * UnrealToUnityScale;
+        return spanXUnity > MaxBspSectionHorizontalSpanUnity ||
+               spanZUnity > MaxBspSectionHorizontalSpanUnity;
     }
 
     private static Vector3 ConvertPosition(System.Numerics.Vector3 raw)

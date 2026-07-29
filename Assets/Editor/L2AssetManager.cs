@@ -326,6 +326,12 @@ internal static class L2AssetManager
             }
 
             material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+
+            if (traits.BlendModeHint == L2Viewer.SceneDomain.Services.MaterialServices.MaterialBlendModeHint.Translucent &&
+                material.HasProperty("_EnableBlendModePreserveSpecularLighting"))
+            {
+                material.SetFloat("_EnableBlendModePreserveSpecularLighting", 0f);
+            }
         }
 
         if (traits.HasSelfIlluminationInput)

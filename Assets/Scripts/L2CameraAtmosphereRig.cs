@@ -21,6 +21,7 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     [SerializeField] private L2DayNightController dayNight;
     [SerializeField] private L2SunController sun;
     [SerializeField] private L2FogController fog;
+    [SerializeField] private L2LocalLightRuntimeOptimizer localLightOptimizer;
 
     private double _nextEditorSyncTime;
 
@@ -28,6 +29,7 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     public L2DayNightController DayNight { get { return dayNight; } }
     public L2SunController Sun { get { return sun; } }
     public L2FogController Fog { get { return fog; } }
+    public L2LocalLightRuntimeOptimizer LocalLightOptimizer { get { return localLightOptimizer; } }
 
     private void OnEnable()
     {
@@ -94,6 +96,7 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
         dayNight = GetOrAddComponent<L2DayNightController>(dayNightNode);
         sun = GetOrAddComponent<L2SunController>(sunNode);
         fog = GetOrAddComponent<L2FogController>(fogNode);
+        localLightOptimizer = GetOrAddComponent<L2LocalLightRuntimeOptimizer>(transform);
 
         probeNode.localPosition = Vector3.zero;
         probeNode.localRotation = Quaternion.identity;

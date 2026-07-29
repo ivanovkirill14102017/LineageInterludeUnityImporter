@@ -11,6 +11,11 @@ internal static class L2LightAssetBuilder
     private const float UnrealLightRadiusScale = 64f / 2f;
     private const float DefaultLightIntensity = 2.35f;
     private const float DefaultFlame01LightCullDistance = 1.1f * L2WorldScale.UnityToUnrealScale;
+    private const float ImportedLightScaleMultiplier = 0.11f;
+    private const float ImportedLightRangeExponent = 1.8f;
+    private const float ImportedLightSourceIntensityExponent = 0.45f;
+    private const float ZeroBrightnessSourceIntensityProxy = DefaultLightIntensity;
+    private const float MinimumSourceIntensity = 0.0001f;
 
     public static void BuildLights(SceneLightData[] lights, SceneSunData[] suns, SceneMoonData[] moons, GameObject parent, Action<string> log)
     {
@@ -48,7 +53,8 @@ internal static class L2LightAssetBuilder
                 var unityLight = lightGo.AddComponent<Light>();
                 unityLight.type = ResolveLightType(lightData);
                 unityLight.color = BuildLightColor(lightData);
-                unityLight.range = BuildLightRange(lightData);
+                var unityRange = BuildLightRange(lightData);
+                unityLight.range = unityRange;
                 var enableShadows = false;
                 unityLight.shadows = LightShadows.None;
                 unityLight.lightmapBakeType = LightmapBakeType.Baked;
@@ -57,7 +63,7 @@ internal static class L2LightAssetBuilder
                     unityLight.spotAngle = BuildSpotAngle(lightData);
                 }
 
-                ConfigureLight(unityLight, BuildLightIntensity(lightData), enableShadows);
+                ConfigureLight(unityLight, BuildLightIntensity(lightData, unityRange), enableShadows);
 
                 importedCount++;
             }
@@ -92,7 +98,25 @@ internal static class L2LightAssetBuilder
         return Color.HSVToRGB(h, s, 1f);
     }
 
-    private static float BuildLightIntensity(SceneLightData lightData)
+    private static float BuildLightIntensity(SceneLightData lightData, float range)
+    {
+        var sourceIntensity = BuildSourceLightIntensity(lightData);
+
+        // Some Unreal lights appear to collapse to zero during import or quantization.
+        // Use a conservative proxy so zero-valued lights do not explode into "sun" lights.
+        var effectiveSourceIntensity = sourceIntensity > MinimumSourceIntensity
+            ? sourceIntensity
+            : ZeroBrightnessSourceIntensityProxy;
+
+        var scaledIntensity =
+            ImportedLightScaleMultiplier *
+            Mathf.Pow(Mathf.Max(0.1f, range), ImportedLightRangeExponent) /
+            Mathf.Pow(effectiveSourceIntensity, ImportedLightSourceIntensityExponent);
+
+        return Mathf.Max(0f, scaledIntensity);
+    }
+
+    private static float BuildSourceLightIntensity(SceneLightData lightData)
     {
         var brightness = lightData.Brightness.GetValueOrDefault(255f);
         return Mathf.Max(0f, (brightness / 255f) * DefaultLightIntensity);

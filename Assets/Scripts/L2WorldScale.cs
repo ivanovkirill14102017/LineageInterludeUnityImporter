@@ -3,10 +3,12 @@ using UnityEngine;
 public static class L2WorldScale
 {
     private const float UnrealRotatorUnitsToRadians = Mathf.PI / 32768f;
+    public const float TerrainQuadrantSizeUnreal = 32768f;
 
     public const float UnrealToUnityScale = 0.016f * 3f;
     public const float BakeUnrealToUnityScale = UnrealToUnityScale;
     public const float UnityToUnrealScale = 1f / UnrealToUnityScale;
+    public const float TerrainQuadrantSizeUnity = TerrainQuadrantSizeUnreal * UnrealToUnityScale;
     public static Vector3 TransformFromUnrealToUnityWithScale(this System.Numerics.Vector3 raw)
     {
         return new Vector3(raw.X * UnrealToUnityScale, raw.Z * UnrealToUnityScale, raw.Y * UnrealToUnityScale);

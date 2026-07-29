@@ -1,5 +1,12 @@
 using UnityEngine;
 
+[System.Serializable]
+public enum DefaultFlame01Preset
+{
+    Torch,
+    Campfire
+}
+
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public sealed class DefaultFlame01Override : MonoBehaviour
@@ -10,51 +17,48 @@ public sealed class DefaultFlame01Override : MonoBehaviour
     private const string SmokeName = "Smoke";
     private const string LightName = "FireLight";
 
-    [Header("Shape")]
-    public float FlameHeight = 0.95f;
-    public float FlameWidth = 0.22f;
-
-    [Header("Light")]
-    public float LightIntensity = 3.6f;
-    public float LightRange = 3.2f;
-    public float FlickerAmplitude = 0.45f;
-    public float FlickerSpeed = 7.5f;
+    [Header("Preset")]
+    public DefaultFlame01Preset Preset = DefaultFlame01Preset.Torch;
+    public bool CastShadows = true;
 
     private static Material s_builtinParticleMaterial;
     private static Texture2D s_builtinParticleTexture;
     private Light _fireLight;
+    private FlamePresetSettings _settings;
 
     private void OnEnable()
     {
-        CacheLight();
+        EnsureEffect();
+        ApplyPreset();
     }
 
     private void OnValidate()
     {
-        CacheLight();
+        EnsureEffect();
+        ApplyPreset();
     }
 
     private void Update()
     {
-        CacheLight();
+        if (_fireLight == null)
+        {
+            CacheLight();
+        }
 
         if (_fireLight == null)
         {
             return;
         }
 
-        _fireLight.color = new Color(1f, 0.56f, 0.22f, 1f);
-        _fireLight.range = LightRange;
-
         var flicker = 1f;
-        if (FlickerAmplitude > 0f)
+        if (_settings.FlickerAmplitude > 0f)
         {
             var time = GetEffectTime();
-            flicker += Mathf.Sin(time * FlickerSpeed) * FlickerAmplitude * 0.35f;
-            flicker += Mathf.Sin(time * (FlickerSpeed * 1.73f)) * FlickerAmplitude * 0.18f;
+            flicker += Mathf.Sin(time * _settings.FlickerSpeed) * _settings.FlickerAmplitude * 0.35f;
+            flicker += Mathf.Sin(time * (_settings.FlickerSpeed * 1.73f)) * _settings.FlickerAmplitude * 0.18f;
         }
 
-        _fireLight.intensity = Mathf.Max(0f, LightIntensity * flicker);
+        _fireLight.intensity = Mathf.Max(0f, _settings.LightIntensity * flicker);
     }
 
     private void CacheLight()
@@ -75,7 +79,7 @@ public sealed class DefaultFlame01Override : MonoBehaviour
     private void RebuildEffectChildren()
     {
         EnsureEffect();
-        CacheLight();
+        ApplyPreset();
     }
 
     private static float GetEffectTime()
@@ -94,11 +98,18 @@ public sealed class DefaultFlame01Override : MonoBehaviour
 
     private void EnsureEffect()
     {
+        _settings = BuildPresetSettings(Preset);
+
         var core = GetOrCreateChild(CoreName);
         var tongues = GetOrCreateChild(TonguesName);
         var embers = GetOrCreateChild(EmbersName);
         var smoke = GetOrCreateChild(SmokeName);
         var lightNode = GetOrCreateChild(LightName);
+
+        ConfigureEffectNodeTransform(core, Vector3.zero);
+        ConfigureEffectNodeTransform(tongues, Vector3.zero);
+        ConfigureEffectNodeTransform(embers, new Vector3(0f, _settings.FlameHeight * 0.08f, 0f));
+        ConfigureEffectNodeTransform(smoke, new Vector3(0f, _settings.FlameHeight * 0.22f, 0f));
 
         ConfigureCoreFlame(GetOrAddParticleSystem(core));
         ConfigureTongues(GetOrAddParticleSystem(tongues));
@@ -109,39 +120,44 @@ public sealed class DefaultFlame01Override : MonoBehaviour
 
     private void ConfigureCoreFlame(ParticleSystem particleSystem)
     {
+        var sizeMultiplier = _settings.ParticleSizeMultiplier;
+        var speedMultiplier = _settings.ParticleSpeedMultiplier;
+        var rateMultiplier = _settings.EmissionMultiplier;
         ConfigureSharedDefaults(particleSystem, loop: true, duration: 1.2f, maxParticles: 80);
 
         var main = particleSystem.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.18f, 0.34f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.55f, 1.1f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.55f * speedMultiplier, 1.1f * speedMultiplier);
         main.startSize3D = false;
-        main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.18f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.08f * sizeMultiplier, 0.18f * sizeMultiplier);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.gravityModifier = 0f;
         main.simulationSpace = ParticleSystemSimulationSpace.Local;
 
         var emission = particleSystem.emission;
-        emission.rateOverTime = 42f;
+        emission.rateOverTime = 42f * rateMultiplier;
 
         var shape = particleSystem.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 5f;
-        shape.radius = FlameWidth * 0.1f;
+        shape.radius = _settings.FlameWidth * 0.1f;
+        shape.radiusThickness = 1f;
+        shape.length = Mathf.Max(0.01f, _settings.FlameHeight * 0.06f);
         shape.position = Vector3.zero;
-        shape.scale = new Vector3(0.65f, FlameHeight * 1.15f, 0.65f);
+        shape.scale = new Vector3(0.65f * sizeMultiplier, _settings.FlameHeight * 1.15f, 0.65f * sizeMultiplier);
 
         var velocity = particleSystem.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
-        velocity.x = new ParticleSystem.MinMaxCurve(-0.05f, 0.05f);
-        velocity.y = new ParticleSystem.MinMaxCurve(1.15f, 2.05f);
-        velocity.z = new ParticleSystem.MinMaxCurve(-0.05f, 0.05f);
+        velocity.x = new ParticleSystem.MinMaxCurve(-0.05f * speedMultiplier, 0.05f * speedMultiplier);
+        velocity.y = new ParticleSystem.MinMaxCurve(1.15f * speedMultiplier, 2.05f * speedMultiplier);
+        velocity.z = new ParticleSystem.MinMaxCurve(-0.05f * speedMultiplier, 0.05f * speedMultiplier);
 
         var limit = particleSystem.limitVelocityOverLifetime;
         limit.enabled = true;
         limit.dampen = 0.2f;
-        limit.limit = 2.2f;
+        limit.limit = 2.2f * speedMultiplier;
 
         var noise = particleSystem.noise;
         noise.enabled = true;
@@ -171,39 +187,50 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         renderer.renderMode = ParticleSystemRenderMode.Stretch;
         renderer.sortMode = ParticleSystemSortMode.Distance;
         renderer.alignment = ParticleSystemRenderSpace.View;
-        renderer.lengthScale = 0.8f;
-        renderer.velocityScale = 0.28f;
+        renderer.lengthScale = 0.8f * sizeMultiplier;
+        renderer.velocityScale = 0.28f * speedMultiplier;
         renderer.cameraVelocityScale = 0f;
         renderer.minParticleSize = 0.0001f;
-        renderer.maxParticleSize = 0.38f;
+        renderer.maxParticleSize = 0.38f * sizeMultiplier;
     }
 
     private void ConfigureTongues(ParticleSystem particleSystem)
     {
+        var sizeMultiplier = _settings.ParticleSizeMultiplier;
+        var speedMultiplier = _settings.ParticleSpeedMultiplier;
+        var rateMultiplier = _settings.EmissionMultiplier;
         ConfigureSharedDefaults(particleSystem, loop: true, duration: 1.4f, maxParticles: 36);
 
         var main = particleSystem.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.12f, 0.22f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(1.05f, 2.2f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.14f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.05f * speedMultiplier, 2.2f * speedMultiplier);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.06f * sizeMultiplier, 0.14f * sizeMultiplier);
         main.startRotation = new ParticleSystem.MinMaxCurve(-0.08f, 0.08f);
         main.startRotation3D = false;
 
         var emission = particleSystem.emission;
-        emission.rateOverTime = 20f;
+        emission.rateOverTime = 20f * rateMultiplier;
 
         var shape = particleSystem.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 4f;
-        shape.radius = FlameWidth * 0.07f;
+        shape.radius = Mathf.Max(0.01f, _settings.FlameWidth * 0.03f);
+        shape.radiusThickness = 1f;
+        shape.length = Mathf.Max(0.01f, _settings.FlameHeight * 0.03f);
+        shape.position = new Vector3(0f, _settings.FlameHeight * 0.02f, 0f);
+        shape.rotation = Vector3.zero;
+        shape.scale = new Vector3(
+            Mathf.Max(0.12f, _settings.FlameWidth * 0.32f),
+            _settings.FlameHeight * 0.28f,
+            Mathf.Max(0.12f, _settings.FlameWidth * 0.32f));
 
         var velocity = particleSystem.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
-        velocity.x = new ParticleSystem.MinMaxCurve(-0.12f, 0.12f);
-        velocity.y = new ParticleSystem.MinMaxCurve(1.8f, 3.1f);
-        velocity.z = new ParticleSystem.MinMaxCurve(-0.12f, 0.12f);
+        velocity.x = new ParticleSystem.MinMaxCurve(-0.08f * speedMultiplier, 0.08f * speedMultiplier);
+        velocity.y = new ParticleSystem.MinMaxCurve(1.8f * speedMultiplier, 3.1f * speedMultiplier);
+        velocity.z = new ParticleSystem.MinMaxCurve(-0.08f * speedMultiplier, 0.08f * speedMultiplier);
 
         var noise = particleSystem.noise;
         noise.enabled = true;
@@ -228,8 +255,8 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         var trails = particleSystem.trails;
         trails.enabled = true;
         trails.mode = ParticleSystemTrailMode.PerParticle;
-        trails.ratio = 1f;
-        trails.lifetime = 0.16f;
+        trails.ratio = 0.75f;
+        trails.lifetime = 0.1f;
         trails.dieWithParticles = true;
         trails.sizeAffectsWidth = true;
         trails.sizeAffectsLifetime = true;
@@ -242,36 +269,43 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         var renderer = GetOrAddRenderer(particleSystem);
         renderer.sharedMaterial = GetBuiltinParticleMaterialOrThrow();
         renderer.renderMode = ParticleSystemRenderMode.Stretch;
-        renderer.lengthScale = 1.35f;
-        renderer.velocityScale = 0.62f;
+        renderer.sortMode = ParticleSystemSortMode.Distance;
+        renderer.alignment = ParticleSystemRenderSpace.View;
+        renderer.lengthScale = 0.95f;
+        renderer.velocityScale = 0.24f * speedMultiplier;
         renderer.cameraVelocityScale = 0f;
         renderer.normalDirection = 0f;
+        renderer.minParticleSize = 0.0001f;
+        renderer.maxParticleSize = 0.3f * Mathf.Max(1f, sizeMultiplier * 0.7f);
     }
 
     private void ConfigureEmbers(ParticleSystem particleSystem)
     {
+        var sizeMultiplier = _settings.ParticleSizeMultiplier;
+        var speedMultiplier = _settings.ParticleSpeedMultiplier;
+        var rateMultiplier = _settings.EmissionMultiplier;
         ConfigureSharedDefaults(particleSystem, loop: true, duration: 1.8f, maxParticles: 24);
 
         var main = particleSystem.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.6f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.35f, 0.9f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.02f, 0.07f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.35f * speedMultiplier, 0.9f * speedMultiplier);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.02f * sizeMultiplier, 0.07f * sizeMultiplier);
         main.gravityModifier = -0.02f;
 
         var emission = particleSystem.emission;
-        emission.rateOverTime = 6f;
+        emission.rateOverTime = 6f * rateMultiplier;
 
         var shape = particleSystem.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = FlameWidth * 0.14f;
+        shape.radius = _settings.FlameWidth * 0.14f;
 
         var velocity = particleSystem.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
-        velocity.x = new ParticleSystem.MinMaxCurve(-0.22f, 0.22f);
-        velocity.y = new ParticleSystem.MinMaxCurve(0.9f, 1.8f);
-        velocity.z = new ParticleSystem.MinMaxCurve(-0.22f, 0.22f);
+        velocity.x = new ParticleSystem.MinMaxCurve(-0.22f * speedMultiplier, 0.22f * speedMultiplier);
+        velocity.y = new ParticleSystem.MinMaxCurve(0.9f * speedMultiplier, 1.8f * speedMultiplier);
+        velocity.z = new ParticleSystem.MinMaxCurve(-0.22f * speedMultiplier, 0.22f * speedMultiplier);
 
         var noise = particleSystem.noise;
         noise.enabled = true;
@@ -304,28 +338,33 @@ public sealed class DefaultFlame01Override : MonoBehaviour
 
     private void ConfigureSmoke(ParticleSystem particleSystem)
     {
+        var sizeMultiplier = _settings.ParticleSizeMultiplier;
+        var speedMultiplier = _settings.ParticleSpeedMultiplier;
+        var rateMultiplier = _settings.EmissionMultiplier;
         ConfigureSharedDefaults(particleSystem, loop: true, duration: 2.2f, maxParticles: 18);
 
         var main = particleSystem.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.4f, 2.2f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.2f, 0.45f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.45f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.2f * speedMultiplier, 0.45f * speedMultiplier);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.18f * sizeMultiplier, 0.45f * sizeMultiplier);
 
         var emission = particleSystem.emission;
-        emission.rateOverTime = 3f;
+        emission.rateOverTime = 3f * rateMultiplier;
 
         var shape = particleSystem.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 9f;
-        shape.radius = FlameWidth * 0.12f;
+        shape.radius = _settings.FlameWidth * 0.12f;
+        shape.radiusThickness = 1f;
+        shape.length = Mathf.Max(0.02f, _settings.FlameHeight * 0.12f);
 
         var velocity = particleSystem.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
-        velocity.x = new ParticleSystem.MinMaxCurve(-0.08f, 0.08f);
-        velocity.y = new ParticleSystem.MinMaxCurve(0.5f, 0.95f);
-        velocity.z = new ParticleSystem.MinMaxCurve(-0.08f, 0.08f);
+        velocity.x = new ParticleSystem.MinMaxCurve(-0.08f * speedMultiplier, 0.08f * speedMultiplier);
+        velocity.y = new ParticleSystem.MinMaxCurve(0.5f * speedMultiplier, 0.95f * speedMultiplier);
+        velocity.z = new ParticleSystem.MinMaxCurve(-0.08f * speedMultiplier, 0.08f * speedMultiplier);
 
         var noise = particleSystem.noise;
         noise.enabled = true;
@@ -355,8 +394,8 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         var size = particleSystem.sizeOverLifetime;
         size.enabled = true;
         size.size = new ParticleSystem.MinMaxCurve(1f, BuildCurve(
-            new Keyframe(0f, 0.35f),
-            new Keyframe(1f, 1.65f)));
+            new Keyframe(0f, 0.35f * sizeMultiplier),
+            new Keyframe(1f, 1.65f * sizeMultiplier)));
 
         var renderer = GetOrAddRenderer(particleSystem);
         renderer.sharedMaterial = GetBuiltinParticleMaterialOrThrow();
@@ -376,11 +415,28 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         }
 
         _fireLight.type = LightType.Point;
-        _fireLight.color = new Color(1f, 0.56f, 0.22f, 1f);
-        _fireLight.intensity = LightIntensity;
-        _fireLight.range = LightRange;
-        _fireLight.shadows = LightShadows.Soft;
+        ApplyStaticLightProperties();
         _fireLight.renderMode = LightRenderMode.Auto;
+    }
+
+    private void ApplyPreset()
+    {
+        _settings = BuildPresetSettings(Preset);
+        CacheLight();
+        ApplyStaticLightProperties();
+    }
+
+    private void ApplyStaticLightProperties()
+    {
+        if (_fireLight == null)
+        {
+            return;
+        }
+
+        _fireLight.color = new Color(1f, 0.56f, 0.22f, 1f);
+        _fireLight.range = _settings.LightRange;
+        _fireLight.intensity = _settings.LightIntensity;
+        _fireLight.shadows = CastShadows ? LightShadows.Soft : LightShadows.None;
     }
 
     private static void ConfigureSharedDefaults(ParticleSystem particleSystem, bool loop, float duration, int maxParticles)
@@ -438,6 +494,18 @@ public sealed class DefaultFlame01Override : MonoBehaviour
         var go = new GameObject(childName);
         go.transform.SetParent(transform, false);
         return go.transform;
+    }
+
+    private static void ConfigureEffectNodeTransform(Transform target, Vector3 localPosition)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.localPosition = localPosition;
+        target.localRotation = Quaternion.identity;
+        target.localScale = Vector3.one;
     }
 
     private static Material GetBuiltinParticleMaterialOrThrow()
@@ -584,5 +652,69 @@ public sealed class DefaultFlame01Override : MonoBehaviour
     private static AnimationCurve BuildCurve(params Keyframe[] keys)
     {
         return new AnimationCurve(keys);
+    }
+
+    private static FlamePresetSettings BuildPresetSettings(DefaultFlame01Preset preset)
+    {
+        switch (preset)
+        {
+            case DefaultFlame01Preset.Campfire:
+                return new FlamePresetSettings(
+                    flameHeight: 4.2f,
+                    flameWidth: 1.24f,
+                    lightIntensity: 25.6f,
+                    lightRange: 23.2f,
+                    flickerAmplitude: 0.52f,
+                    flickerSpeed: 5.6f,
+                    emissionMultiplier: 3.7f,
+                    particleSizeMultiplier: 5.2f,
+                    particleSpeedMultiplier: 1.55f);
+            default:
+                return new FlamePresetSettings(
+                    flameHeight: 2.4f,
+                    flameWidth: 0.56f,
+                    lightIntensity: 11.2f,
+                    lightRange: 10.4f,
+                    flickerAmplitude: 0.38f,
+                    flickerSpeed: 8.2f,
+                    emissionMultiplier: 1.64f,
+                    particleSizeMultiplier: 3.2f,
+                    particleSpeedMultiplier: 1.25f);
+        }
+    }
+
+    private readonly struct FlamePresetSettings
+    {
+        public FlamePresetSettings(
+            float flameHeight,
+            float flameWidth,
+            float lightIntensity,
+            float lightRange,
+            float flickerAmplitude,
+            float flickerSpeed,
+            float emissionMultiplier,
+            float particleSizeMultiplier,
+            float particleSpeedMultiplier)
+        {
+            FlameHeight = flameHeight;
+            FlameWidth = flameWidth;
+            LightIntensity = lightIntensity;
+            LightRange = lightRange;
+            FlickerAmplitude = flickerAmplitude;
+            FlickerSpeed = flickerSpeed;
+            EmissionMultiplier = emissionMultiplier;
+            ParticleSizeMultiplier = particleSizeMultiplier;
+            ParticleSpeedMultiplier = particleSpeedMultiplier;
+        }
+
+        public float FlameHeight { get; }
+        public float FlameWidth { get; }
+        public float LightIntensity { get; }
+        public float LightRange { get; }
+        public float FlickerAmplitude { get; }
+        public float FlickerSpeed { get; }
+        public float EmissionMultiplier { get; }
+        public float ParticleSizeMultiplier { get; }
+        public float ParticleSpeedMultiplier { get; }
     }
 }

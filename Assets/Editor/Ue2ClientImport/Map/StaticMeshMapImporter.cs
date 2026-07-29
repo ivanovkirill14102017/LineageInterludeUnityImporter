@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using UnityEngine;
 
 internal static class StaticMeshMapImporter
