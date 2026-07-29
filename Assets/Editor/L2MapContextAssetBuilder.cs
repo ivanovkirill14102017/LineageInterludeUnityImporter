@@ -20,13 +20,14 @@ internal static class L2MapContextAssetBuilder
 
         var boundsMin = source.WorldBoundsMin.TransformFromUnrealToUnityWithScale();
         var boundsMax = source.WorldBoundsMax.TransformFromUnrealToUnityWithScale();
+        var normalizedBounds = NormalizeBoundsToTerrainQuadrant(boundsMin, boundsMax);
 
         asset.MapKey = source.MapKey;
         asset.SourcePath = source.SourcePath;
         asset.WorldModelName = source.WorldModelName;
         asset.WorldModelExportIndex = source.WorldModelExportIndex;
-        asset.WorldBoundsMinUnity = Vector3.Min(boundsMin, boundsMax);
-        asset.WorldBoundsMaxUnity = Vector3.Max(boundsMin, boundsMax);
+        asset.WorldBoundsMinUnity = normalizedBounds.min;
+        asset.WorldBoundsMaxUnity = normalizedBounds.max;
         asset.ForcedOutdoorZoneNumbers = source.ForcedOutdoorZoneNumbers ?? new int[0];
         asset.MapAverageIndoorFogEnd = source.MapAverageIndoorFogEnd;
         asset.LevelDistanceFogEnd = source.LevelDistanceFogEnd;
@@ -63,6 +64,26 @@ internal static class L2MapContextAssetBuilder
 
         EditorUtility.SetDirty(asset);
         return asset;
+    }
+
+    private static (Vector3 min, Vector3 max) NormalizeBoundsToTerrainQuadrant(Vector3 boundsMin, Vector3 boundsMax)
+    {
+        var originalMin = Vector3.Min(boundsMin, boundsMax);
+        var originalMax = Vector3.Max(boundsMin, boundsMax);
+        var center = (originalMin + originalMax) * 0.5f;
+        var verticalSize = Mathf.Max(0.01f, originalMax.y - originalMin.y);
+        var halfQuadrantSize = L2WorldScale.TerrainQuadrantSizeUnity * 0.5f;
+        var halfVerticalSize = verticalSize * 0.5f;
+
+        var min = new Vector3(
+            center.x - halfQuadrantSize,
+            center.y - halfVerticalSize,
+            center.z - halfQuadrantSize);
+        var max = new Vector3(
+            center.x + halfQuadrantSize,
+            center.y + halfVerticalSize,
+            center.z + halfQuadrantSize);
+        return (min, max);
     }
 
 }

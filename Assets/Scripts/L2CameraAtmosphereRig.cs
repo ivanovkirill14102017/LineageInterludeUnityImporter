@@ -107,6 +107,7 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
         sun.DayNight = dayNight;
         fog.Probe = probe;
 
+        dayNight.enabled = false;
         dayNight.AutoFindDirectionalLights = true;
         sun.AutoFindReferences = false;
         fog.AutoFindReferences = true;
