@@ -25,18 +25,20 @@ internal static class PlayerCharacterPartAssetBuilder
 
     private sealed class RuntimeVertex
     {
-        public RuntimeVertex(Vector3N position, Vector2N uv, int materialId, RuntimeInfluence[] influences)
+        public RuntimeVertex(Vector3N position, Vector2N uv, int materialId, RuntimeInfluence[] influences, string pointKey)
         {
             Position = position;
             UV = uv;
             MaterialId = materialId;
             Influences = influences ?? Array.Empty<RuntimeInfluence>();
+            PointKey = string.IsNullOrWhiteSpace(pointKey) ? Guid.NewGuid().ToString("N") : pointKey;
         }
 
         public Vector3N Position { get; }
         public Vector2N UV { get; }
         public int MaterialId { get; }
         public RuntimeInfluence[] Influences { get; }
+        public string PointKey { get; }
     }
 
     public static SceneSkeletalAsset BuildMeshOnlyAsset(SceneResourceLocation location, SceneSkeletalAsset baseAsset)
@@ -158,22 +160,26 @@ internal static class PlayerCharacterPartAssetBuilder
     private static SceneSkeletalGeometry BuildGeometry(UkxSkeletalMeshObject mesh)
     {
         var runtimeVertices = BuildVertices(mesh);
-        var points = new SceneSkeletalPoint[runtimeVertices.Length];
+        var points = new List<SceneSkeletalPoint>(runtimeVertices.Length);
         var wedges = new SceneSkeletalWedge[runtimeVertices.Length];
         var weights = new List<SceneSkeletalWeight>(runtimeVertices.Sum(x => x.Influences.Length));
+        var pointIndexByKey = new Dictionary<string, int>(StringComparer.Ordinal);
+        var pointWeightsWritten = new HashSet<int>();
 
         for (var i = 0; i < runtimeVertices.Length; i++)
         {
-            points[i] = new SceneSkeletalPoint
-            {
-                Position = ToActorXPosition(runtimeVertices[i].Position)
-            };
+            var pointIndex = GetOrCreatePointIndex(runtimeVertices[i]);
             wedges[i] = new SceneSkeletalWedge
             {
-                PointIndex = i,
+                PointIndex = pointIndex,
                 UV = runtimeVertices[i].UV,
                 MaterialIndex = runtimeVertices[i].MaterialId
             };
+
+            if (!pointWeightsWritten.Add(pointIndex))
+            {
+                continue;
+            }
 
             foreach (var influence in runtimeVertices[i].Influences)
             {
@@ -185,12 +191,12 @@ internal static class PlayerCharacterPartAssetBuilder
                 weights.Add(new SceneSkeletalWeight
                 {
                     Weight = influence.Weight,
-                    PointIndex = i,
+                    PointIndex = pointIndex,
                     BoneIndex = influence.BoneIndex
                 });
             }
         }
-
+        
         var faces = new SceneSkeletalFace[runtimeVertices.Length / 3];
         for (var faceIndex = 0; faceIndex < faces.Length; faceIndex++)
         {
@@ -209,7 +215,7 @@ internal static class PlayerCharacterPartAssetBuilder
         return new SceneSkeletalGeometry
         {
             Name = mesh.ObjectName,
-            Points = points,
+            Points = points.ToArray(),
             Wedges = wedges,
             Faces = faces,
             Weights = weights.ToArray(),
@@ -225,6 +231,22 @@ internal static class PlayerCharacterPartAssetBuilder
             BoundsMin = boundsMin,
             BoundsMax = boundsMax
         };
+
+        int GetOrCreatePointIndex(RuntimeVertex vertex)
+        {
+            if (pointIndexByKey.TryGetValue(vertex.PointKey, out var existingIndex))
+            {
+                return existingIndex;
+            }
+
+            var pointIndex = points.Count;
+            pointIndexByKey[vertex.PointKey] = pointIndex;
+            points.Add(new SceneSkeletalPoint
+            {
+                Position = ToActorXPosition(vertex.Position)
+            });
+            return pointIndex;
+        }
     }
 
     internal static SceneSkeletalGeometry RemapGeometryWeights(
@@ -507,12 +529,24 @@ internal static class PlayerCharacterPartAssetBuilder
         AppendLineageInfluence(influences, section.LineageBoneMap, wedge.Bone1, wedge.Weight1);
         AppendLineageInfluence(influences, section.LineageBoneMap, wedge.Bone2, wedge.Weight2);
         AppendLineageInfluence(influences, section.LineageBoneMap, wedge.Bone3, wedge.Weight3);
-        return new RuntimeVertex(wedge.Position, wedge.UV, section.MaterialIndex, NormalizeWeights(influences));
+        var normalized = NormalizeWeights(influences);
+        return new RuntimeVertex(
+            wedge.Position,
+            wedge.UV,
+            section.MaterialIndex,
+            normalized,
+            BuildSyntheticPointKey(wedge.Position, normalized));
     }
 
     private static RuntimeVertex CreateRigidVertex(UkxAnimMeshVertex vertex, int materialIndex, int boneIndex)
     {
-        return new RuntimeVertex(vertex.Position, vertex.UV, materialIndex, new[] { new RuntimeInfluence(boneIndex, 1f) });
+        var influences = new[] { new RuntimeInfluence(boneIndex, 1f) };
+        return new RuntimeVertex(
+            vertex.Position,
+            vertex.UV,
+            materialIndex,
+            influences,
+            BuildSyntheticPointKey(vertex.Position, influences));
     }
 
     private static RuntimeVertex CreateStandardVertex(
@@ -523,7 +557,7 @@ internal static class PlayerCharacterPartAssetBuilder
         int pointIndex)
     {
         var influences = (uint)pointIndex < influencesByPoint.Length ? influencesByPoint[pointIndex] : Array.Empty<RuntimeInfluence>();
-        return new RuntimeVertex(position, uv, materialIndex, influences);
+        return new RuntimeVertex(position, uv, materialIndex, influences, $"src:{pointIndex}");
     }
 
     private static RuntimeInfluence[][] BuildInfluenceMap(int pointCount, UkxVertInfluence[] influences)
@@ -663,6 +697,23 @@ internal static class PlayerCharacterPartAssetBuilder
         }
 
         influences.Add(new RuntimeInfluence(lineageBoneMap[localBoneIndex], weight));
+    }
+
+    private static string BuildSyntheticPointKey(Vector3N position, IReadOnlyList<RuntimeInfluence> influences)
+    {
+        var key = $"{Quantize(position.X)}|{Quantize(position.Y)}|{Quantize(position.Z)}";
+        for (var i = 0; i < influences.Count; i++)
+        {
+            var influence = influences[i];
+            key += $"|{influence.BoneIndex}:{Quantize(influence.Weight)}";
+        }
+
+        return key;
+    }
+
+    private static string Quantize(float value)
+    {
+        return MathF.Round(value, 5).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static (Vector3N Min, Vector3N Max) ComputeBounds(IEnumerable<Vector3N> points)

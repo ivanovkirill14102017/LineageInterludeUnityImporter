@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services.CharacterServices;
 using UnityEditor;
@@ -47,18 +48,24 @@ internal static class PlayerCharacterImportBuilder
             $"Bones={sharedAsset.Skeleton.Bones.Count}, Sequences={sharedAsset.AnimationSet.Sequences.Count}.");
 
         var characterName = BuildCharacterName(baseClass, gender, appearance.VisualFamily);
-        var referenceText = $"{appearance.SkeletonMeshLocation.Reference}.{appearance.VisualFamily}";
+        var packageName = Path.GetFileNameWithoutExtension(appearance.SkeletonMeshLocation.PackagePath);
+        var objectName = appearance.SkeletonMeshLocation.ObjectName ?? characterName;
+        var referenceText = L2AssetManager.BuildReferenceText(packageName, objectName, characterName);
+        var skeletalAssetRoot = L2AssetManager.BuildClientPackageObjectRoot(
+            AssetOutputRoot,
+            packageName,
+            objectName,
+            "PlayerCharacters");
 
         L2AssetManager.EnsureFolderExists(AssetOutputRoot);
         L2AssetManager.EnsureFolderExists(PrefabOutputRoot);
 
         var characterAsset = L2SkeletalCharacterAssetFactory.Build(characterName, sharedAsset);
-        var characterAssetPath = L2AssetManager.BuildClientPackageAssetPath(
-            AssetOutputRoot,
-            referenceText,
+        var characterAssetPath = L2AssetManager.BuildAssetPathInFolder(
+            skeletalAssetRoot,
             "PC",
+            objectName,
             "asset",
-            "PlayerCharacters",
             "skeleton");
         characterAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(characterAsset, characterAssetPath);
         log?.Invoke($"[PlayerCharacter] Character asset updated: {characterAssetPath}");

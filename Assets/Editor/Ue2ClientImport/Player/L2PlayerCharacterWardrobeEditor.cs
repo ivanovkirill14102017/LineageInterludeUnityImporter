@@ -62,6 +62,7 @@ public sealed class L2PlayerCharacterWardrobeEditor : Editor
             property.intValue = next;
             serializedObject.ApplyModifiedProperties();
             wardrobe.ApplyAppearance();
+            wardrobe.ApplyAnimation();
             EditorUtility.SetDirty(wardrobe);
             serializedObject.Update();
         }

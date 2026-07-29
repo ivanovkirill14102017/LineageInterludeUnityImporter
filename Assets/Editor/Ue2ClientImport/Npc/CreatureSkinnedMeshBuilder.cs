@@ -16,6 +16,7 @@ internal static class CreatureSkinnedMeshBuilder
         var vertices = new List<Vector3>();
         var uvs = new List<Vector2>();
         var boneWeights = new List<BoneWeight>();
+        var sourcePointIndices = new List<int>();
         var trianglesBySubmesh = new List<int>[Math.Max(1, materials.Length)];
         var wedgeToVertexIndex = new Dictionary<int, int>();
         for (var i = 0; i < trianglesBySubmesh.Length; i++)
@@ -65,7 +66,7 @@ internal static class CreatureSkinnedMeshBuilder
             mesh.SetTriangles(trianglesBySubmesh[i], i, true);
         }
 
-        mesh.RecalculateNormals();
+        mesh.normals = BuildSmoothedNormals(vertices, sourcePointIndices, trianglesBySubmesh);
         mesh.RecalculateBounds();
         mesh.bindposes = BuildBindPoses(asset, out var emptyWeightCount);
         notes = emptyWeightCount > 0
@@ -90,8 +91,82 @@ internal static class CreatureSkinnedMeshBuilder
             vertices.Add(CreatureSkeletalImportUtility.ToUnityPosition(point.Position));
             uvs.Add(new Vector2(wedge.UV.x, 1f - wedge.UV.y));
             boneWeights.Add(CreatureSkeletalImportUtility.GetBoneWeight(weightsByPoint, wedge.PointIndex));
+            sourcePointIndices.Add(wedge.PointIndex);
             return vertexIndex;
         }
+    }
+
+    private static Vector3[] BuildSmoothedNormals(
+        IReadOnlyList<Vector3> vertices,
+        IReadOnlyList<int> sourcePointIndices,
+        IReadOnlyList<List<int>> trianglesBySubmesh)
+    {
+        var faceNormals = new Vector3[vertices.Count];
+        foreach (var triangles in trianglesBySubmesh)
+        {
+            if (triangles == null)
+            {
+                continue;
+            }
+
+            for (var i = 0; i + 2 < triangles.Count; i += 3)
+            {
+                var index0 = triangles[i];
+                var index1 = triangles[i + 1];
+                var index2 = triangles[i + 2];
+                if ((uint)index0 >= vertices.Count || (uint)index1 >= vertices.Count || (uint)index2 >= vertices.Count)
+                {
+                    continue;
+                }
+
+                var a = vertices[index0];
+                var b = vertices[index1];
+                var c = vertices[index2];
+                var normal = Vector3.Cross(b - a, c - a);
+                if (normal.sqrMagnitude <= 0.000001f)
+                {
+                    continue;
+                }
+
+                normal.Normalize();
+                faceNormals[index0] += normal;
+                faceNormals[index1] += normal;
+                faceNormals[index2] += normal;
+            }
+        }
+
+        var normalByPointIndex = new Dictionary<int, Vector3>();
+        for (var vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+        {
+            if ((uint)vertexIndex >= sourcePointIndices.Count)
+            {
+                continue;
+            }
+
+            var pointIndex = sourcePointIndices[vertexIndex];
+            if (normalByPointIndex.TryGetValue(pointIndex, out var current))
+            {
+                normalByPointIndex[pointIndex] = current + faceNormals[vertexIndex];
+            }
+            else
+            {
+                normalByPointIndex[pointIndex] = faceNormals[vertexIndex];
+            }
+        }
+
+        var result = new Vector3[vertices.Count];
+        for (var vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+        {
+            var normal = (uint)vertexIndex < sourcePointIndices.Count &&
+                         normalByPointIndex.TryGetValue(sourcePointIndices[vertexIndex], out var smoothed)
+                ? smoothed
+                : faceNormals[vertexIndex];
+            result[vertexIndex] = normal.sqrMagnitude > 0.000001f
+                ? normal.normalized
+                : Vector3.up;
+        }
+
+        return result;
     }
 
     private static Matrix4x4[] BuildBindPoses(L2SkeletalCharacterAsset asset, out int emptyWeightCount)

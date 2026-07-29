@@ -33,12 +33,12 @@ internal static class CreatureSkeletalMaterialImporter
         Action<string> log,
         L2SkeletalAnimatorPrefabBuilder.BuildContext context)
     {
-        var textures = ImportTextures(asset, referenceText, log, context);
+        var importedPlans = CollectTextureImportPlans(asset, referenceText, log, context);
+        var textures = ImportTextures(asset, importedPlans, context);
         var shader = StaticMeshImportUtility.FindDefaultShader() ?? Shader.Find("Standard");
         var errorShader = Shader.Find("Hidden/InternalErrorShader");
         var materialIds = CreatureSkeletalImportUtility.GetMaterialIds(asset);
         var materials = new Material[materialIds.Length];
-        var importedPlans = CollectTextureImportPlans(asset, referenceText, log, context);
         var traitsByReference = importedPlans
             .Where(x => x != null && !string.IsNullOrWhiteSpace(x.TextureReference) && x.Traits != null)
             .GroupBy(x => x.TextureReference, StringComparer.OrdinalIgnoreCase)
@@ -114,16 +114,28 @@ internal static class CreatureSkeletalMaterialImporter
 
         foreach (var binding in bindings.Where(x => x != null))
         {
+            if (!string.IsNullOrWhiteSpace(binding.TextureReference))
+            {
+                if (string.IsNullOrWhiteSpace(asset.PrimaryTextureReference))
+                {
+                    asset.PrimaryTextureReference = binding.TextureReference;
+                }
+
+                CreatureSkeletalTextureResolver.TryCollectTextureReferencePlan(binding.TextureReference, context, seen, plans);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(binding.PackageName) || string.IsNullOrWhiteSpace(binding.ObjectName))
             {
                 continue;
             }
 
-            var resolvedTexture = ResolveExactTextureBinding(
+            var resolvedTexture = CreatureSkeletalTextureResolver.ResolveExactTextureBinding(
                 asset.SourcePackagePath,
                 binding,
                 context.MaterialResolver,
-                context.TextureManager);
+                context.TextureManager,
+                context);
             if (resolvedTexture == null || resolvedTexture.Texture == null || string.IsNullOrWhiteSpace(resolvedTexture.Reference))
             {
                 continue;
@@ -144,12 +156,12 @@ internal static class CreatureSkeletalMaterialImporter
 
         foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
         {
-            TryCollectTextureReferencePlan(textureRef?.Reference, context.TextureManager, seen, plans);
+            CreatureSkeletalTextureResolver.TryCollectTextureReferencePlan(textureRef?.Reference, context, seen, plans);
         }
 
         if (!string.IsNullOrWhiteSpace(asset.PrimaryTextureReference))
         {
-            TryCollectTextureReferencePlan(asset.PrimaryTextureReference, context.TextureManager, seen, plans);
+            CreatureSkeletalTextureResolver.TryCollectTextureReferencePlan(asset.PrimaryTextureReference, context, seen, plans);
         }
 
         EditorUtility.SetDirty(asset);
@@ -189,10 +201,64 @@ internal static class CreatureSkeletalMaterialImporter
         }
     }
 
+    public static void PreloadTextureReferences(
+        IEnumerable<string> textureReferences,
+        Action<string> log,
+        L2SkeletalAnimatorPrefabBuilder.BuildContext context)
+    {
+        if (textureReferences == null || context?.TextureManager == null || string.IsNullOrWhiteSpace(context.ClientRoot))
+        {
+            return;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var plans = new List<TextureImportPlan>();
+        foreach (var textureReference in textureReferences)
+        {
+            CreatureSkeletalTextureResolver.TryCollectTextureReferencePlan(textureReference, context, seen, plans);
+        }
+
+        if (plans.Count == 0)
+        {
+            return;
+        }
+
+        var textureDir = L2AssetManager.SharedTexturesRoot;
+        ImportTexturePlansBatch(plans, textureDir);
+
+        var primed = 0;
+        var loaded = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        foreach (var textureReference in seen)
+        {
+            CreatureSkeletalTextureResolver.TryImportTextureReference(textureReference, context, textureDir, loaded);
+            if (loaded.ContainsKey(textureReference))
+            {
+                primed++;
+            }
+        }
+
+        log?.Invoke($"[TextureBatch] Preloaded {primed} skeletal textures for archetype build.");
+    }
+
+    internal static bool TryResolveTextureAlias(
+        BspTextureManager textureManager,
+        string packageName,
+        string objectName)
+    {
+        return CreatureSkeletalTextureResolver.TryResolveTextureAlias(textureManager, packageName, objectName);
+    }
+
+    internal static bool TryResolveTextureOrMaterialReference(
+        L2SkeletalAnimatorPrefabBuilder.BuildContext context,
+        string packageName,
+        string objectName)
+    {
+        return CreatureSkeletalTextureResolver.TryResolveTextureOrMaterialReference(context, packageName, objectName);
+    }
+
     private static Dictionary<string, Texture2D> ImportTextures(
         L2SkeletalCharacterAsset asset,
-        string referenceText,
-        Action<string> log,
+        IReadOnlyCollection<TextureImportPlan> plans,
         L2SkeletalAnimatorPrefabBuilder.BuildContext context)
     {
         var result = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
@@ -204,23 +270,21 @@ internal static class CreatureSkeletalMaterialImporter
         var textureDir = L2AssetManager.SharedTexturesRoot;
         L2AssetManager.EnsureFolderExists(textureDir);
 
-        PrimeExistingTextureAssets(asset, textureDir, result);
-        var plans = CollectTextureImportPlans(asset, referenceText, log, context);
+        CreatureSkeletalTextureResolver.PrimeExistingTextureAssets(asset, textureDir, result, context);
         ImportTexturePlansBatch(plans, textureDir);
-        PrimeExistingTextureAssets(asset, textureDir, result);
+        CreatureSkeletalTextureResolver.PrimeExistingTextureAssets(asset, textureDir, result, context);
 
         foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
         {
-            TryImportTextureReference(textureRef?.Reference, context.TextureManager, textureDir, result);
+            CreatureSkeletalTextureResolver.TryImportTextureReference(textureRef?.Reference, context, textureDir, result);
         }
 
         if (!string.IsNullOrWhiteSpace(asset.PrimaryTextureReference))
         {
-            TryImportTextureReference(asset.PrimaryTextureReference, context.TextureManager, textureDir, result);
+            CreatureSkeletalTextureResolver.TryImportTextureReference(asset.PrimaryTextureReference, context, textureDir, result);
         }
 
-        PrimeExistingTextureAssets(asset, textureDir, result);
-
+        CreatureSkeletalTextureResolver.PrimeExistingTextureAssets(asset, textureDir, result, context);
         return result;
     }
 
@@ -255,6 +319,45 @@ internal static class CreatureSkeletalMaterialImporter
         return null;
     }
 
+    private static Texture2D ResolveTextureForMaterial(
+        L2SkeletalCharacterAsset asset,
+        int materialId,
+        Dictionary<string, Texture2D> textures)
+    {
+        if (asset == null || textures == null || textures.Count == 0)
+        {
+            return null;
+        }
+
+        if (asset.MaterialBindings != null)
+        {
+            var binding = asset.MaterialBindings.FirstOrDefault(
+                x => x != null && x.MaterialId == materialId && !string.IsNullOrWhiteSpace(x.TextureReference));
+            if (binding != null && textures.TryGetValue(binding.TextureReference, out var boundTexture))
+            {
+                return boundTexture;
+            }
+        }
+
+        foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
+        {
+            if (textureRef != null &&
+                !string.IsNullOrWhiteSpace(textureRef.Reference) &&
+                textures.TryGetValue(textureRef.Reference, out var usedTexture))
+            {
+                return usedTexture;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(asset.PrimaryTextureReference) &&
+            textures.TryGetValue(asset.PrimaryTextureReference, out var primaryTexture))
+        {
+            return primaryTexture;
+        }
+
+        return null;
+    }
+
     private static bool TryInferTextureForMaterial(
         L2SkeletalCharacterAsset asset,
         int materialId,
@@ -275,9 +378,9 @@ internal static class CreatureSkeletalMaterialImporter
         {
             return false;
         }
+
         var pascalBase = ToPascalCase(normalizedBase);
         var oneBasedIndex = materialId + 1;
-
         var packageCandidates = new[]
         {
             normalizedBase,
@@ -288,7 +391,6 @@ internal static class CreatureSkeletalMaterialImporter
         }
         .Where(x => !string.IsNullOrWhiteSpace(x))
         .Distinct(StringComparer.OrdinalIgnoreCase);
-
         var objectCandidates = new[]
         {
             $"{normalizedBase}_t{materialId:00}",
@@ -358,270 +460,5 @@ internal static class CreatureSkeletalMaterialImporter
                 ? string.Empty
                 : char.ToUpperInvariant(x[0]) + x.Substring(1).ToLowerInvariant());
         return string.Concat(parts);
-    }
-
-    private static Texture2D ResolveTextureForMaterial(
-        L2SkeletalCharacterAsset asset,
-        int materialId,
-        Dictionary<string, Texture2D> textures)
-    {
-        if (asset == null || textures == null || textures.Count == 0)
-        {
-            return null;
-        }
-
-        if (asset.MaterialBindings != null)
-        {
-            var binding = asset.MaterialBindings.FirstOrDefault(
-                x => x != null && x.MaterialId == materialId && !string.IsNullOrWhiteSpace(x.TextureReference));
-            if (binding != null && textures.TryGetValue(binding.TextureReference, out var boundTexture))
-            {
-                return boundTexture;
-            }
-        }
-
-        foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
-        {
-            if (textureRef != null &&
-                !string.IsNullOrWhiteSpace(textureRef.Reference) &&
-                textures.TryGetValue(textureRef.Reference, out var usedTexture))
-            {
-                return usedTexture;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(asset.PrimaryTextureReference) &&
-            textures.TryGetValue(asset.PrimaryTextureReference, out var primaryTexture))
-        {
-            return primaryTexture;
-        }
-
-        return null;
-    }
-
-    private static void PrimeExistingTextureAssets(
-        L2SkeletalCharacterAsset asset,
-        string textureDir,
-        Dictionary<string, Texture2D> result)
-    {
-        if (asset == null || result == null)
-        {
-            return;
-        }
-
-        foreach (var binding in asset.MaterialBindings ?? Array.Empty<L2SkeletalMaterialBindingData>())
-        {
-            TryUseExistingTextureAsset(binding?.TextureReference, textureDir, result);
-        }
-
-        foreach (var textureRef in asset.UsedTextures ?? Array.Empty<L2SkeletalTextureRefData>())
-        {
-            TryUseExistingTextureAsset(textureRef?.Reference, textureDir, result);
-        }
-
-        TryUseExistingTextureAsset(asset.PrimaryTextureReference, textureDir, result);
-    }
-
-    private static void TryCollectTextureReferencePlan(
-        string textureReference,
-        BspTextureManager textureManager,
-        HashSet<string> seen,
-        List<TextureImportPlan> plans)
-    {
-        if (string.IsNullOrWhiteSpace(textureReference) || textureManager == null || seen == null || plans == null || !seen.Add(textureReference))
-        {
-            return;
-        }
-
-        if (!TryParseTextureReference(textureReference, out var packageName, out var objectName))
-        {
-            return;
-        }
-
-        var resolvedTexture = textureManager.ResolveMany(new[]
-        {
-            new SceneTextureRequest(packageName, objectName)
-        });
-        if (!resolvedTexture.TryGetValue(textureReference, out var textureEntry) || textureEntry?.Texture == null)
-        {
-            var directKey = $"{packageName}.{objectName}";
-            if (!resolvedTexture.TryGetValue(directKey, out textureEntry) || textureEntry?.Texture == null)
-            {
-                return;
-            }
-        }
-
-        plans.Add(new TextureImportPlan(textureReference, textureEntry.Texture, traits: null));
-    }
-
-    private static void TryImportTextureReference(
-        string textureReference,
-        BspTextureManager textureManager,
-        string textureDir,
-        Dictionary<string, Texture2D> result)
-    {
-        if (string.IsNullOrWhiteSpace(textureReference) || result.ContainsKey(textureReference) || textureManager == null)
-        {
-            return;
-        }
-
-        if (TryUseExistingTextureAsset(textureReference, textureDir, result))
-        {
-            return;
-        }
-
-        if (!TryParseTextureReference(textureReference, out var packageName, out var objectName))
-        {
-            return;
-        }
-
-        var resolvedTexture = textureManager.ResolveMany(new[]
-        {
-            new SceneTextureRequest(packageName, objectName)
-        });
-        if (!resolvedTexture.TryGetValue(textureReference, out var textureEntry) || textureEntry?.Texture == null)
-        {
-            var directKey = $"{packageName}.{objectName}";
-            if (!resolvedTexture.TryGetValue(directKey, out textureEntry) || textureEntry?.Texture == null)
-            {
-                return;
-            }
-        }
-
-        var texture = ImportedTextureAssetUtility.LoadOrCreateTextureAsset(
-            textureReference,
-            textureEntry.Texture,
-            textureDir,
-            "SkeletalTextures",
-            traits: null,
-            reuseExisting: true);
-        if (texture != null)
-        {
-            result[textureReference] = texture;
-        }
-    }
-
-    private static bool TryUseExistingTextureAsset(
-        string textureReference,
-        string textureDir,
-        Dictionary<string, Texture2D> result)
-    {
-        if (string.IsNullOrWhiteSpace(textureReference) || result.ContainsKey(textureReference))
-        {
-            return false;
-        }
-
-        var texturePath = ImportedTextureAssetUtility.BuildTextureAssetPath(textureDir, textureReference, "SkeletalTextures");
-        var existingTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
-        if (existingTexture == null)
-        {
-            return false;
-        }
-
-        result[textureReference] = existingTexture;
-        return true;
-    }
-
-    private static bool TryParseTextureReference(string textureReference, out string packageName, out string objectName)
-    {
-        packageName = null;
-        objectName = null;
-        if (string.IsNullOrWhiteSpace(textureReference))
-        {
-            return false;
-        }
-
-        var separatorIndex = textureReference.LastIndexOf('.');
-        if (separatorIndex <= 0 || separatorIndex >= textureReference.Length - 1)
-        {
-            return false;
-        }
-
-        packageName = textureReference.Substring(0, separatorIndex);
-        objectName = textureReference.Substring(separatorIndex + 1);
-        return !string.IsNullOrWhiteSpace(packageName) && !string.IsNullOrWhiteSpace(objectName);
-    }
-
-    private static ResolvedSkeletalTextureBinding ResolveExactTextureBinding(
-        string sourcePackagePath,
-        L2SkeletalMaterialBindingData binding,
-        SceneMaterialResolver materialResolver,
-        BspTextureManager textureManager)
-    {
-        if (binding == null || string.IsNullOrWhiteSpace(binding.PackageName) || string.IsNullOrWhiteSpace(binding.ObjectName))
-        {
-            return null;
-        }
-
-        var directReference = !string.IsNullOrWhiteSpace(binding.TextureReference)
-            ? binding.TextureReference
-            : $"{binding.PackageName}.{binding.ObjectName}";
-        if (!string.IsNullOrWhiteSpace(directReference))
-        {
-            var resolvedDirectTexture = textureManager.ResolveMany(new[]
-            {
-                new SceneTextureRequest(binding.PackageName, binding.ObjectName)
-            });
-            var directKey = $"{binding.PackageName}.{binding.ObjectName}";
-            if (resolvedDirectTexture.TryGetValue(directKey, out var directTexture) && directTexture?.Texture != null)
-            {
-                return new ResolvedSkeletalTextureBinding(
-                    directReference,
-                    binding.ResolvedPackagePath,
-                    directTexture.Texture,
-                    traits: null);
-            }
-        }
-
-        var graph = materialResolver.ResolveMany(
-                sourcePackagePath,
-                new[]
-                {
-                    new SceneMaterialRequest(binding.PackageName, binding.ObjectName)
-                })
-            .Values
-            .FirstOrDefault();
-        if (graph == null)
-        {
-            return null;
-        }
-
-        var preferredSlot = MaterialTextureSlotOrdering.GetPreferredTextureSlot(graph.TextureSlots);
-        if (preferredSlot == null)
-        {
-            return null;
-        }
-
-        var texture = preferredSlot.Texture;
-        if (texture == null)
-        {
-            var resolvedTexture = textureManager.ResolveMany(new[]
-            {
-                new SceneTextureRequest(preferredSlot.PackageName, preferredSlot.ObjectName)
-            });
-            resolvedTexture.TryGetValue(preferredSlot.Reference, out var resolved);
-            texture = resolved?.Texture;
-        }
-
-        return new ResolvedSkeletalTextureBinding(
-            preferredSlot.Reference,
-            preferredSlot.PackagePath,
-            texture,
-            MaterialHeuristics.GetKnownTraits(graph));
-    }
-    private sealed class ResolvedSkeletalTextureBinding
-    {
-        public ResolvedSkeletalTextureBinding(string reference, string resolvedPackagePath, TextureData texture, MaterialKnownTraits traits)
-        {
-            Reference = reference;
-            ResolvedPackagePath = resolvedPackagePath;
-            Texture = texture;
-            Traits = traits;
-        }
-
-        public string Reference { get; }
-        public string ResolvedPackagePath { get; }
-        public TextureData Texture { get; }
-        public MaterialKnownTraits Traits { get; }
     }
 }

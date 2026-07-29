@@ -356,12 +356,7 @@ internal static class CreatureMapImporter
             return false;
         }
 
-        var characterAssetPath = L2AssetManager.BuildClientPackageAssetPath(
-            L2AssetManager.SharedSkeletalCharactersRoot,
-            spawn.MeshResource.Reference,
-            "NPC",
-            "asset",
-            "SkeletalCharacters");
+        var characterAssetPath = BuildCreatureCharacterAssetPath(spawn);
         var characterAsset = AssetDatabase.LoadAssetAtPath<L2SkeletalCharacterAsset>(characterAssetPath);
         if (characterAsset == null)
         {
@@ -495,5 +490,22 @@ internal static class CreatureMapImporter
             "PF",
             "prefab",
             "CreaturePrefabs");
+    }
+
+    private static string BuildCreatureCharacterAssetPath(SceneCreatureSpawnData spawn)
+    {
+        var packageName = spawn?.MeshResource?.PackageName;
+        var objectName = spawn?.MeshResource?.ObjectName;
+        var objectRoot = L2AssetManager.BuildClientPackageObjectRoot(
+            L2AssetManager.SharedSkeletalCharactersRoot,
+            packageName,
+            objectName,
+            "SkeletalCharacters");
+        return L2AssetManager.BuildAssetPathInFolder(
+            objectRoot,
+            "NPC",
+            objectName ?? "SkeletalCharacter",
+            "asset",
+            "skeleton");
     }
 }

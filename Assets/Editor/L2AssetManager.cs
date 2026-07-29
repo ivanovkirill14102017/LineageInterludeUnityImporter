@@ -8,8 +8,9 @@ using L2Viewer.PackageCore;
 internal static class L2AssetManager
 {
     public static string SharedPackagesRoot => $"{MapImportPaths.OutputRoot}/ClientPackages";
+    public static string SharedAnimationsRoot => $"{SharedPackagesRoot}/Animations";
     public static string SharedStaticMeshesRoot => $"{SharedPackagesRoot}/StaticMeshes";
-    public static string SharedSkeletalCharactersRoot => SharedPackagesRoot;
+    public static string SharedSkeletalCharactersRoot => SharedAnimationsRoot;
     public static string ManagedStaticMeshPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshPrefabs";
     public static string ManagedCreaturePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/CreaturePrefabs";
     public static string ManagedPlayerCharacterPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/PlayerCharacterPrefabs";
@@ -127,6 +128,48 @@ internal static class L2AssetManager
         EnsureFolderExists(normalized.Substring(0, slashIndex));
     }
 
+    public static string BuildClientPackageObjectRoot(string root, string packageName, string objectName, string fallbackCategory)
+    {
+        var normalizedRoot = root.Replace('\\', '/');
+        var sanitizedPackage = SanitizePathSegment(packageName);
+        var sanitizedObject = SanitizePathSegment(objectName);
+
+        string directory;
+        if (string.IsNullOrWhiteSpace(sanitizedPackage) && string.IsNullOrWhiteSpace(sanitizedObject))
+        {
+            directory = $"{normalizedRoot}/{fallbackCategory}";
+        }
+        else if (string.IsNullOrWhiteSpace(sanitizedPackage))
+        {
+            directory = $"{normalizedRoot}/{fallbackCategory}/{sanitizedObject}";
+        }
+        else if (string.IsNullOrWhiteSpace(sanitizedObject))
+        {
+            directory = $"{normalizedRoot}/{sanitizedPackage}";
+        }
+        else
+        {
+            directory = $"{normalizedRoot}/{sanitizedPackage}/{sanitizedObject}";
+        }
+
+        EnsureFolderExists(directory);
+        return directory;
+    }
+
+    public static string BuildAssetPathInFolder(string folder, string prefix, string fileStem, string extension, string suffix = null)
+    {
+        var normalizedFolder = folder.Replace('\\', '/');
+        var normalizedStem = SanitizePathSegment(fileStem);
+        if (string.IsNullOrWhiteSpace(normalizedStem))
+        {
+            normalizedStem = prefix;
+        }
+
+        EnsureFolderExists(normalizedFolder);
+        var suffixPart = string.IsNullOrWhiteSpace(suffix) ? string.Empty : $"_{SanitizePathSegment(suffix)}";
+        return $"{normalizedFolder}/{prefix}_{normalizedStem}{suffixPart}.{extension.TrimStart('.')}";
+    }
+
     public static string BuildClientPackageAssetPath(string root, string referenceText, string prefix, string extension, string fallbackCategory, string suffix = null)
     {
         var normalizedRoot = root.Replace('\\', '/');
@@ -175,6 +218,22 @@ internal static class L2AssetManager
         }
 
         return fallback ?? "ImportedAsset";
+    }
+
+    private static string SanitizePathSegment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = value.Trim().Replace('\\', '_').Replace('/', '_').Replace(':', '_');
+        foreach (var invalidChar in Path.GetInvalidFileNameChars())
+        {
+            sanitized = sanitized.Replace(invalidChar, '_');
+        }
+
+        return sanitized;
     }
 
     public static void ApplyMaterialTraits(Material material, L2Viewer.SceneDomain.Services.MaterialServices.MaterialKnownTraits traits, bool isHdrp)

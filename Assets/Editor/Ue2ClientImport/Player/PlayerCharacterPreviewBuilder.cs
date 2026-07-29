@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services.CharacterServices;
+using L2Viewer.SceneDomain.Services.MaterialServices;
 using L2Viewer.SceneDomain.Services.Utility;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -61,18 +62,24 @@ internal static class PlayerCharacterPreviewBuilder
                 .Where(x => x != null),
             log);
         var characterName = BuildCharacterName(appearance);
-        var referenceText = $"{appearance.SkeletonMeshLocation.Reference}.{appearance.VisualFamily}";
+        var packageName = Path.GetFileNameWithoutExtension(appearance.SkeletonMeshLocation.PackagePath);
+        var objectName = appearance.SkeletonMeshLocation.ObjectName ?? characterName;
+        var referenceText = L2AssetManager.BuildReferenceText(packageName, objectName, characterName);
+        var skeletalAssetRoot = L2AssetManager.BuildClientPackageObjectRoot(
+            PlayerCharacterImportBuilder.AssetOutputRoot,
+            packageName,
+            objectName,
+            "PlayerCharacters");
 
         L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.AssetOutputRoot);
         L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.PrefabOutputRoot);
 
         var baseAsset = L2SkeletalCharacterAssetFactory.Build(characterName, skeletonSharedAsset);
-        var characterAssetPath = L2AssetManager.BuildClientPackageAssetPath(
-            PlayerCharacterImportBuilder.AssetOutputRoot,
-            referenceText,
+        var characterAssetPath = L2AssetManager.BuildAssetPathInFolder(
+            skeletalAssetRoot,
             "PC",
+            objectName,
             "asset",
-            "PlayerCharacters",
             "skeleton");
         baseAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(baseAsset, characterAssetPath);
         log?.Invoke($"[PlayerPreview] Base skeletal asset updated: {characterAssetPath}");
@@ -202,9 +209,6 @@ internal static class PlayerCharacterPreviewBuilder
         Action<string> log)
     {
         var renderParts = new List<PartRenderData>();
-        var assetRoot = $"{PlayerCharacterImportBuilder.AssetOutputRoot}/PlayerCharacters/Parts";
-        L2AssetManager.EnsureFolderExists(assetRoot);
-
         foreach (var part in appearance.Parts ?? Array.Empty<SceneCharacterResolvedPartData>())
         {
             if (part == null || part.MeshResources == null || part.MeshResources.Length == 0)
@@ -224,26 +228,31 @@ internal static class PlayerCharacterPreviewBuilder
                 var sharedAsset = BuildPartSharedAsset(location, baseSharedAsset, log);
                 var partName = $"{CreatureSkeletalImportUtility.SanitizeName(part.Slot.ToString())}_{i:D2}_{meshReference.ObjectName}";
                 var partAsset = L2SkeletalCharacterAssetFactory.Build(partName, sharedAsset);
-                ApplyPartTextureOverrides(partAsset, part);
+                ApplyPartTextureOverrides(partAsset, part, i, buildContext);
+                var derivedAssetRoot = BuildDerivedAssetRoot(location);
+                var variantToken = BuildDerivedVariantToken(part.Slot.ToString(), i);
 
-                var partAssetPath = L2AssetManager.BuildClientPackageAssetPath(
-                    assetRoot,
-                    $"{referenceText}.{partName}",
+                var partAssetPath = L2AssetManager.BuildAssetPathInFolder(
+                    $"{derivedAssetRoot}/Parts",
                     "PCP",
+                    meshReference.ObjectName ?? partName,
                     "asset",
-                    "PlayerCharacterParts",
-                    "part");
+                    $"{variantToken}_part");
                 partAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(partAsset, partAssetPath);
 
-                var materials = CreatureSkeletalMaterialImporter.CreateMaterials(partAsset, $"{referenceText}.{partName}", assetRoot, log, buildContext);
+                var materials = CreatureSkeletalMaterialImporter.CreateMaterials(
+                    partAsset,
+                    variantToken,
+                    $"{derivedAssetRoot}/Materials",
+                    log,
+                    buildContext);
                 var mesh = CreatureSkinnedMeshBuilder.Build(partAsset, materials, log, out _);
-                var meshAssetPath = L2AssetManager.BuildClientPackageAssetPath(
-                    assetRoot,
-                    $"{referenceText}.{partName}",
+                var meshAssetPath = L2AssetManager.BuildAssetPathInFolder(
+                    $"{derivedAssetRoot}/Meshes",
                     "SM",
+                    meshReference.ObjectName ?? partName,
                     "asset",
-                    "PlayerCharacterParts",
-                    "mesh");
+                    $"{variantToken}_mesh");
                 mesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(mesh, meshAssetPath);
 
                 renderParts.Add(new PartRenderData
@@ -268,7 +277,31 @@ internal static class PlayerCharacterPreviewBuilder
         return PlayerCharacterPartAssetBuilder.BuildMeshOnlyAsset(location, baseSharedAsset);
     }
 
-    private static void ApplyPartTextureOverrides(L2SkeletalCharacterAsset asset, SceneCharacterResolvedPartData part)
+    private static string BuildDerivedAssetRoot(SceneResourceLocation location)
+    {
+        var packageName = Path.GetFileNameWithoutExtension(location?.PackagePath);
+        var objectName = location?.ObjectName ?? "DerivedMesh";
+        var objectRoot = L2AssetManager.BuildClientPackageObjectRoot(
+            PlayerCharacterImportBuilder.AssetOutputRoot,
+            packageName,
+            objectName,
+            "PlayerCharacterParts");
+        var derivedRoot = $"{objectRoot}/Derived";
+        L2AssetManager.EnsureFolderExists(derivedRoot);
+        return derivedRoot;
+    }
+
+    private static string BuildDerivedVariantToken(string slotName, int meshPartIndex)
+    {
+        var slotToken = CreatureSkeletalImportUtility.SanitizeName(slotName ?? "Slot");
+        return $"{slotToken}_{meshPartIndex:D2}";
+    }
+
+    private static void ApplyPartTextureOverrides(
+        L2SkeletalCharacterAsset asset,
+        SceneCharacterResolvedPartData part,
+        int meshPartIndex,
+        L2SkeletalAnimatorPrefabBuilder.BuildContext buildContext)
     {
         if (asset == null || part?.TextureResources == null || part.TextureResources.Length == 0)
         {
@@ -283,25 +316,87 @@ internal static class PlayerCharacterPreviewBuilder
             return;
         }
 
-        asset.UsedTextures = textureResources
-            .Select(x => new L2SkeletalTextureRefData
+        var overrideTexture = SelectResolvedTextureOverride(textureResources, meshPartIndex, buildContext);
+        if (overrideTexture == null)
+        {
+            return;
+        }
+
+        asset.UsedTextures = new[]
+        {
+            new L2SkeletalTextureRefData
             {
-                Reference = x.Reference,
+                Reference = overrideTexture.Reference,
                 ResolvedPackagePath = string.Empty
-            })
-            .ToArray();
-        asset.PrimaryTextureReference = textureResources[0].Reference;
+            }
+        };
+        asset.PrimaryTextureReference = overrideTexture.Reference;
 
         var bindings = asset.MaterialBindings ?? Array.Empty<L2SkeletalMaterialBindingData>();
         for (var i = 0; i < bindings.Length; i++)
         {
-            var texture = textureResources[Math.Min(i, textureResources.Length - 1)];
             var binding = bindings[i];
-            binding.PackageName = texture.PackageName;
-            binding.ObjectName = texture.ObjectName;
-            binding.TextureReference = texture.Reference;
+            binding.PackageName = overrideTexture.PackageName;
+            binding.ObjectName = overrideTexture.ObjectName;
+            binding.TextureReference = overrideTexture.Reference;
             binding.ResolvedPackagePath = string.Empty;
         }
+    }
+
+    private static SceneResourceReference SelectResolvedTextureOverride(
+        IReadOnlyList<SceneResourceReference> textureResources,
+        int meshPartIndex,
+        L2SkeletalAnimatorPrefabBuilder.BuildContext buildContext)
+    {
+        if (textureResources == null || textureResources.Count == 0)
+        {
+            return null;
+        }
+
+        var filtered = textureResources
+            .Where(x => x != null &&
+                        !string.IsNullOrWhiteSpace(x.Reference) &&
+                        !string.IsNullOrWhiteSpace(x.PackageName) &&
+                        !string.IsNullOrWhiteSpace(x.ObjectName))
+            .ToArray();
+        if (filtered.Length == 0)
+        {
+            return null;
+        }
+
+        var preferredIndex = Mathf.Clamp(meshPartIndex, 0, filtered.Length - 1);
+        if (TryResolveTextureReference(filtered[preferredIndex], buildContext))
+        {
+            return filtered[preferredIndex];
+        }
+
+        foreach (var texture in filtered)
+        {
+            if (TryResolveTextureReference(texture, buildContext))
+            {
+                return texture;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryResolveTextureReference(
+        SceneResourceReference texture,
+        L2SkeletalAnimatorPrefabBuilder.BuildContext buildContext)
+    {
+        if (texture == null ||
+            buildContext == null ||
+            string.IsNullOrWhiteSpace(texture.PackageName) ||
+            string.IsNullOrWhiteSpace(texture.ObjectName))
+        {
+            return false;
+        }
+
+        return CreatureSkeletalMaterialImporter.TryResolveTextureOrMaterialReference(
+            buildContext,
+            texture.PackageName,
+            texture.ObjectName);
     }
 
     private static SceneResourceLocation ResolveMeshLocation(

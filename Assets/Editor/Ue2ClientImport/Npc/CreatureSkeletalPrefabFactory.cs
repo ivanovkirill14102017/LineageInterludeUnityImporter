@@ -1,53 +1,45 @@
+using System;
+using System.Linq;
 using UnityEditor;
-using UnityEditor.Animations;
 using UnityEngine;
 
 internal static class CreatureSkeletalPrefabFactory
 {
-    public static void Create(L2SkeletalCharacterAsset asset, Mesh mesh, Material[] materials, AnimatorController controller, string prefabPath, string displayLabel)
+    public static void Create(L2CreatureCharacterArchetypeAsset archetype, string prefabPath, string displayLabel)
     {
-        var session = L2SceneSkeletalAssetBridge.CreateSession(asset);
-        var bindFrame = session.CaptureBindPoseDebugFrame();
-        var bonePoses = CreatureSkeletalImportUtility.BuildBonePoses(bindFrame.Bones, asset.Bones);
-
-        var root = new GameObject($"NPC_{asset.CharacterName}");
-        try
+        if (archetype == null)
         {
-            var skeletonRoot = new GameObject("Skeleton").transform;
-            skeletonRoot.SetParent(root.transform, false);
-
-            var boneTransforms = CreatureSkeletalImportUtility.CreateBoneHierarchy(asset.Bones, bonePoses, skeletonRoot);
-
-            var geometry = new GameObject("Geometry");
-            geometry.transform.SetParent(root.transform, false);
-            geometry.transform.localScale = Vector3.one;
-
-            var renderer = geometry.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.sharedMaterials = materials;
-            renderer.rootBone = CreatureSkeletalImportUtility.ResolveRootBone(asset.Bones, boneTransforms);
-            renderer.bones = boneTransforms;
-            renderer.updateWhenOffscreen = true;
-            renderer.localBounds = mesh.bounds;
-
-            var animator = root.AddComponent<Animator>();
-            animator.runtimeAnimatorController = controller;
-            animator.applyRootMotion = false;
-            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-            root.AddComponent<L2AnimationNotifyReceiver>();
-
-            CreatureSkeletalImportUtility.CreateLabel(root.transform, mesh, displayLabel);
-
-            EditorUtility.SetDirty(renderer);
-            EditorUtility.SetDirty(animator);
-            EditorUtility.SetDirty(root);
-
-            L2AssetManager.EnsureParentFolderExists(prefabPath);
-            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            throw new ArgumentNullException(nameof(archetype));
         }
-        finally
-        {
-            Object.DestroyImmediate(root);
-        }
+
+        L2ModularCharacterPrefabFactory.Create(
+            archetype,
+            prefabPath,
+            $"NPC_{archetype.BaseAsset.CharacterName}",
+            build =>
+            {
+                var wardrobe = build.Root.AddComponent<L2CreatureWardrobe>();
+                wardrobe.Archetype = archetype;
+                wardrobe.SkeletonRoot = build.SkeletonRoot;
+                wardrobe.RootBone = build.RootBone;
+                wardrobe.Bones = build.Bones;
+                wardrobe.SlotBindings = build.SlotBindings;
+                wardrobe.Animator = build.Animator;
+                wardrobe.ApplyAppearance();
+                wardrobe.ApplyAnimation();
+
+                EditorUtility.SetDirty(wardrobe);
+                EditorUtility.SetDirty(build.Animator);
+                EditorUtility.SetDirty(build.Root);
+            },
+            root =>
+            {
+                var labelMesh = archetype.Slots?
+                    .FirstOrDefault(x => x?.SlotName == "Body")?
+                    .Variants?.FirstOrDefault()?
+                    .Parts?.FirstOrDefault()?
+                    .Mesh;
+                CreatureSkeletalImportUtility.CreateLabel(root.transform, labelMesh, displayLabel);
+            });
     }
 }

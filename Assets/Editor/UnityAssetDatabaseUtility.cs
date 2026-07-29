@@ -30,6 +30,13 @@ internal static class UnityAssetDatabaseUtility
         {
             if (existing.GetType() == asset.GetType())
             {
+                if (existing is Mesh existingMesh)
+                {
+                    // Native mesh buffers can keep stale layout data across CopySerialized updates.
+                    // Clear the existing mesh first so Unity rebuilds the vertex/index buffers cleanly.
+                    existingMesh.Clear(false);
+                }
+
                 EditorUtility.CopySerialized(asset, existing);
                 EditorUtility.SetDirty(existing);
 
