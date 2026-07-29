@@ -7,6 +7,10 @@ using UnityEditor;
 [DisallowMultipleComponent]
 public sealed class L2CameraAtmosphereRig : MonoBehaviour
 {
+#if UNITY_EDITOR
+    private const double SceneViewFollowIntervalSeconds = 0.2d;
+#endif
+
     [Header("Rig")]
     public bool AutoBuildRig = true;
     public bool FollowSceneViewCameraInEditMode = true;
@@ -22,6 +26,9 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     [SerializeField] private L2FogController fog;
     [SerializeField] private L2LocalLightRuntimeOptimizer localLightOptimizer;
 
+#if UNITY_EDITOR
+    private double nextSceneViewFollowTime;
+#endif
 
     public L2CameraAtmosphereProbe Probe { get { return probe; } }
     public L2DayNightController DayNight { get { return dayNight; } }
@@ -32,6 +39,17 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     private void OnEnable()
     {
         EnsureRig();
+#if UNITY_EDITOR
+        EditorApplication.update -= OnEditorUpdate;
+        EditorApplication.update += OnEditorUpdate;
+#endif
+    }
+
+    private void OnDisable()
+    {
+#if UNITY_EDITOR
+        EditorApplication.update -= OnEditorUpdate;
+#endif
     }
 
     private void OnValidate()
@@ -97,10 +115,39 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
             return;
         }
 
-        transform.position = sceneView.camera.transform.position;
-        transform.rotation = sceneView.camera.transform.rotation;
+        var sceneViewTransform = sceneView.camera.transform;
+        if ((transform.position - sceneViewTransform.position).sqrMagnitude > 0.000001f ||
+            Quaternion.Angle(transform.rotation, sceneViewTransform.rotation) > 0.01f)
+        {
+            transform.position = sceneViewTransform.position;
+            transform.rotation = sceneViewTransform.rotation;
+        }
 #endif
     }
+
+#if UNITY_EDITOR
+    private void OnEditorUpdate()
+    {
+        SyncToSceneViewCameraThrottled();
+    }
+
+    private void SyncToSceneViewCameraThrottled()
+    {
+        if (Application.isPlaying || !FollowSceneViewCameraInEditMode)
+        {
+            return;
+        }
+
+        var now = EditorApplication.timeSinceStartup;
+        if (now < nextSceneViewFollowTime)
+        {
+            return;
+        }
+
+        nextSceneViewFollowTime = now + SceneViewFollowIntervalSeconds;
+        SyncToSceneViewCamera();
+    }
+#endif
 
     private Transform GetOrCreateChild(string childName)
     {

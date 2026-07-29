@@ -12,6 +12,9 @@ public sealed class L2MapContextVolume : MonoBehaviour
     public L2MapAtmosphereContextAsset Context;
     public bool AutoConfigureContextCollider = true;
 
+    [Header("Placement")]
+    public bool AutoAlignToTerrainQuadrant = true;
+
     [Header("Debug")]
     public bool DrawGizmo = true;
     [SerializeField] private string mapKey;
@@ -27,18 +30,21 @@ public sealed class L2MapContextVolume : MonoBehaviour
     private void OnEnable()
     {
         RebuildCaches();
+        AlignToTerrainQuadrant();
         EnsureContextColliderSetup();
     }
 
     private void OnValidate()
     {
         RebuildCaches();
+        AlignToTerrainQuadrant();
         EnsureContextColliderSetup();
     }
 
     public void RefreshContext()
     {
         RebuildCaches();
+        AlignToTerrainQuadrant();
         EnsureContextColliderSetup();
     }
 
@@ -66,8 +72,8 @@ public sealed class L2MapContextVolume : MonoBehaviour
             return false;
         }
 
-        var localPosition = transform.InverseTransformPoint(worldPosition);
-        var unrealPoint = ToUnrealPosition(localPosition);
+        var evaluationPosition = ToEvaluationPosition(worldPosition);
+        var unrealPoint = ToUnrealPosition(evaluationPosition);
         var probeResult = Probe(unrealPoint, Context.Nodes);
 
         L2MapAtmosphereContextAsset.ZoneData zoneData;
@@ -91,28 +97,28 @@ public sealed class L2MapContextVolume : MonoBehaviour
         if (!state.HasPreviousProbePosition)
         {
             state.HasPreviousProbePosition = true;
-            state.PreviousProbeLocalPosition = localPosition;
+            state.PreviousProbeLocalPosition = evaluationPosition;
             state.PreviousZone = probeResult.ZoneNumber;
             state.PreviousObservedIndoor = observedIndoor;
             state.HasTransitionPoint = false;
         }
         else
         {
-            var jumpDistance = Vector3.Distance(state.PreviousProbeLocalPosition, localPosition);
+            var jumpDistance = Vector3.Distance(state.PreviousProbeLocalPosition, evaluationPosition);
             if (jumpDistance >= consumer.GetTransitionResetDistance())
             {
                 state.HasTransitionPoint = false;
             }
             else if (state.PreviousZone != probeResult.ZoneNumber || state.PreviousObservedIndoor != observedIndoor)
             {
-                state.TransitionPointLocalPosition = FindTransitionPoint(state.PreviousProbeLocalPosition, localPosition, state.PreviousZone, probeResult.ZoneNumber);
+                state.TransitionPointLocalPosition = FindTransitionPoint(state.PreviousProbeLocalPosition, evaluationPosition, state.PreviousZone, probeResult.ZoneNumber);
                 state.HasTransitionPoint = true;
             }
         }
 
         float signedDepth;
-        var indoorWeight = ComputeIndoorWeight(consumer, state, localPosition, observedIndoor, out signedDepth);
-        state.PreviousProbeLocalPosition = localPosition;
+        var indoorWeight = ComputeIndoorWeight(consumer, state, evaluationPosition, observedIndoor, out signedDepth);
+        state.PreviousProbeLocalPosition = evaluationPosition;
         state.PreviousZone = probeResult.ZoneNumber;
         state.PreviousObservedIndoor = observedIndoor;
         _consumerStates[key] = state;
@@ -140,6 +146,13 @@ public sealed class L2MapContextVolume : MonoBehaviour
             MapMoonEulerDegrees = Context.MapMoonEulerDegrees
         };
         return true;
+    }
+
+    private Vector3 ToEvaluationPosition(Vector3 worldPosition)
+    {
+        return transform.parent != null
+            ? transform.parent.InverseTransformPoint(worldPosition)
+            : transform.InverseTransformPoint(worldPosition);
     }
 
     public static bool TryFindContaining(Vector3 worldPosition, out L2MapContextVolume volume)
@@ -209,6 +222,53 @@ public sealed class L2MapContextVolume : MonoBehaviour
             Mathf.Max(0.01f, Mathf.Abs(boundsSize.x)),
             Mathf.Max(0.01f, Mathf.Abs(boundsSize.y)),
             Mathf.Max(0.01f, Mathf.Abs(boundsSize.z)));
+    }
+
+    private void AlignToTerrainQuadrant()
+    {
+        if (!AutoAlignToTerrainQuadrant || Context == null || transform.parent == null)
+        {
+            return;
+        }
+
+        var terrain = FindSiblingTerrain();
+        if (terrain == null || terrain.terrainData == null)
+        {
+            return;
+        }
+
+        var terrainSize = terrain.terrainData.size;
+        var terrainWorldCenter = terrain.transform.position + new Vector3(terrainSize.x * 0.5f, 0f, terrainSize.z * 0.5f);
+        var worldPosition = transform.position;
+        worldPosition.x = terrainWorldCenter.x - boundsCenter.x;
+        worldPosition.z = terrainWorldCenter.z - boundsCenter.z;
+
+        if ((transform.position - worldPosition).sqrMagnitude > 0.000001f)
+        {
+            transform.position = worldPosition;
+        }
+    }
+
+    private Terrain FindSiblingTerrain()
+    {
+        var mapRoot = transform.parent;
+        if (mapRoot == null)
+        {
+            return null;
+        }
+
+        var expectedTerrainName = $"{mapRoot.name}_Terrain";
+        var terrains = mapRoot.GetComponentsInChildren<Terrain>(true);
+        for (var i = 0; i < terrains.Length; i++)
+        {
+            var terrain = terrains[i];
+            if (terrain != null && terrain.name == expectedTerrainName)
+            {
+                return terrain;
+            }
+        }
+
+        return terrains.Length > 0 ? terrains[0] : null;
     }
 
     private float ResolveActiveSourceFogEnd(bool hasZoneInfo, L2MapAtmosphereContextAsset.ZoneData zoneData)
