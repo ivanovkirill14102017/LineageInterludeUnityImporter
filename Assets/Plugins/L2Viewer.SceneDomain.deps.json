@@ -13,6 +13,7 @@
           "L2Viewer.DbFile": "1.0.0",
           "L2Viewer.PackageCore": "1.0.0",
           "L2Viewer.SceneDTO": "1.0.0",
+          "L2Viewer.UFile": "1.0.0",
           "L2Viewer.UkxFile": "1.0.0",
           "L2Viewer.UnrFile": "1.0.0",
           "L2Viewer.UsxFile": "1.0.0",
@@ -73,6 +74,17 @@
           }
         }
       },
+      "L2Viewer.UFile/1.0.0": {
+        "dependencies": {
+          "L2Viewer.PackageCore": "1.0.0"
+        },
+        "runtime": {
+          "L2Viewer.UFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
       "L2Viewer.UkxFile/1.0.0": {
         "dependencies": {
           "L2Viewer.PackageCore": "1.0.0",
@@ -87,7 +99,8 @@
       },
       "L2Viewer.UnrFile/1.0.0": {
         "dependencies": {
-          "L2Viewer.PackageCore": "1.0.0"
+          "L2Viewer.PackageCore": "1.0.0",
+          "L2Viewer.UFile": "1.0.0"
         },
         "runtime": {
           "L2Viewer.UnrFile.dll": {
@@ -150,6 +163,11 @@
       "sha512": ""
     },
     "L2Viewer.SceneDTO/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "L2Viewer.UFile/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

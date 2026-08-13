@@ -344,7 +344,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         string referenceText,
         Action<string> log,
         BuildContext context = null,
-        bool includeMaterials = true)
+        bool includeMaterials = true,
+        string assetObjectRootSuffix = null)
     {
         if (sharedAsset == null)
         {
@@ -356,6 +357,10 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             : sharedAsset.MeshObjectName;
         var activeContext = context ?? new BuildContext(clientRoot);
         var assetObjectRoot = ResolveSkeletalAssetObjectRoot(assetRoot, sharedAsset, characterName);
+        if (!string.IsNullOrWhiteSpace(assetObjectRootSuffix))
+        {
+            assetObjectRoot = $"{assetObjectRoot}/{SanitizePathSegment(assetObjectRootSuffix)}";
+        }
 
         L2AssetManager.EnsureFolderExists(assetObjectRoot);
         L2AssetManager.EnsureFolderExists(prefabRoot);
@@ -420,7 +425,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         string prefabNameSuffix,
         string displayLabel,
         Action<string> log,
-        bool finalizeAssets = true)
+        bool finalizeAssets = true,
+        string archetypeNameSuffix = null)
     {
         if (prepared == null)
         {
@@ -485,7 +491,9 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             "NCA",
             characterAsset.MeshObjectName ?? prepared.CharacterName,
             "asset",
-            "archetype");
+            string.IsNullOrWhiteSpace(archetypeNameSuffix)
+                ? "archetype"
+                : $"archetype_{archetypeNameSuffix}");
         archetype = UnityAssetDatabaseUtility.CreateOrReplaceAsset(archetype, archetypeAssetPath);
         var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
             prepared.PrefabRoot,
@@ -517,5 +525,21 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             packageName,
             objectName,
             "SkeletalCharacters");
+    }
+
+    private static string SanitizePathSegment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = value.Trim().Replace('\\', '_').Replace('/', '_').Replace(':', '_');
+        foreach (var invalidChar in Path.GetInvalidFileNameChars())
+        {
+            sanitized = sanitized.Replace(invalidChar, '_');
+        }
+
+        return sanitized;
     }
 }

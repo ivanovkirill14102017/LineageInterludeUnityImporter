@@ -8,6 +8,7 @@ public sealed class L2StartupWindow : EditorWindow
 
     private MapImporterPanel _mapImporter;
     private CreatureNpcImporterPanel _creatureImporter;
+    private NonPermanentVisualImporterPanel _nonPermanentVisualImporter;
     private PlayerCharacterImporterPanel _playerCharacterImporter;
     private SkillVisualImporterPanel _skillVisualImporter;
     private Vector2 _scroll;
@@ -40,6 +41,7 @@ public sealed class L2StartupWindow : EditorWindow
     {
         _mapImporter = new MapImporterPanel(Repaint);
         _creatureImporter = new CreatureNpcImporterPanel(Repaint);
+        _nonPermanentVisualImporter = new NonPermanentVisualImporterPanel(Repaint);
         _playerCharacterImporter = new PlayerCharacterImporterPanel(Repaint);
         _skillVisualImporter = new SkillVisualImporterPanel(Repaint);
     }
@@ -49,6 +51,7 @@ public sealed class L2StartupWindow : EditorWindow
         _mapImporter?.Dispose();
         _mapImporter = null;
         _creatureImporter = null;
+        _nonPermanentVisualImporter = null;
         _playerCharacterImporter = null;
         _skillVisualImporter = null;
     }
@@ -80,6 +83,13 @@ public sealed class L2StartupWindow : EditorWindow
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
+                _nonPermanentVisualImporter.OnGUI();
+            }
+
+            EditorGUILayout.Space(8f);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
                 _playerCharacterImporter.OnGUI();
             }
 
@@ -96,6 +106,7 @@ public sealed class L2StartupWindow : EditorWindow
     {
         _mapImporter ??= new MapImporterPanel(Repaint);
         _creatureImporter ??= new CreatureNpcImporterPanel(Repaint);
+        _nonPermanentVisualImporter ??= new NonPermanentVisualImporterPanel(Repaint);
         _playerCharacterImporter ??= new PlayerCharacterImporterPanel(Repaint);
         _skillVisualImporter ??= new SkillVisualImporterPanel(Repaint);
     }
