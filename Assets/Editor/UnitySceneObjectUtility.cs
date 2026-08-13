@@ -3,6 +3,11 @@ using UnityEngine;
 
 internal static class UnitySceneObjectUtility
 {
+    public static bool ObjectExists(string objectName)
+    {
+        return !string.IsNullOrWhiteSpace(objectName) && GameObject.Find(objectName) != null;
+    }
+
     public static void RemoveExistingObject(string objectName)
     {
         var existing = GameObject.Find(objectName);

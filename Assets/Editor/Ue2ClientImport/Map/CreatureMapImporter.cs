@@ -61,9 +61,14 @@ internal static class CreatureMapImporter
 
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
-        UnitySceneObjectUtility.RemoveExistingObject($"{request.ObjectName}_Creatures");
+        var creatureRootName = $"{request.ObjectName}_Creatures";
+        if (UnitySceneObjectUtility.ObjectExists(creatureRootName))
+        {
+            log($"[Creatures] Skipping import because '{creatureRootName}' already exists.");
+            return Task.CompletedTask;
+        }
 
-        var creatureRoot = new GameObject($"{request.ObjectName}_Creatures");
+        var creatureRoot = new GameObject(creatureRootName);
         creatureRoot.transform.SetParent(mapRoot.transform, false);
 
         context?.Report("Creatures", "Build prefab cache", 0.20f);

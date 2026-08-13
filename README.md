@@ -1,7 +1,13 @@
 # LineageInterludeUnityImporter
 
+Start here: [START_HERE.md](START_HERE.md)
+
+Main Unity entry point: `L2 > Startup`.
+
 путь до исходников палгина/Path to pligin sources:
 local C:\\Users\\User\\source\\OpenSharpUE2IvanovKirillResearchProject\\L2Viewer.SceneDomain\\bin\\Debug\\netstandard2.1
+
+путь до локальных исходников сервера C:\Users\User\source\decompiled_all_l2javaInterlude\decompiled_all
 
 published https://github.com/ivanovkirill14102017/OpenSharpUE2IvanovKirillResearchProject
 

@@ -3,6 +3,27 @@ using System.Collections.Generic;
 using L2Viewer.SceneDomain.Models;
 using UnityEngine;
 
+internal sealed class StaticMeshPlacementAsset
+{
+    public StaticMeshPlacementAsset(
+        Mesh renderMesh,
+        Material[] materials,
+        Texture2D[][] flipbooks,
+        GameObject prefab)
+    {
+        RenderMesh = renderMesh;
+        Materials = materials;
+        Flipbooks = flipbooks;
+        Prefab = prefab;
+    }
+
+    public Mesh RenderMesh { get; }
+    public Material[] Materials { get; }
+    public Texture2D[][] Flipbooks { get; }
+    public GameObject Prefab { get; }
+    public bool HasPrefab => Prefab != null;
+}
+
 internal static class StaticMeshInstancePlacer
 {
     private const string DefaultFlame01Token = "Default_Flame01";
@@ -10,7 +31,7 @@ internal static class StaticMeshInstancePlacer
     public static void PlaceInstances(
         IReadOnlyList<SceneStaticMeshInstance> instances,
         GameObject parent,
-        IReadOnlyDictionary<string, GameObject> prefabCache,
+        IReadOnlyDictionary<string, StaticMeshPlacementAsset> assetCache,
         Action<string> log)
     {
         log($"Placing {instances.Count} instances on the scene...");
@@ -24,17 +45,17 @@ internal static class StaticMeshInstancePlacer
                 continue;
             }
 
-            if (string.IsNullOrEmpty(instance.MeshReference) || !prefabCache.TryGetValue(instance.MeshReference, out var prefab))
+            if (string.IsNullOrEmpty(instance.MeshReference) || !assetCache.TryGetValue(instance.MeshReference, out var asset))
             {
                 continue;
             }
 
-            if (prefab == null)
+            if (asset == null)
             {
                 continue;
             }
 
-            var visual = InstantiateSceneObject(prefab, parent.transform);
+            var visual = StaticMeshSceneObjectFactory.InstantiateOrCreate(asset, parent.transform);
             if (visual == null)
             {
                 continue;
@@ -45,7 +66,7 @@ internal static class StaticMeshInstancePlacer
             visual.transform.localPosition = instance.WorldLocation.TransformFromUnrealToUnityWithScale();
             visual.transform.localRotation = instance.UnrealRotationRaw.ToUnityRotationFromUnrealRotator();
             visual.transform.localScale = new Vector3(instance.Scale.X, instance.Scale.Z, instance.Scale.Y);
-            ApplyPrePivotOffset(visual.transform, instance);
+            ApplyPrePivotOffset(visual.transform, instance, asset.HasPrefab);
 
             spawnedCount++;
         }
@@ -91,22 +112,28 @@ internal static class StaticMeshInstancePlacer
     }
 
 
-    private static void ApplyPrePivotOffset(Transform visualRoot, SceneStaticMeshInstance instance)
+    private static void ApplyPrePivotOffset(Transform visualRoot, SceneStaticMeshInstance instance, bool hasGeometryChild)
     {
         if (visualRoot == null)
         {
             return;
         }
 
-        var geometry = visualRoot.Find("Geometry");
-        if (geometry == null)
-        {
-            geometry = visualRoot;
-        }
-
-        geometry.localPosition = instance.PrePivot == System.Numerics.Vector3.Zero
+        var offset = instance.PrePivot == System.Numerics.Vector3.Zero
             ? Vector3.zero
             : ComputePrePivotOffset(instance.PrePivot, instance.Scale).TransformFromUnrealToUnityWithScale();
+
+        if (!hasGeometryChild)
+        {
+            visualRoot.localPosition += visualRoot.localRotation * Vector3.Scale(visualRoot.localScale, offset);
+            return;
+        }
+
+        var geometry = visualRoot.Find("Geometry");
+        if (geometry != null)
+        {
+            geometry.localPosition = offset;
+        }
     }
 
     private static System.Numerics.Vector3 ComputePrePivotOffset(
@@ -131,6 +158,40 @@ internal static class StaticMeshInstancePlacer
             : UnityEngine.Object.Instantiate(prefab, parent, false);
     }
 
+}
+
+internal static class StaticMeshSceneObjectFactory
+{
+    public static GameObject InstantiateOrCreate(StaticMeshPlacementAsset asset, Transform parent)
+    {
+        if (asset == null)
+        {
+            return null;
+        }
+
+        if (asset.Prefab != null)
+        {
+            return UnityEngine.Object.Instantiate(asset.Prefab, parent, false);
+        }
+
+        if (asset.RenderMesh == null || asset.Materials == null || asset.Materials.Length == 0)
+        {
+            return null;
+        }
+
+        var visual = new GameObject(asset.RenderMesh.name);
+        visual.transform.SetParent(parent, false);
+        visual.isStatic = true;
+
+        var filter = visual.AddComponent<MeshFilter>();
+        filter.sharedMesh = asset.RenderMesh;
+
+        var renderer = visual.AddComponent<MeshRenderer>();
+        renderer.sharedMaterials = asset.Materials;
+        StaticMeshFlipbookUtility.ApplyFlipbooks(visual, renderer, asset.Flipbooks);
+
+        return visual;
+    }
 }
 
 internal static class StaticMeshRendererMaterialUtility

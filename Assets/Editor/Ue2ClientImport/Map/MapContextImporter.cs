@@ -19,10 +19,14 @@ internal static class MapContextImporter
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
 
-        var contextAsset = L2MapContextAssetBuilder.BuildContextAsset(mapContext, request.OutputDir);
         var contextRootName = $"{request.ObjectName}_Context";
-        UnitySceneObjectUtility.RemoveExistingObject(contextRootName);
+        if (UnitySceneObjectUtility.ObjectExists(contextRootName))
+        {
+            log($"[Context] Skipping import because '{contextRootName}' already exists.");
+            return;
+        }
 
+        var contextAsset = L2MapContextAssetBuilder.BuildContextAsset(mapContext, request.OutputDir);
         var contextRoot = new GameObject(contextRootName);
         contextRoot.transform.SetParent(mapRoot.transform, false);
         AlignContextRootToTerrainQuadrant(contextRoot.transform, mapRoot.transform, contextAsset, log);

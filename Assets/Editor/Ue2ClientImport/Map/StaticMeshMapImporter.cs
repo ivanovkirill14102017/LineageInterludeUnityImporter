@@ -35,9 +35,14 @@ internal static class StaticMeshMapImporter
         context?.Report("Static Meshes", "Scene root preparation", 0.18f);
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
-        UnitySceneObjectUtility.RemoveExistingObject($"{request.ObjectName}_StaticMeshes");
+        var staticMeshRootName = $"{request.ObjectName}_StaticMeshes";
+        if (UnitySceneObjectUtility.ObjectExists(staticMeshRootName))
+        {
+            log($"[StaticMesh] Skipping import because '{staticMeshRootName}' already exists.");
+            return Task.CompletedTask;
+        }
 
-        var staticMeshRoot = new GameObject($"{request.ObjectName}_StaticMeshes");
+        var staticMeshRoot = new GameObject(staticMeshRootName);
         staticMeshRoot.transform.SetParent(mapRoot.transform, false);
         log("[StaticMesh] DONE Scene root preparation");
 

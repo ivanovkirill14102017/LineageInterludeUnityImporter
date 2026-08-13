@@ -35,8 +35,11 @@ internal static class LightingMapImporter
 
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         var lightsRootName = $"{request.ObjectName}_Lights";
-        UnitySceneObjectUtility.RemoveExistingObject(lightsRootName);
-        UnitySceneObjectUtility.RemoveExistingObject($"{request.ObjectName}_LightingVolume");
+        if (UnitySceneObjectUtility.ObjectExists(lightsRootName))
+        {
+            log($"[Lighting] Skipping import because '{lightsRootName}' already exists.");
+            return Task.CompletedTask;
+        }
 
         log("[Lighting] START Scene root preparation");
         context?.Report("Lights", "Scene root preparation", 0.42f);

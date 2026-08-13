@@ -75,7 +75,11 @@ internal static class BspMapImporter
     {
         log($"Importing {scene.Models.Length} {variantLabel} BSP models...");
 
-        UnitySceneObjectUtility.RemoveExistingObject(rootObjectName);
+        if (UnitySceneObjectUtility.ObjectExists(rootObjectName))
+        {
+            log($"[BSP] Skipping {variantLabel} import because '{rootObjectName}' already exists.");
+            return;
+        }
 
         var root = new GameObject(rootObjectName);
         root.transform.SetParent(mapRoot.transform, false);

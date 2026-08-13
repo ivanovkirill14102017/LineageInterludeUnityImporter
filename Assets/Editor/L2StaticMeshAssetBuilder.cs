@@ -53,9 +53,12 @@ internal static class L2StaticMeshAssetBuilder
         context?.ThrowIfCancellationRequested();
         context?.Report("Particles/Static Mesh Dependencies", "Mesh asset build", 0.68f);
         var meshCache = BuildMeshAssets(filteredDefinitions, meshDir, mapKey, context);
+        var collisionMeshCache = BuildCollisionMeshAssets(filteredDefinitions, meshDir, mapKey, context);
         context?.ThrowIfCancellationRequested();
         context?.Report("Particles/Static Mesh Dependencies", "Prefab asset build", 0.86f);
-        return BuildPrefabAssets(meshCache, materialCatalog, prefabDir, context);
+        return BuildPlacementAssets(meshCache, collisionMeshCache, materialCatalog, prefabDir, context)
+            .Where(pair => pair.Value?.Prefab != null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value.Prefab, StringComparer.OrdinalIgnoreCase);
     }
 
     public static void BuildStaticMeshes(
@@ -122,13 +125,14 @@ internal static class L2StaticMeshAssetBuilder
         geometryStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Geometry asset build ({geometryStopwatch.Elapsed.TotalSeconds:F2}s)");
 
-        log("[StaticMesh/Pipeline] START Prefab asset build");
+        log("[StaticMesh/Pipeline] START Collider prefab asset build");
         context?.ThrowIfCancellationRequested();
-        context?.Report("Static Meshes", "Prefab asset build", 0.70f);
+        context?.Report("Static Meshes", "Collider prefab asset build", 0.70f);
         var prefabStopwatch = Stopwatch.StartNew();
-        var prefabCache = BuildPrefabAssets(meshCache, materialCatalog, prefabDir, context);
+        var collisionMeshCache = BuildCollisionMeshAssets(meshDefinitions, meshDir, mapKey, context);
+        var assetCache = BuildPlacementAssets(meshCache, collisionMeshCache, materialCatalog, prefabDir, context);
         prefabStopwatch.Stop();
-        log($"[StaticMesh/Pipeline] DONE Prefab asset build ({prefabStopwatch.Elapsed.TotalSeconds:F2}s)");
+        log($"[StaticMesh/Pipeline] DONE Collider prefab asset build ({prefabStopwatch.Elapsed.TotalSeconds:F2}s)");
 
         log("[StaticMesh/Pipeline] START Instance placement");
         context?.ThrowIfCancellationRequested();
@@ -190,7 +194,7 @@ internal static class L2StaticMeshAssetBuilder
         if (placeRegularInstances)
         {
             context?.ThrowIfCancellationRequested();
-            StaticMeshInstancePlacer.PlaceInstances(regularInstances, parent, prefabCache, log);
+            StaticMeshInstancePlacer.PlaceInstances(regularInstances, parent, assetCache, log);
         }
 
         var shouldPlaceRegularTreeInstances = regularTreeInstances.Length > 0 &&
@@ -198,7 +202,7 @@ internal static class L2StaticMeshAssetBuilder
         if (shouldPlaceRegularTreeInstances)
         {
             context?.ThrowIfCancellationRequested();
-            StaticMeshInstancePlacer.PlaceInstances(regularTreeInstances, parent, prefabCache, log);
+            StaticMeshInstancePlacer.PlaceInstances(regularTreeInstances, parent, assetCache, log);
         }
 
         if (populateTerrainVegetation)
@@ -220,7 +224,7 @@ internal static class L2StaticMeshAssetBuilder
         if (placeTerrainDecorations)
         {
             context?.ThrowIfCancellationRequested();
-            TerrainDecorationInstancePlacer.PlaceDecorations(terrainDecorationRegularLayers, parent, prefabCache, clientPath, log);
+            TerrainDecorationInstancePlacer.PlaceDecorations(terrainDecorationRegularLayers, parent, assetCache, clientPath, log);
         }
         placementStopwatch.Stop();
         log($"[StaticMesh/Pipeline] DONE Instance placement ({placementStopwatch.Elapsed.TotalSeconds:F2}s)");
@@ -361,13 +365,14 @@ internal static class L2StaticMeshAssetBuilder
         L2AssetManager.EnsureFolderExists(textureDir);
     }
 
-    private static Dictionary<string, GameObject> BuildPrefabAssets(
+    private static Dictionary<string, StaticMeshPlacementAsset> BuildPlacementAssets(
         IReadOnlyDictionary<string, Mesh> meshCache,
+        IReadOnlyDictionary<string, Mesh> collisionMeshCache,
         StaticMeshMaterialCatalog materialCatalog,
         string prefabDir,
         MapImportExecutionContext context = null)
     {
-        var prefabCache = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+        var assetCache = new Dictionary<string, StaticMeshPlacementAsset>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var pair in meshCache)
         {
@@ -393,14 +398,59 @@ internal static class L2StaticMeshAssetBuilder
                 "StaticMeshPrefabs");
 
             materialCatalog.FlipbooksByMeshReference.TryGetValue(meshReference, out var flipbooks);
-            var prefab = CreateOrUpdatePrefab(prefabPath, mesh, materials, flipbooks);
-            if (prefab != null)
+            collisionMeshCache.TryGetValue(meshReference, out var collisionMesh);
+            GameObject prefab = null;
+            if (collisionMesh != null)
             {
-                prefabCache[meshReference] = prefab;
+                prefab = LoadOrCreatePrefab(prefabPath, mesh, materials, flipbooks, collisionMesh);
             }
+
+            assetCache[meshReference] = new StaticMeshPlacementAsset(mesh, materials, flipbooks, prefab);
         }
 
-        return prefabCache;
+        return assetCache;
+    }
+
+    private static Dictionary<string, Mesh> BuildCollisionMeshAssets(
+        IReadOnlyDictionary<string, SceneStaticMeshDefinition> meshDefinitions,
+        string meshDir,
+        string mapKey,
+        MapImportExecutionContext context = null)
+    {
+        var meshCache = new Dictionary<string, Mesh>(StringComparer.OrdinalIgnoreCase);
+
+        UnityAssetDatabaseUtility.RunAssetEditingBatch(() =>
+        {
+            foreach (var pair in meshDefinitions)
+            {
+                context?.ThrowIfCancellationRequested();
+                var meshReference = pair.Key;
+                var definition = pair.Value;
+                if (definition.CollisionGeometry == null ||
+                    definition.CollisionGeometry.Triangles == null ||
+                    definition.CollisionGeometry.Triangles.Count == 0)
+                {
+                    continue;
+                }
+
+                var meshAssetPath = L2AssetManager.BuildClientPackageAssetPath(
+                    meshDir,
+                    meshReference,
+                    "SMC",
+                    "asset",
+                    $"{mapKey}/StaticMeshColliders");
+
+                var mesh = LoadOrCreateMeshAsset(definition.CollisionGeometry, meshAssetPath);
+                if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
+                {
+                    continue;
+                }
+
+                meshCache[meshReference] = mesh;
+            }
+        });
+
+        return meshCache;
     }
 
     private static Dictionary<string, Mesh> BuildMeshAssets(
@@ -430,7 +480,7 @@ internal static class L2StaticMeshAssetBuilder
                     "asset",
                     $"{mapKey}/StaticMeshes");
 
-                var mesh = BuildMeshAsset(definition.RenderGeometry, meshAssetPath);
+                var mesh = LoadOrCreateMeshAsset(definition.RenderGeometry, meshAssetPath);
                 if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
                 {
                     continue;
@@ -469,7 +519,18 @@ internal static class L2StaticMeshAssetBuilder
         }
     }
 
-    private static Mesh BuildMeshAsset(SceneTriangleMeshData meshData, string assetPath)
+    private static Mesh LoadOrCreateMeshAsset(SceneTriangleMeshData meshData, string assetPath)
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(assetPath);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        return CreateMeshAsset(meshData, assetPath);
+    }
+
+    private static Mesh CreateMeshAsset(SceneTriangleMeshData meshData, string assetPath)
     {
         var unityMesh = new Mesh
         {
@@ -536,10 +597,33 @@ internal static class L2StaticMeshAssetBuilder
         }
 
         unityMesh.RecalculateBounds();
-        return UnityAssetDatabaseUtility.CreateOrReplaceAsset(unityMesh, assetPath);
+        L2AssetManager.EnsureParentFolderExists(assetPath);
+        AssetDatabase.CreateAsset(unityMesh, assetPath);
+        return unityMesh;
     }
 
-    private static GameObject CreateOrUpdatePrefab(string prefabPath, Mesh mesh, Material[] materials, Texture2D[][] flipbooks)
+    private static GameObject LoadOrCreatePrefab(
+        string prefabPath,
+        Mesh mesh,
+        Material[] materials,
+        Texture2D[][] flipbooks,
+        Mesh collisionMesh)
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        return CreatePrefab(prefabPath, mesh, materials, flipbooks, collisionMesh);
+    }
+
+    private static GameObject CreatePrefab(
+        string prefabPath,
+        Mesh mesh,
+        Material[] materials,
+        Texture2D[][] flipbooks,
+        Mesh collisionMesh)
     {
         var prefabRoot = new GameObject(Path.GetFileNameWithoutExtension(prefabPath));
         try
@@ -560,6 +644,19 @@ internal static class L2StaticMeshAssetBuilder
             var renderer = geometryRoot.AddComponent<MeshRenderer>();
             renderer.sharedMaterials = materials;
             StaticMeshFlipbookUtility.ApplyFlipbooks(geometryRoot, renderer, flipbooks);
+
+            if (collisionMesh != null)
+            {
+                var colliderRoot = new GameObject("Collider");
+                colliderRoot.isStatic = true;
+                colliderRoot.transform.SetParent(prefabRoot.transform, false);
+                colliderRoot.transform.localPosition = Vector3.zero;
+                colliderRoot.transform.localRotation = Quaternion.identity;
+                colliderRoot.transform.localScale = Vector3.one;
+
+                var collider = colliderRoot.AddComponent<MeshCollider>();
+                collider.sharedMesh = collisionMesh;
+            }
 
             L2AssetManager.EnsureParentFolderExists(prefabPath);
             var prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);

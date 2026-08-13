@@ -48,7 +48,12 @@ internal static class ParticleMapImporter
         context?.Report("Particles", "Scene root preparation", 0.58f);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         var particlesRootName = $"{request.ObjectName}_Particles";
-        UnitySceneObjectUtility.RemoveExistingObject(particlesRootName);
+        if (UnitySceneObjectUtility.ObjectExists(particlesRootName))
+        {
+            log($"[Particles] Skipping import because '{particlesRootName}' already exists.");
+            return;
+        }
+
         MapImportAssetPreparation.EnsureMapOutputFolderExists(request.OutputDir);
 
         var particlesRoot = new GameObject(particlesRootName);

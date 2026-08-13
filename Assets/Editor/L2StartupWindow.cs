@@ -2,9 +2,9 @@ using UnityEditor;
 using UnityEngine;
 
 [InitializeOnLoad]
-public sealed class L2ImportDashboardWindow : EditorWindow
+public sealed class L2StartupWindow : EditorWindow
 {
-    private const string SessionShownKey = "L2ImportDashboardWindow.Shown";
+    private const string SessionShownKey = "L2StartupWindow.Shown";
 
     private MapImporterPanel _mapImporter;
     private CreatureNpcImporterPanel _creatureImporter;
@@ -12,15 +12,15 @@ public sealed class L2ImportDashboardWindow : EditorWindow
     private SkillVisualImporterPanel _skillVisualImporter;
     private Vector2 _scroll;
 
-    static L2ImportDashboardWindow()
+    static L2StartupWindow()
     {
         EditorApplication.delayCall += OpenOnProjectLoad;
     }
 
-    [MenuItem("L2/Import Dashboard")]
+    [MenuItem("L2/Startup")]
     public static void OpenWindow()
     {
-        var window = GetWindow<L2ImportDashboardWindow>("L2 Import Dashboard");
+        var window = GetWindow<L2StartupWindow>("L2 Startup");
         window.minSize = new Vector2(900f, 720f);
         window.Show();
     }
@@ -61,7 +61,7 @@ public sealed class L2ImportDashboardWindow : EditorWindow
         {
             _scroll = scroll.scrollPosition;
 
-            EditorGUILayout.LabelField("Lineage II Interlude Import", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Lineage II Interlude Import Startup", EditorStyles.boldLabel);
             EditorGUILayout.Space(6f);
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))

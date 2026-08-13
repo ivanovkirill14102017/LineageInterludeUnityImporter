@@ -28,7 +28,13 @@ internal static class TerrainMapImporter
 
         log("[Terrain] START Scene root preparation");
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
-        UnitySceneObjectUtility.RemoveExistingObject($"{request.ObjectName}_Terrain");
+        var terrainRootName = $"{request.ObjectName}_Terrain";
+        if (UnitySceneObjectUtility.ObjectExists(terrainRootName))
+        {
+            log($"[Terrain] Skipping import because '{terrainRootName}' already exists.");
+            return Task.CompletedTask;
+        }
+
         MapImportAssetPreparation.PrepareTerrainOutputFolder(request.OutputDir);
         log("[Terrain] DONE Scene root preparation");
 
@@ -61,7 +67,7 @@ internal static class TerrainMapImporter
             placeTreeInstancesAsRegularInstances: false,
             terrainImport: terrainImport,
             populateTerrainVegetation: true,
-            removeExistingConvertedTerrainVegetationFallback: true);
+            removeExistingConvertedTerrainVegetationFallback: false);
             vegetationStopwatch.Stop();
             log($"[Terrain] DONE Terrain vegetation build ({vegetationStopwatch.Elapsed.TotalSeconds:F2}s)");
         }

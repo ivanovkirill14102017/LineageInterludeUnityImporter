@@ -10,8 +10,9 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Terrain", request.MapKey, 0.10f);
-            await TerrainMapImporter.ImportAsync(request, source, log);
+            await ImportSectionIfMissing(request, "Terrain", log, () => TerrainMapImporter.ImportAsync(request, source, log));
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Terrain", log, context);
     }
@@ -22,8 +23,9 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Static Meshes", request.MapKey, 0.10f);
-            await StaticMeshMapImporter.ImportAsync(request, source, log, context);
+            await ImportSectionIfMissing(request, "StaticMeshes", log, () => StaticMeshMapImporter.ImportAsync(request, source, log, context));
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Meshes", log, context);
     }
@@ -34,9 +36,14 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import BSP", request.MapKey, 0.10f);
-            await BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
-            MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+            await ImportSectionIfMissing(request, "BSP", log, () => BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
+            await ImportSectionIfMissing(request, "Context", log, () =>
+            {
+                MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+                return Task.CompletedTask;
+            });
             MapImportFinalizer.Complete(UnitySceneObjectUtility.CreateMapRoot(request.ObjectName), log);
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import BSP", log, context);
@@ -48,8 +55,9 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Lights", request.MapKey, 0.10f);
-            await LightingMapImporter.ImportAsync(request, source, log, context);
+            await ImportSectionIfMissing(request, "Lights", log, () => LightingMapImporter.ImportAsync(request, source, log, context));
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Lights", log, context);
     }
@@ -60,9 +68,14 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Volumes", request.MapKey, 0.10f);
-            await VolumeMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
-            MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+            await ImportSectionIfMissing(request, "Volumes", log, () => VolumeMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
+            await ImportSectionIfMissing(request, "Context", log, () =>
+            {
+                MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+                return Task.CompletedTask;
+            });
             MapImportFinalizer.Complete(UnitySceneObjectUtility.CreateMapRoot(request.ObjectName), log);
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Volumes", log, context);
@@ -74,8 +87,13 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Particles", request.MapKey, 0.10f);
-            ParticleMapImporter.ImportAsync(request, source, log, context);
+            await ImportSectionIfMissing(request, "Particles", log, () =>
+            {
+                ParticleMapImporter.ImportAsync(request, source, log, context);
+                return Task.CompletedTask;
+            });
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Particles", log, context);
     }
@@ -86,8 +104,9 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Creatures", request.MapKey, 0.10f);
-            await CreatureMapImporter.ImportAsync(request, source, log, context);
+            await ImportSectionIfMissing(request, "Creatures", log, () => CreatureMapImporter.ImportAsync(request, source, log, context));
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Creatures", log, context);
     }
@@ -98,26 +117,50 @@ internal static class MapImportOrchestrator
         {
             context?.Report("Load Map", request.MapRelativePath, 0.02f);
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
+            MapImportSceneManager.PrepareMapImportScene(request, log);
 
             context?.Report("Import Terrain", request.MapKey, 0.08f);
-            await TerrainMapImporter.ImportAsync(request, source, log, finalizeScene: false, buildTerrainVegetation: true);
+            await ImportSectionIfMissing(request, "Terrain", log, () => TerrainMapImporter.ImportAsync(request, source, log, finalizeScene: false, buildTerrainVegetation: true));
             context?.Report("Import Static Meshes", request.MapKey, 0.22f);
-            await StaticMeshMapImporter.ImportAsync(request, source, log, context, finalizeScene: false, convertTerrainDecorationsToTerrainVegetation: true);
+            await ImportSectionIfMissing(request, "StaticMeshes", log, () => StaticMeshMapImporter.ImportAsync(request, source, log, context, finalizeScene: false, convertTerrainDecorationsToTerrainVegetation: true));
             context?.Report("Import BSP", request.MapKey, 0.38f);
-            await BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            await ImportSectionIfMissing(request, "BSP", log, () => BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
             context?.Report("Import Lights", request.MapKey, 0.54f);
-            await LightingMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            await ImportSectionIfMissing(request, "Lights", log, () => LightingMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
             context?.Report("Import Volumes", request.MapKey, 0.68f);
-            await VolumeMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            await ImportSectionIfMissing(request, "Volumes", log, () => VolumeMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
             context?.Report("Import Particles", request.MapKey, 0.80f);
-            ParticleMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            await ImportSectionIfMissing(request, "Particles", log, () =>
+            {
+                ParticleMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+                return Task.CompletedTask;
+            });
             context?.Report("Import Creatures", request.MapKey, 0.88f);
-            await CreatureMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
+            await ImportSectionIfMissing(request, "Creatures", log, () => CreatureMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
             context?.Report("Finalize", request.MapKey, 0.98f);
-            MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
-            MapImportFinalizer.Complete(UnitySceneObjectUtility.CreateMapRoot(request.ObjectName), log);
+            await ImportSectionIfMissing(request, "Context", log, () =>
+            {
+                MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
+                return Task.CompletedTask;
+            });
+            MapImportSceneManager.FinalizeChunkedMapImport(request, log);
             context?.Report("Done", request.MapKey, 1f);
         }, "Import All", log, context);
+    }
+
+    private static async Task ImportSectionIfMissing(
+        MapImportRequest request,
+        string sectionName,
+        Action<string> log,
+        Func<Task> import)
+    {
+        if (MapImportSceneManager.IsSectionImported(request, sectionName))
+        {
+            log?.Invoke($"[Import] Skipping {sectionName}: existing scene/chunk data is treated as correct.");
+            return;
+        }
+
+        await import();
     }
 
     private static async Task Run(Func<Task> action, string operationName, Action<string> log, MapImportExecutionContext context)

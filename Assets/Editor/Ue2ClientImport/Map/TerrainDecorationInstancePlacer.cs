@@ -15,7 +15,7 @@ internal static class TerrainDecorationInstancePlacer
     public static void PlaceDecorations(
         IReadOnlyList<SceneTerrainDecorationLayer> terrainDecorations,
         GameObject parent,
-        IReadOnlyDictionary<string, GameObject> prefabCache,
+        IReadOnlyDictionary<string, StaticMeshPlacementAsset> assetCache,
         string clientPath,
         Action<string> log)
     {
@@ -40,8 +40,8 @@ internal static class TerrainDecorationInstancePlacer
         foreach (var layer in terrainDecorations)
         {
             if (string.IsNullOrWhiteSpace(layer.MeshReference) ||
-                !prefabCache.TryGetValue(layer.MeshReference, out var prefab) ||
-                prefab == null)
+                !assetCache.TryGetValue(layer.MeshReference, out var asset) ||
+                asset == null)
             {
                 continue;
             }
@@ -95,7 +95,7 @@ internal static class TerrainDecorationInstancePlacer
                         var scale = ResolveScale(layer, jitterU, jitterV, rng);
                         var yawDegrees = layer.RandomYaw ? (float)(rng.NextDouble() * 360.0) : 0f;
 
-                        var visual = InstantiateSceneObject(prefab, terrainDecorationRoot.transform);
+                        var visual = StaticMeshSceneObjectFactory.InstantiateOrCreate(asset, terrainDecorationRoot.transform);
                         if (visual == null)
                         {
                             continue;
@@ -270,13 +270,6 @@ internal static class TerrainDecorationInstancePlacer
     private static float Lerp(float a, float b, float t)
     {
         return a + ((b - a) * t);
-    }
-
-    private static GameObject InstantiateSceneObject(GameObject prefab, Transform parent)
-    {
-        return prefab == null
-            ? null
-            : UnityEngine.Object.Instantiate(prefab, parent, false);
     }
 
 }

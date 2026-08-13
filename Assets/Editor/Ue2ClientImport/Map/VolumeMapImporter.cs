@@ -35,7 +35,11 @@ internal static class VolumeMapImporter
         context?.Report("Volumes", "Scene root preparation", 0.38f);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         var volumesRootName = $"{request.ObjectName}_Volumes";
-        UnitySceneObjectUtility.RemoveExistingObject(volumesRootName);
+        if (UnitySceneObjectUtility.ObjectExists(volumesRootName))
+        {
+            log($"[Volumes] Skipping import because '{volumesRootName}' already exists.");
+            return Task.CompletedTask;
+        }
 
         var volumesRoot = new GameObject(volumesRootName);
         volumesRoot.transform.SetParent(mapRoot.transform, false);
