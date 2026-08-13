@@ -26,11 +26,15 @@ internal static class CreatureAnimatorControllerBuilder
             "AnimatorControllers");
 
         var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
-        if (controller == null)
+        if (controller != null)
         {
-            L2AssetManager.EnsureParentFolderExists(controllerPath);
-            controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+            notes = $"AnimatorController reused: {controllerPath}.";
+            log?.Invoke($"[SkinnedPOC] AnimatorController ready: {controllerPath}");
+            return controller;
         }
+
+        L2AssetManager.EnsureParentFolderExists(controllerPath);
+        controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
 
         var layer = controller.layers.Length > 0 ? controller.layers[0] : new AnimatorControllerLayer
         {
@@ -95,7 +99,7 @@ internal static class CreatureAnimatorControllerBuilder
         notes = defaultState != null
             ? $"AnimatorController created with {clips.Length} state(s); default state is '{defaultState.name}'."
             : "AnimatorController created without a default state.";
-        log?.Invoke($"[SkinnedPOC] AnimatorController updated: {controllerPath}");
+        log?.Invoke($"[SkinnedPOC] AnimatorController created: {controllerPath}");
         return controller;
     }
 

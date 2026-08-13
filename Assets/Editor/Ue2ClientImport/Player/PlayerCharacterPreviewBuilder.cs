@@ -84,8 +84,8 @@ internal static class PlayerCharacterPreviewBuilder
             objectName,
             "asset",
             "skeleton");
-        baseAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(baseAsset, characterAssetPath);
-        log?.Invoke($"[PlayerPreview] Base skeletal asset updated: {characterAssetPath}");
+        baseAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(baseAsset, characterAssetPath);
+        log?.Invoke($"[PlayerPreview] Base skeletal asset ready: {characterAssetPath}");
 
         var buildContext = L2SkeletalAnimatorPrefabBuilder.CreateBuildContext(clientRoot);
         var sequenceNames = CreatureSkeletalImportUtility.GetAllSequenceNames(baseAsset);
@@ -239,7 +239,7 @@ internal static class PlayerCharacterPreviewBuilder
                     meshReference.ObjectName ?? partName,
                     "asset",
                     $"{variantToken}_part");
-                partAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(partAsset, partAssetPath);
+                partAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(partAsset, partAssetPath);
 
                 var materials = CreatureSkeletalMaterialImporter.CreateMaterials(
                     partAsset,
@@ -254,7 +254,7 @@ internal static class PlayerCharacterPreviewBuilder
                     meshReference.ObjectName ?? partName,
                     "asset",
                     $"{variantToken}_mesh");
-                mesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(mesh, meshAssetPath);
+                mesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(mesh, meshAssetPath);
 
                 renderParts.Add(new PartRenderData
                 {
@@ -486,6 +486,12 @@ internal static class PlayerCharacterPreviewBuilder
         SceneCharacterAppearanceData appearance,
         Action<string> log)
     {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
+        {
+            log?.Invoke($"[PlayerPreview] Reusing existing preview prefab: {prefabPath}");
+            return;
+        }
+
         var session = L2SceneSkeletalAssetBridge.CreateSession(baseAsset);
         var bindFrame = session.CaptureBindPoseDebugFrame();
         var bonePoses = CreatureSkeletalImportUtility.BuildBonePoses(bindFrame.Bones, baseAsset.Bones);
@@ -538,7 +544,7 @@ internal static class PlayerCharacterPreviewBuilder
 
             L2AssetManager.EnsureParentFolderExists(prefabPath);
             PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-            log?.Invoke($"[PlayerPreview] Preview prefab updated: {prefabPath}");
+            log?.Invoke($"[PlayerPreview] Preview prefab created: {prefabPath}");
         }
         finally
         {

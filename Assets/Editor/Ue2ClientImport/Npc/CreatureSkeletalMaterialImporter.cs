@@ -87,7 +87,7 @@ internal static class CreatureSkeletalMaterialImporter
                 }
             }
 
-            materials[i] = UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, materialPath);
+            materials[i] = UnityAssetDatabaseUtility.CreateAssetIfMissing(material, materialPath);
         }
 
         return materials;

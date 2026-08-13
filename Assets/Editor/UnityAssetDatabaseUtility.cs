@@ -55,6 +55,30 @@ internal static class UnityAssetDatabaseUtility
         return asset;
     }
 
+    public static T CreateAssetIfMissing<T>(T asset, string assetPath) where T : Object
+    {
+        var expectedName = Path.GetFileNameWithoutExtension(assetPath);
+        if (!string.IsNullOrWhiteSpace(expectedName) && asset != null)
+        {
+            asset.name = expectedName;
+        }
+
+        var existingAsset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+        if (existingAsset != null)
+        {
+            if (!ReferenceEquals(existingAsset, asset) && asset != null)
+            {
+                Object.DestroyImmediate(asset);
+            }
+
+            return existingAsset as T;
+        }
+
+        L2AssetManager.EnsureParentFolderExists(assetPath);
+        AssetDatabase.CreateAsset(asset, assetPath);
+        return asset;
+    }
+
     public static void DeleteFolderIfExists(string folderPath)
     {
         if (!AssetDatabase.IsValidFolder(folderPath))

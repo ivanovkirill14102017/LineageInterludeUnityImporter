@@ -67,8 +67,8 @@ internal static class PlayerCharacterImportBuilder
             objectName,
             "asset",
             "skeleton");
-        characterAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(characterAsset, characterAssetPath);
-        log?.Invoke($"[PlayerCharacter] Character asset updated: {characterAssetPath}");
+        characterAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(characterAsset, characterAssetPath);
+        log?.Invoke($"[PlayerCharacter] Character asset ready: {characterAssetPath}");
 
         var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
             PrefabOutputRoot,
@@ -103,6 +103,12 @@ internal static class PlayerCharacterImportBuilder
         SceneCharacterAppearanceData appearance,
         Action<string> log)
     {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
+        {
+            log?.Invoke($"[PlayerCharacter] Reusing existing debug prefab: {prefabPath}");
+            return;
+        }
+
         var root = new GameObject($"PC_{characterName}");
         try
         {
@@ -133,7 +139,7 @@ internal static class PlayerCharacterImportBuilder
             label.SkeletonUri = appearance.SkeletonMeshLocation.Uri;
 
             PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-            log?.Invoke($"[PlayerCharacter] Debug prefab updated: {prefabPath}");
+            log?.Invoke($"[PlayerCharacter] Debug prefab created: {prefabPath}");
         }
         finally
         {

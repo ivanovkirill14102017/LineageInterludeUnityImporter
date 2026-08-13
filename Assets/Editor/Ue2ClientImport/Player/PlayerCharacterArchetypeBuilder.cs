@@ -43,18 +43,6 @@ internal static class PlayerCharacterArchetypeBuilder
         context?.Report("Player Archetype", "Resolve base appearance", 0.02f);
         var appearanceBuilder = new SceneCharacterAppearanceBuilder();
         var baseAppearance = appearanceBuilder.Build(clientRoot, baseRequest);
-        appearanceOptions ??= new SceneCharacterAppearanceOptionsBuilder().Build(clientRoot, baseClass, gender);
-        equipmentCatalog ??= new SceneCharacterEquipmentCatalogBuilder().Build(clientRoot, dbRoot, baseClass, gender);
-        var packageIndex = BuildSkeletalPackageIndex(clientRoot);
-
-        context?.Report("Player Archetype", "Resolve base skeleton asset", 0.08f);
-        var resolver = new SceneSkeletalMeshResolver();
-        var baseSharedAsset = BuildCanonicalSharedAsset(
-            clientRoot,
-            resolver.ResolveAsset(baseAppearance.SkeletonMeshLocation),
-            packageIndex,
-            EnumerateCanonicalMeshReferences(baseAppearance, appearanceOptions, equipmentCatalog),
-            context);
         var characterName = $"{baseAppearance.Gender}_{baseAppearance.BaseClass}_{baseAppearance.VisualFamily}";
         var skeletonPackageName = Path.GetFileNameWithoutExtension(baseAppearance.SkeletonMeshLocation.PackagePath);
         var skeletonObjectName = baseAppearance.SkeletonMeshLocation.ObjectName ?? characterName;
@@ -68,15 +56,54 @@ internal static class PlayerCharacterArchetypeBuilder
         L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.AssetOutputRoot);
         L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.PrefabOutputRoot);
 
-        var baseAsset = L2SkeletalCharacterAssetFactory.Build(characterName, baseSharedAsset);
         var characterAssetPath = L2AssetManager.BuildAssetPathInFolder(
             skeletalAssetRoot,
             "PC",
             skeletonObjectName,
             "asset",
             "skeleton");
-        baseAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(baseAsset, characterAssetPath);
-        log?.Invoke($"[PlayerArchetype] Base skeletal asset updated: {characterAssetPath}");
+        var archetypeFolder = $"{PlayerCharacterImportBuilder.PrefabOutputRoot}/Archetypes/{baseAppearance.BaseClass}/{baseAppearance.Gender}";
+        var archetypeAssetPath = L2AssetManager.BuildAssetPathInFolder(
+            archetypeFolder,
+            "PCA",
+            skeletonObjectName,
+            "asset",
+            "archetype");
+        var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
+            PlayerCharacterImportBuilder.PrefabOutputRoot,
+            referenceText,
+            "PF",
+            "prefab",
+            "PlayerCharacterPrefabs",
+            "wardrobe");
+
+        if (AssetDatabase.LoadAssetAtPath<L2PlayerCharacterArchetypeAsset>(archetypeAssetPath) != null &&
+            AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
+        {
+            log?.Invoke($"[PlayerArchetype] Reusing existing archetype/prefab: {prefabPath}");
+            InstantiatePrefabIfAvailable(prefabPath, log);
+            importStopwatch.Stop();
+            log?.Invoke($"[PlayerArchetype/Timing] Total archetype import took {importStopwatch.Elapsed.TotalSeconds:F2}s");
+            context?.Report("Player Archetype", "Done", 1f);
+            return new ImportResult(prefabPath, archetypeAssetPath);
+        }
+
+        appearanceOptions ??= new SceneCharacterAppearanceOptionsBuilder().Build(clientRoot, baseClass, gender);
+        equipmentCatalog ??= new SceneCharacterEquipmentCatalogBuilder().Build(clientRoot, dbRoot, baseClass, gender);
+        var packageIndex = BuildSkeletalPackageIndex(clientRoot);
+
+        context?.Report("Player Archetype", "Resolve base skeleton asset", 0.08f);
+        var resolver = new SceneSkeletalMeshResolver();
+        var baseSharedAsset = BuildCanonicalSharedAsset(
+            clientRoot,
+            resolver.ResolveAsset(baseAppearance.SkeletonMeshLocation),
+            packageIndex,
+            EnumerateCanonicalMeshReferences(baseAppearance, appearanceOptions, equipmentCatalog),
+            context);
+
+        var baseAsset = L2SkeletalCharacterAssetFactory.Build(characterName, baseSharedAsset);
+        baseAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(baseAsset, characterAssetPath);
+        log?.Invoke($"[PlayerArchetype] Base skeletal asset ready: {characterAssetPath}");
 
         context?.Report("Player Archetype", "Bake animation clips/controller", 0.14f);
         var buildContext = L2SkeletalAnimatorPrefabBuilder.CreateBuildContext(clientRoot);
@@ -126,28 +153,23 @@ internal static class PlayerCharacterArchetypeBuilder
         archetype.BaseAsset = baseAsset;
         archetype.AnimatorController = controller;
         archetype.Slots = slots;
-
-        var archetypeFolder = $"{PlayerCharacterImportBuilder.PrefabOutputRoot}/Archetypes/{baseAppearance.BaseClass}/{baseAppearance.Gender}";
-        var archetypeAssetPath = L2AssetManager.BuildAssetPathInFolder(
-            archetypeFolder,
-            "PCA",
-            skeletonObjectName,
-            "asset",
-            "archetype");
-        archetype = UnityAssetDatabaseUtility.CreateOrReplaceAsset(archetype, archetypeAssetPath);
+        archetype = UnityAssetDatabaseUtility.CreateAssetIfMissing(archetype, archetypeAssetPath);
 
         context?.Report("Player Archetype", "Create wardrobe prefab", 0.96f);
-        var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
-            PlayerCharacterImportBuilder.PrefabOutputRoot,
-            referenceText,
-            "PF",
-            "prefab",
-            "PlayerCharacterPrefabs",
-            "wardrobe");
         CreateWardrobePrefab(baseAsset, archetype, prefabPath, characterName, log);
 
         AssetDatabase.SaveAssets();
 
+        InstantiatePrefabIfAvailable(prefabPath, log);
+
+        importStopwatch.Stop();
+        log?.Invoke($"[PlayerArchetype/Timing] Total archetype import took {importStopwatch.Elapsed.TotalSeconds:F2}s");
+        context?.Report("Player Archetype", "Done", 1f);
+        return new ImportResult(prefabPath, archetypeAssetPath);
+    }
+
+    private static void InstantiatePrefabIfAvailable(string prefabPath, Action<string> log)
+    {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (prefab != null)
         {
@@ -159,11 +181,6 @@ internal static class PlayerCharacterArchetypeBuilder
                 log?.Invoke("[PlayerArchetype] Wardrobe prefab instantiated into the current scene and selected.");
             }
         }
-
-        importStopwatch.Stop();
-        log?.Invoke($"[PlayerArchetype/Timing] Total archetype import took {importStopwatch.Elapsed.TotalSeconds:F2}s");
-        context?.Report("Player Archetype", "Done", 1f);
-        return new ImportResult(prefabPath, archetypeAssetPath);
     }
 
     private static readonly Dictionary<string, Dictionary<string, string>> SkeletalPackageIndexCache =
@@ -224,7 +241,10 @@ internal static class PlayerCharacterArchetypeBuilder
             SceneCharacterPaperdollSlot.Chest,
             SceneCharacterPaperdollSlot.Legs,
             SceneCharacterPaperdollSlot.Gloves,
-            SceneCharacterPaperdollSlot.Feet
+            SceneCharacterPaperdollSlot.Feet,
+            SceneCharacterPaperdollSlot.RightHand,
+            SceneCharacterPaperdollSlot.LeftHand,
+            SceneCharacterPaperdollSlot.LeftRightHand
         };
 
         foreach (var part in baseAppearance?.Parts ?? Array.Empty<SceneCharacterResolvedPartData>())
@@ -269,6 +289,11 @@ internal static class PlayerCharacterArchetypeBuilder
 
             foreach (var item in slot?.Items ?? Array.Empty<SceneCharacterEquipmentCatalogItemData>())
             {
+                if (!PlayerCharacterSlotCatalogBuilder.CanBuildEquipmentItem(slot.Slot, item))
+                {
+                    continue;
+                }
+
                 foreach (var mesh in item?.MeshResources ?? Array.Empty<SceneResourceReference>())
                 {
                     if (mesh != null)
@@ -325,7 +350,7 @@ internal static class PlayerCharacterArchetypeBuilder
         {
             foreach (var item in slot?.Items ?? Array.Empty<SceneCharacterEquipmentCatalogItemData>())
             {
-                if (item == null || !item.IsRenderableWithCurrentAppearanceBuilder)
+                if (!PlayerCharacterSlotCatalogBuilder.CanBuildEquipmentItem(slot.Slot, item))
                 {
                     continue;
                 }
@@ -403,6 +428,6 @@ internal static class PlayerCharacterArchetypeBuilder
                 EditorUtility.SetDirty(build.Animator);
                 EditorUtility.SetDirty(build.Root);
             });
-        log?.Invoke($"[PlayerArchetype] Wardrobe prefab updated: {prefabPath}");
+        log?.Invoke($"[PlayerArchetype] Wardrobe prefab ready: {prefabPath}");
     }
 }

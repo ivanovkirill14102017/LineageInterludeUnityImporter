@@ -20,6 +20,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         public Dictionary<string, SceneSkeletalAsset> PartAssetCache;
         public Dictionary<string, Mesh> MeshAssetCache;
         public MapImportExecutionContext Context;
+        public string AssetOutputRoot;
         public Action<string> Log;
     }
 
@@ -40,7 +41,10 @@ internal static class PlayerCharacterSlotCatalogBuilder
             BuildEquipmentSlot(SceneCharacterPaperdollSlot.Chest, args, progress),
             BuildEquipmentSlot(SceneCharacterPaperdollSlot.Legs, args, progress),
             BuildEquipmentSlot(SceneCharacterPaperdollSlot.Gloves, args, progress),
-            BuildEquipmentSlot(SceneCharacterPaperdollSlot.Feet, args, progress)
+            BuildEquipmentSlot(SceneCharacterPaperdollSlot.Feet, args, progress),
+            BuildEquipmentSlot(SceneCharacterPaperdollSlot.RightHand, args, progress),
+            BuildEquipmentSlot(SceneCharacterPaperdollSlot.LeftHand, args, progress),
+            BuildEquipmentSlot(SceneCharacterPaperdollSlot.LeftRightHand, args, progress)
         };
     }
 
@@ -104,7 +108,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
     {
         var variants = new List<L2CharacterVariantData>();
         var basePart = args.BaseAppearance?.Parts?.FirstOrDefault(x => x != null && x.Slot == slot);
-        if (basePart != null)
+        if (basePart != null && !IsWeaponSlot(slot))
         {
             variants.Add(BuildVariant(
                 slot.ToString(),
@@ -121,7 +125,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         var items = args.EquipmentCatalog?.Slots?
             .FirstOrDefault(x => x.Slot == slot)?
             .Items?
-            .Where(x => x != null && x.IsRenderableWithCurrentAppearanceBuilder)
+            .Where(x => CanBuildEquipmentItem(slot, x))
             .ToArray() ?? Array.Empty<SceneCharacterEquipmentCatalogItemData>();
         foreach (var item in items)
         {
@@ -145,7 +149,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         };
     }
 
-    private static L2CharacterVariantData BuildVariant(
+    internal static L2CharacterVariantData BuildVariant(
         string slotName,
         string displayName,
         string variantKey,
@@ -156,7 +160,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         BuildArgs args,
         VariantBuildProgress progress)
     {
-        progress.Report(args.Context, slotName, displayName);
+        progress?.Report(args.Context, slotName, displayName);
         var parts = new List<L2CharacterVariantPartData>();
         var textures = textureResources?.Where(x => x != null && !string.IsNullOrWhiteSpace(x.Reference)).ToArray()
                        ?? Array.Empty<SceneResourceReference>();
@@ -173,7 +177,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
                 sharedAsset);
             ApplyPartTextureOverrides(tempAsset, textures, i, args.BuildContext);
 
-            var derivedAssetRoot = BuildDerivedAssetRoot(location);
+            var derivedAssetRoot = BuildDerivedAssetRoot(location, args.AssetOutputRoot);
             var variantToken = BuildDerivedVariantToken(slotName, variantKey, i);
             var materials = CreatureSkeletalMaterialImporter.CreateMaterials(
                 tempAsset,
@@ -250,17 +254,17 @@ internal static class PlayerCharacterSlotCatalogBuilder
             tempAsset.MeshObjectName ?? tempAsset.CharacterName ?? "Mesh",
             "asset",
             $"{materialPrefix}_mesh");
-        mesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(mesh, meshAssetPath);
+        mesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(mesh, meshAssetPath);
         cache[meshKey] = mesh;
         return mesh;
     }
 
-    private static string BuildDerivedAssetRoot(SceneResourceLocation location)
+    private static string BuildDerivedAssetRoot(SceneResourceLocation location, string assetOutputRoot)
     {
         var packageName = Path.GetFileNameWithoutExtension(location?.PackagePath);
         var objectName = location?.ObjectName ?? "DerivedMesh";
         var objectRoot = L2AssetManager.BuildClientPackageObjectRoot(
-            PlayerCharacterImportBuilder.AssetOutputRoot,
+            string.IsNullOrWhiteSpace(assetOutputRoot) ? PlayerCharacterImportBuilder.AssetOutputRoot : assetOutputRoot,
             packageName,
             objectName,
             "PlayerCharacterParts");
@@ -401,6 +405,9 @@ internal static class PlayerCharacterSlotCatalogBuilder
         count += CountEquipmentVariants(SceneCharacterPaperdollSlot.Legs, baseAppearance, equipmentCatalog);
         count += CountEquipmentVariants(SceneCharacterPaperdollSlot.Gloves, baseAppearance, equipmentCatalog);
         count += CountEquipmentVariants(SceneCharacterPaperdollSlot.Feet, baseAppearance, equipmentCatalog);
+        count += CountEquipmentVariants(SceneCharacterPaperdollSlot.RightHand, baseAppearance, equipmentCatalog);
+        count += CountEquipmentVariants(SceneCharacterPaperdollSlot.LeftHand, baseAppearance, equipmentCatalog);
+        count += CountEquipmentVariants(SceneCharacterPaperdollSlot.LeftRightHand, baseAppearance, equipmentCatalog);
         return Math.Max(1, count);
     }
 
@@ -409,15 +416,39 @@ internal static class PlayerCharacterSlotCatalogBuilder
         SceneCharacterAppearanceData baseAppearance,
         SceneCharacterEquipmentCatalogData equipmentCatalog)
     {
-        var count = baseAppearance?.Parts?.Any(x => x != null && x.Slot == slot) == true ? 1 : 0;
+        var count = !IsWeaponSlot(slot) && baseAppearance?.Parts?.Any(x => x != null && x.Slot == slot) == true ? 1 : 0;
         count += equipmentCatalog?.Slots?
             .FirstOrDefault(x => x.Slot == slot)?
             .Items?
-            .Count(x => x != null && x.IsRenderableWithCurrentAppearanceBuilder) ?? 0;
+            .Count(x => CanBuildEquipmentItem(slot, x)) ?? 0;
         return count;
     }
 
-    private sealed class VariantBuildProgress
+    internal static bool CanBuildEquipmentItem(SceneCharacterPaperdollSlot slot, SceneCharacterEquipmentCatalogItemData item)
+    {
+        if (item == null)
+        {
+            return false;
+        }
+
+        if (item.IsRenderableWithCurrentAppearanceBuilder)
+        {
+            return true;
+        }
+
+        return IsWeaponSlot(slot) &&
+               (item.MeshResources ?? Array.Empty<SceneResourceReference>())
+               .Any(x => x != null && !string.IsNullOrWhiteSpace(x.Reference));
+    }
+
+    internal static bool IsWeaponSlot(SceneCharacterPaperdollSlot slot)
+    {
+        return slot == SceneCharacterPaperdollSlot.RightHand ||
+               slot == SceneCharacterPaperdollSlot.LeftHand ||
+               slot == SceneCharacterPaperdollSlot.LeftRightHand;
+    }
+
+    internal sealed class VariantBuildProgress
     {
         private readonly int _total;
         private int _completed;

@@ -33,6 +33,11 @@ internal static class L2ModularCharacterPrefabFactory
             throw new ArgumentNullException(nameof(customize));
         }
 
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
+        {
+            return;
+        }
+
         var asset = archetype.BaseAsset;
         var session = L2SceneSkeletalAssetBridge.CreateSession(asset);
         var bindFrame = session.CaptureBindPoseDebugFrame();
@@ -46,7 +51,7 @@ internal static class L2ModularCharacterPrefabFactory
 
             var boneTransforms = CreatureSkeletalImportUtility.CreateBoneHierarchy(asset.Bones, bonePoses, skeletonRoot);
             var rootBone = CreatureSkeletalImportUtility.ResolveRootBone(asset.Bones, boneTransforms);
-            var slotBindings = BuildSlotBindings(root.transform, archetype.Slots);
+            var slotBindings = BuildSlotBindings(root.transform, archetype.Slots, boneTransforms);
 
             var animator = root.AddComponent<Animator>();
             animator.runtimeAnimatorController = archetype.AnimatorController;
@@ -76,7 +81,8 @@ internal static class L2ModularCharacterPrefabFactory
 
     private static L2ModularSkeletalCharacterBehaviour.SlotBinding[] BuildSlotBindings(
         Transform root,
-        IEnumerable<L2CharacterSlotCatalogData> slots)
+        IEnumerable<L2CharacterSlotCatalogData> slots,
+        IReadOnlyList<Transform> bones)
     {
         var slotNames = (slots ?? Array.Empty<L2CharacterSlotCatalogData>())
             .Where(x => x != null && !string.IsNullOrWhiteSpace(x.SlotName))
@@ -87,7 +93,7 @@ internal static class L2ModularCharacterPrefabFactory
         foreach (var slotName in slotNames)
         {
             var slotRoot = new GameObject(slotName).transform;
-            slotRoot.SetParent(root, false);
+            slotRoot.SetParent(ResolveSlotParent(root, slotName, bones), false);
             bindings.Add(new L2ModularSkeletalCharacterBehaviour.SlotBinding
             {
                 SlotName = slotName,
@@ -97,4 +103,92 @@ internal static class L2ModularCharacterPrefabFactory
 
         return bindings.ToArray();
     }
+
+    private static Transform ResolveSlotParent(Transform root, string slotName, IReadOnlyList<Transform> bones)
+    {
+        if (string.Equals(slotName, "RightHand", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(slotName, "LeftRightHand", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(slotName, "Weapon", StringComparison.OrdinalIgnoreCase))
+        {
+            return FindBone(bones, RightHandBoneNames) ?? root;
+        }
+
+        if (string.Equals(slotName, "LeftHand", StringComparison.OrdinalIgnoreCase))
+        {
+            return FindBone(bones, LeftHandBoneNames) ?? root;
+        }
+
+        return root;
+    }
+
+    private static Transform FindBone(IReadOnlyList<Transform> bones, IReadOnlyList<string> candidateNames)
+    {
+        if (bones == null || candidateNames == null)
+        {
+            return null;
+        }
+
+        foreach (var candidate in candidateNames)
+        {
+            var normalizedCandidate = NormalizeBoneName(candidate);
+            var exact = bones.FirstOrDefault(x => string.Equals(NormalizeBoneName(x?.name), normalizedCandidate, StringComparison.OrdinalIgnoreCase));
+            if (exact != null)
+            {
+                return exact;
+            }
+        }
+
+        foreach (var candidate in candidateNames)
+        {
+            var normalizedCandidate = NormalizeBoneName(candidate);
+            var partial = bones.FirstOrDefault(x => NormalizeBoneName(x?.name).Contains(normalizedCandidate));
+            if (partial != null)
+            {
+                return partial;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeBoneName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+    }
+
+    private static readonly string[] RightHandBoneNames =
+    {
+        "rhand",
+        "r hand",
+        "right hand",
+        "bip01 r hand",
+        "bip01 rhand",
+        "bip01 right hand",
+        "hand r",
+        "hand right",
+        "weapon r",
+        "rightweapon"
+    };
+
+    private static readonly string[] LeftHandBoneNames =
+    {
+        "lhand",
+        "l hand",
+        "left hand",
+        "bip01 l hand",
+        "bip01 lhand",
+        "bip01 left hand",
+        "hand l",
+        "hand left",
+        "weapon l",
+        "leftweapon"
+    };
 }

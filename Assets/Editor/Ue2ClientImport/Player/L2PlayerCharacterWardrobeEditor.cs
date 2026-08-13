@@ -19,6 +19,9 @@ public sealed class L2PlayerCharacterWardrobeEditor : Editor
         DrawSlotPopup(wardrobe, "Legs", nameof(L2PlayerCharacterWardrobe.SelectedLegsIndex));
         DrawSlotPopup(wardrobe, "Gloves", nameof(L2PlayerCharacterWardrobe.SelectedGlovesIndex));
         DrawSlotPopup(wardrobe, "Feet", nameof(L2PlayerCharacterWardrobe.SelectedFeetIndex));
+        DrawSlotPopup(wardrobe, "RightHand", nameof(L2PlayerCharacterWardrobe.SelectedRightHandIndex), "Right Weapon");
+        DrawSlotPopup(wardrobe, "LeftHand", nameof(L2PlayerCharacterWardrobe.SelectedLeftHandIndex), "Left Weapon");
+        DrawSlotPopup(wardrobe, "LeftRightHand", nameof(L2PlayerCharacterWardrobe.SelectedLeftRightHandIndex), "Two-Hand Weapon");
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -45,18 +48,18 @@ public sealed class L2PlayerCharacterWardrobeEditor : Editor
         }
     }
 
-    private void DrawSlotPopup(L2PlayerCharacterWardrobe wardrobe, string slotName, string propertyName)
+    private void DrawSlotPopup(L2PlayerCharacterWardrobe wardrobe, string slotName, string propertyName, string label = null)
     {
         var labels = wardrobe.GetVariantDisplayNames(slotName);
         if (labels.Length == 0)
         {
-            EditorGUILayout.LabelField(slotName, "<none>");
+            EditorGUILayout.LabelField(label ?? slotName, "<none>");
             return;
         }
 
         var property = serializedObject.FindProperty(propertyName);
         var current = Mathf.Clamp(property.intValue, 0, labels.Length - 1);
-        var next = EditorGUILayout.Popup(slotName, current, labels);
+        var next = EditorGUILayout.Popup(label ?? slotName, current, labels);
         if (next != current)
         {
             property.intValue = next;

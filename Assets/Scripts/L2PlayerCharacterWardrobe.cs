@@ -12,6 +12,9 @@ public sealed class L2PlayerCharacterWardrobe : L2ModularSkeletalCharacterBehavi
     public int SelectedLegsIndex;
     public int SelectedGlovesIndex;
     public int SelectedFeetIndex;
+    public int SelectedRightHandIndex;
+    public int SelectedLeftHandIndex;
+    public int SelectedLeftRightHandIndex;
 
     protected override L2ModularCharacterArchetypeAssetBase GetArchetype()
     {
@@ -38,6 +41,9 @@ public sealed class L2PlayerCharacterWardrobe : L2ModularSkeletalCharacterBehavi
             "Legs" => SelectedLegsIndex,
             "Gloves" => SelectedGlovesIndex,
             "Feet" => SelectedFeetIndex,
+            "RightHand" => SelectedRightHandIndex,
+            "LeftHand" => SelectedLeftHandIndex,
+            "LeftRightHand" => SelectedLeftRightHandIndex,
             _ => 0
         };
     }
@@ -63,6 +69,15 @@ public sealed class L2PlayerCharacterWardrobe : L2ModularSkeletalCharacterBehavi
                 break;
             case "Feet":
                 SelectedFeetIndex = index;
+                break;
+            case "RightHand":
+                SelectedRightHandIndex = index;
+                break;
+            case "LeftHand":
+                SelectedLeftHandIndex = index;
+                break;
+            case "LeftRightHand":
+                SelectedLeftRightHandIndex = index;
                 break;
         }
     }

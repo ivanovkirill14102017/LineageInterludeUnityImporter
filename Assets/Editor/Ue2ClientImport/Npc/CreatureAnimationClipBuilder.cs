@@ -122,9 +122,9 @@ internal static class CreatureAnimationClipBuilder
                 "AN",
                 "anim",
                 "SkeletalAnimations");
-            var clipAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(clip, clipPath);
+            var clipAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(clip, clipPath);
             clipInfos.Add(new ClipBuildInfo(clipPath, clipAsset));
-            log?.Invoke($"[SkinnedPOC] AnimationClip updated: {clipPath}");
+            log?.Invoke($"[SkinnedPOC] AnimationClip ready: {clipPath}");
         }
 
         notes = clipInfos.Count > 0

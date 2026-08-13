@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
 using L2Viewer.SceneDomain.Services.CharacterServices;
+using L2Viewer.SceneDomain.Services.Utility;
 using UnityEditor;
 using UnityEngine;
 
@@ -72,7 +73,7 @@ internal static class CreatureMapImporter
         creatureRoot.transform.SetParent(mapRoot.transform, false);
 
         context?.Report("Creatures", "Build prefab cache", 0.20f);
-        var prefabCache = BuildPrefabCache(selectedSpawns, source.ClientPath, log, context);
+        var prefabCache = BuildPrefabCache(selectedSpawns, source.ClientPath, dbRootPath, log, context);
         context?.Report("Creatures", "Place spawn instances", 0.92f);
         var placementStopwatch = Stopwatch.StartNew();
         PlaceSpawns(selectedSpawns, creatureRoot, prefabCache, log);
@@ -92,14 +93,17 @@ internal static class CreatureMapImporter
     private static Dictionary<string, GameObject> BuildPrefabCache(
         IReadOnlyList<SceneCreatureSpawnData> spawns,
         string clientRoot,
+        string dbRootPath,
         Action<string> log,
         MapImportExecutionContext context)
     {
         var resolver = new SceneSkeletalMeshResolver();
         var buildContext = L2SkeletalAnimatorPrefabBuilder.CreateBuildContext(clientRoot);
+        var weaponCatalog = CreatureWeaponCatalog.Build(clientRoot, dbRootPath, log);
+        var packageIndex = ScenePackageIndexer.BuildResourcePackageIndex(clientRoot);
         var prefabCache = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
         var prefabPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var preparedBuilds = new List<(string PrefabKey, string DisplayName, L2SkeletalAnimatorPrefabBuilder.PreparedBuildData Build)>();
+        var preparedBuilds = new List<(string PrefabKey, string DisplayName, SceneCreatureSpawnData Spawn, L2SkeletalAnimatorPrefabBuilder.PreparedBuildData Build)>();
         var texturePlansByReference = new Dictionary<string, CreatureSkeletalMaterialImporter.TextureImportPlan>(StringComparer.OrdinalIgnoreCase);
         var uniquePrefabs = spawns
             .Where(x => x != null && x.MeshResource != null && !string.IsNullOrWhiteSpace(x.MeshResource.PackagePath) && !string.IsNullOrWhiteSpace(x.MeshResource.ObjectName))
@@ -123,16 +127,11 @@ internal static class CreatureMapImporter
                     ComputeProgress(0.20f, 0.52f, preparedBuilds.Count + prefabPaths.Count, uniquePrefabs.Length));
                 var expectedPrefabPath = BuildPrefabPath(spawn);
                 var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(expectedPrefabPath);
-                if (existingPrefab != null && ShouldReuseExistingPrefab(existingPrefab, spawn))
+                if (existingPrefab != null)
                 {
                     prefabPaths[prefabKey] = expectedPrefabPath;
                     log($"[Creatures] Reusing existing prefab for '{spawn.DisplayName}': {expectedPrefabPath}");
                     continue;
-                }
-
-                if (existingPrefab != null)
-                {
-                    log($"[Creatures] Rebuilding prefab for '{spawn.DisplayName}' because cached materials are invalid or stale.");
                 }
 
                 var resolveStart = Stopwatch.StartNew();
@@ -170,7 +169,7 @@ internal static class CreatureMapImporter
                     }
                 }
 
-                preparedBuilds.Add((prefabKey, spawn.DisplayName, prepared));
+                preparedBuilds.Add((prefabKey, spawn.DisplayName, spawn, prepared));
             }
             catch (Exception ex)
             {
@@ -211,7 +210,7 @@ internal static class CreatureMapImporter
                     var preparedWithMaterials = L2SkeletalAnimatorPrefabBuilder.MaterializePreparedBuildMaterials(
                         preparedBuilds[i].Build,
                         log);
-                    preparedBuilds[i] = (preparedBuilds[i].PrefabKey, preparedBuilds[i].DisplayName, preparedWithMaterials);
+                    preparedBuilds[i] = (preparedBuilds[i].PrefabKey, preparedBuilds[i].DisplayName, preparedBuilds[i].Spawn, preparedWithMaterials);
                 }
                 catch (Exception ex)
                 {
@@ -231,12 +230,21 @@ internal static class CreatureMapImporter
                 context?.ThrowIfCancellationRequested();
                 try
                 {
+                    var weaponSlots = BuildCreatureWeaponSlots(
+                        preparedBuilds[i].Build,
+                        preparedBuilds[i].Spawn,
+                        clientRoot,
+                        packageIndex,
+                        weaponCatalog,
+                        log,
+                        context);
                     var build = L2SkeletalAnimatorPrefabBuilder.CompletePreparedBuild(
                         preparedBuilds[i].Build,
                         prefabNameSuffix: null,
                         displayLabel: preparedBuilds[i].DisplayName,
                         log,
-                        finalizeAssets: false);
+                        finalizeAssets: false,
+                        extraSlots: weaponSlots);
                     prefabPaths[preparedBuilds[i].PrefabKey] = build.PrefabPath;
                 }
                 catch (Exception ex)
@@ -334,6 +342,133 @@ internal static class CreatureMapImporter
             binding.TextureReference = textureRefs[i];
             binding.ResolvedPackagePath = spawn.TextureResources[i]?.PackagePath ?? string.Empty;
         }
+    }
+
+    private static IReadOnlyList<L2CharacterSlotCatalogData> BuildCreatureWeaponSlots(
+        L2SkeletalAnimatorPrefabBuilder.PreparedBuildData prepared,
+        SceneCreatureSpawnData spawn,
+        string clientRoot,
+        IReadOnlyDictionary<string, string> packageIndex,
+        CreatureWeaponCatalog weaponCatalog,
+        Action<string> log,
+        MapImportExecutionContext context)
+    {
+        if (prepared?.SharedAsset == null || spawn == null || weaponCatalog == null)
+        {
+            return Array.Empty<L2CharacterSlotCatalogData>();
+        }
+
+        var slots = new Dictionary<string, L2CharacterSlotCatalogData>(StringComparer.OrdinalIgnoreCase);
+        AddCreatureWeaponSlot(
+            slots,
+            SceneCharacterPaperdollSlot.RightHand,
+            spawn.RightHandItemId,
+            prepared,
+            clientRoot,
+            packageIndex,
+            weaponCatalog,
+            log,
+            context);
+        AddCreatureWeaponSlot(
+            slots,
+            SceneCharacterPaperdollSlot.LeftHand,
+            spawn.LeftHandItemId,
+            prepared,
+            clientRoot,
+            packageIndex,
+            weaponCatalog,
+            log,
+            context);
+
+        return slots.Values.ToArray();
+    }
+
+    private static void AddCreatureWeaponSlot(
+        IDictionary<string, L2CharacterSlotCatalogData> slots,
+        SceneCharacterPaperdollSlot sourceSlot,
+        int itemId,
+        L2SkeletalAnimatorPrefabBuilder.PreparedBuildData prepared,
+        string clientRoot,
+        IReadOnlyDictionary<string, string> packageIndex,
+        CreatureWeaponCatalog weaponCatalog,
+        Action<string> log,
+        MapImportExecutionContext context)
+    {
+        if (itemId <= 0 || !weaponCatalog.TryGet(itemId, out var item))
+        {
+            return;
+        }
+
+        var slot = ResolveCreatureWeaponSlot(sourceSlot, item);
+        var slotName = slot.ToString();
+        if (slots.ContainsKey(slotName))
+        {
+            return;
+        }
+
+        try
+        {
+            CreatureSkeletalMaterialImporter.PreloadTextureReferences(
+                (item.TextureResources ?? Array.Empty<SceneResourceReference>())
+                .Where(x => !string.IsNullOrWhiteSpace(x?.Reference))
+                .Select(x => x.Reference),
+                log,
+                prepared.Context);
+            var variant = PlayerCharacterSlotCatalogBuilder.BuildVariant(
+                slotName,
+                $"{item.ItemId} {item.DisplayName}",
+                $"{slotName.ToLowerInvariant()}_{item.ItemId}",
+                item.ItemId,
+                -1,
+                item.MeshResources,
+                item.TextureResources,
+                new PlayerCharacterSlotCatalogBuilder.BuildArgs
+                {
+                    ClientRoot = clientRoot,
+                    BaseSharedAsset = prepared.SharedAsset,
+                    PackageIndex = packageIndex,
+                    BuildContext = prepared.Context,
+                    PartAssetCache = new Dictionary<string, SceneSkeletalAsset>(StringComparer.OrdinalIgnoreCase),
+                    MeshAssetCache = new Dictionary<string, Mesh>(StringComparer.OrdinalIgnoreCase),
+                    Context = context,
+                    AssetOutputRoot = L2AssetManager.SharedSkeletalCharactersRoot,
+                    Log = log
+                },
+                progress: null);
+            slots[slotName] = new L2CharacterSlotCatalogData
+            {
+                SlotName = slotName,
+                DefaultVariantIndex = 0,
+                Variants = new[] { variant }
+            };
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"[Creatures] Failed to build weapon {itemId} for '{prepared.CharacterName}': {ex.Message}");
+        }
+    }
+
+    private static SceneCharacterPaperdollSlot ResolveCreatureWeaponSlot(
+        SceneCharacterPaperdollSlot sourceSlot,
+        SceneCharacterEquipmentCatalogItemData item)
+    {
+        var paperdollSlots = item?.PaperdollSlots ?? Array.Empty<SceneCharacterPaperdollSlot>();
+        if (paperdollSlots.Contains(SceneCharacterPaperdollSlot.LeftRightHand))
+        {
+            return SceneCharacterPaperdollSlot.LeftRightHand;
+        }
+
+        if (paperdollSlots.Contains(SceneCharacterPaperdollSlot.LeftHand))
+        {
+            return SceneCharacterPaperdollSlot.LeftHand;
+        }
+
+        if (paperdollSlots.Contains(SceneCharacterPaperdollSlot.RightHand))
+        {
+            return SceneCharacterPaperdollSlot.RightHand;
+        }
+
+        return sourceSlot;
     }
 
     private static bool TrySplitReference(string reference, out string packageName, out string objectName)
@@ -490,10 +625,11 @@ internal static class CreatureMapImporter
 
     private static string BuildPrefabKey(SceneCreatureSpawnData spawn)
     {
-        return spawn?.MeshResource?.Reference
+        var visualKey = spawn?.MeshResource?.Reference
             ?? spawn?.MeshResource?.ObjectName
             ?? spawn?.VisualKey
             ?? string.Empty;
+        return $"{visualKey}|rhand={spawn?.RightHandItemId ?? 0}|lhand={spawn?.LeftHandItemId ?? 0}";
     }
 
     private static string BuildPrefabPath(SceneCreatureSpawnData spawn)
@@ -503,7 +639,17 @@ internal static class CreatureMapImporter
             spawn.MeshResource.Reference,
             "PF",
             "prefab",
-            "CreaturePrefabs");
+            "CreaturePrefabs",
+            BuildWeaponPrefabSuffix(spawn));
+    }
+
+    private static string BuildWeaponPrefabSuffix(SceneCreatureSpawnData spawn)
+    {
+        var rightHandItemId = spawn?.RightHandItemId ?? 0;
+        var leftHandItemId = spawn?.LeftHandItemId ?? 0;
+        return rightHandItemId <= 0 && leftHandItemId <= 0
+            ? null
+            : $"weapon_r{rightHandItemId}_l{leftHandItemId}";
     }
 
     private static string BuildCreatureCharacterAssetPath(SceneCreatureSpawnData spawn)
@@ -521,5 +667,65 @@ internal static class CreatureMapImporter
             objectName ?? "SkeletalCharacter",
             "asset",
             "skeleton");
+    }
+
+    private sealed class CreatureWeaponCatalog
+    {
+        private readonly Dictionary<int, SceneCharacterEquipmentCatalogItemData> _itemsById;
+
+        private CreatureWeaponCatalog(Dictionary<int, SceneCharacterEquipmentCatalogItemData> itemsById)
+        {
+            _itemsById = itemsById ?? new Dictionary<int, SceneCharacterEquipmentCatalogItemData>();
+        }
+
+        public static CreatureWeaponCatalog Build(string clientRoot, string dbRootPath, Action<string> log)
+        {
+            if (string.IsNullOrWhiteSpace(clientRoot) || string.IsNullOrWhiteSpace(dbRootPath))
+            {
+                return new CreatureWeaponCatalog(new Dictionary<int, SceneCharacterEquipmentCatalogItemData>());
+            }
+
+            try
+            {
+                var catalog = new SceneCharacterEquipmentCatalogBuilder().Build(
+                    clientRoot,
+                    dbRootPath,
+                    SceneCharacterBaseClass.HumanFighter,
+                    SceneCharacterGender.Male);
+                var items = new Dictionary<int, SceneCharacterEquipmentCatalogItemData>();
+                foreach (var slot in catalog?.Slots ?? Array.Empty<SceneCharacterEquipmentCatalogSlotData>())
+                {
+                    if (slot == null || !PlayerCharacterSlotCatalogBuilder.IsWeaponSlot(slot.Slot))
+                    {
+                        continue;
+                    }
+
+                    foreach (var item in slot.Items ?? Array.Empty<SceneCharacterEquipmentCatalogItemData>())
+                    {
+                        if (item == null ||
+                            item.ItemId <= 0 ||
+                            !PlayerCharacterSlotCatalogBuilder.CanBuildEquipmentItem(slot.Slot, item))
+                        {
+                            continue;
+                        }
+
+                        items[item.ItemId] = item;
+                    }
+                }
+
+                log?.Invoke($"[Creatures] Loaded {items.Count} weapon visuals from equipment catalog.");
+                return new CreatureWeaponCatalog(items);
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"[Creatures] Failed to load weapon visual catalog: {ex.Message}");
+                return new CreatureWeaponCatalog(new Dictionary<int, SceneCharacterEquipmentCatalogItemData>());
+            }
+        }
+
+        public bool TryGet(int itemId, out SceneCharacterEquipmentCatalogItemData item)
+        {
+            return _itemsById.TryGetValue(itemId, out item);
+        }
     }
 }

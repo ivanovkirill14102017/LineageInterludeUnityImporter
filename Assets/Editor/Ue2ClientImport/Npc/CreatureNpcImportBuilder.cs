@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
 using L2Viewer.SceneDomain.Services.CharacterServices;
@@ -56,7 +57,7 @@ internal static class CreatureNpcImportBuilder
             prefabNameSuffix: null,
             displayLabel: characterName,
             log);
-        log($"Prefab updated: {result.PrefabPath}");
+        log($"Prefab ready: {result.PrefabPath}");
 
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(result.PrefabPath);
         if (prefab != null)
@@ -98,7 +99,7 @@ internal static class CreatureNpcImportBuilder
             prefabNameSuffix: null,
             displayLabel: characterName,
             log);
-        log?.Invoke($"Prefab updated: {result.PrefabPath}");
+        log?.Invoke($"Prefab ready: {result.PrefabPath}");
 
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(result.PrefabPath);
         if (prefab != null)
@@ -179,6 +180,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             string assetRoot,
             string characterName,
             string characterAssetPath,
+            SceneSkeletalAsset sharedAsset,
             L2SkeletalCharacterAsset characterAsset,
             Material[] materials,
             BuildContext context)
@@ -188,6 +190,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             AssetRoot = assetRoot;
             CharacterName = characterName;
             CharacterAssetPath = characterAssetPath;
+            SharedAsset = sharedAsset;
             CharacterAsset = characterAsset;
             Materials = materials ?? Array.Empty<Material>();
             Context = context;
@@ -198,6 +201,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         public string AssetRoot { get; }
         public string CharacterName { get; }
         public string CharacterAssetPath { get; }
+        public SceneSkeletalAsset SharedAsset { get; }
         public L2SkeletalCharacterAsset CharacterAsset { get; }
         public Material[] Materials { get; }
         public BuildContext Context { get; }
@@ -372,8 +376,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             sharedAsset.MeshObjectName ?? characterName,
             "asset",
             "skeleton");
-        characterAsset = UnityAssetDatabaseUtility.CreateOrReplaceAsset(characterAsset, characterAssetPath);
-        log?.Invoke($"[CreatureAnimator] Character asset updated: {characterAssetPath}");
+        characterAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(characterAsset, characterAssetPath);
+        log?.Invoke($"[CreatureAnimator] Character asset ready: {characterAssetPath}");
 
         var materials = includeMaterials
             ? CreatureSkeletalMaterialImporter.CreateMaterials(
@@ -389,6 +393,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             assetObjectRoot,
             characterName,
             characterAssetPath,
+            sharedAsset,
             characterAsset,
             materials,
             activeContext);
@@ -415,6 +420,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             prepared.AssetRoot,
             prepared.CharacterName,
             prepared.CharacterAssetPath,
+            prepared.SharedAsset,
             prepared.CharacterAsset,
             materials,
             prepared.Context);
@@ -426,7 +432,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         string displayLabel,
         Action<string> log,
         bool finalizeAssets = true,
-        string archetypeNameSuffix = null)
+        string archetypeNameSuffix = null,
+        IReadOnlyList<L2CharacterSlotCatalogData> extraSlots = null)
     {
         if (prepared == null)
         {
@@ -442,8 +449,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             characterAsset.MeshObjectName ?? prepared.CharacterName,
             "asset",
             "skinned");
-        skinnedMesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(skinnedMesh, meshPath);
-        log?.Invoke($"[CreatureAnimator] Skinned mesh updated: {meshPath}");
+        skinnedMesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(skinnedMesh, meshPath);
+        log?.Invoke($"[CreatureAnimator] Skinned mesh ready: {meshPath}");
 
         var sequenceNames = CreatureSkeletalImportUtility.GetAllSequenceNames(characterAsset);
         var clips = CreatureAnimationClipBuilder.Build(characterAsset, prepared.ReferenceText, prepared.AssetRoot, sequenceNames, log, out _);
@@ -455,7 +462,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         archetype.SkeletonUri = characterAsset.SourcePackagePath;
         archetype.BaseAsset = characterAsset;
         archetype.AnimatorController = controller;
-        archetype.Slots = new[]
+        var slots = new List<L2CharacterSlotCatalogData>
         {
             new L2CharacterSlotCatalogData
             {
@@ -478,14 +485,14 @@ internal static class L2SkeletalAnimatorPrefabBuilder
                         }
                     }
                 }
-            },
-            new L2CharacterSlotCatalogData
-            {
-                SlotName = "Weapon",
-                DefaultVariantIndex = 0,
-                Variants = Array.Empty<L2CharacterVariantData>()
             }
         };
+        if (extraSlots != null)
+        {
+            slots.AddRange(extraSlots.Where(x => x != null));
+        }
+
+        archetype.Slots = slots.ToArray();
         var archetypeAssetPath = L2AssetManager.BuildAssetPathInFolder(
             $"{prepared.PrefabRoot}/Archetypes",
             "NCA",
@@ -494,7 +501,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             string.IsNullOrWhiteSpace(archetypeNameSuffix)
                 ? "archetype"
                 : $"archetype_{archetypeNameSuffix}");
-        archetype = UnityAssetDatabaseUtility.CreateOrReplaceAsset(archetype, archetypeAssetPath);
+        archetype = UnityAssetDatabaseUtility.CreateAssetIfMissing(archetype, archetypeAssetPath);
         var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
             prepared.PrefabRoot,
             prepared.ReferenceText,
