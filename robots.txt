@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ivanovkirill14102017.github.io/LineageInterludeUnityImporter/sitemap.xml
