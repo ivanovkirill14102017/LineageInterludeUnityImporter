@@ -79,6 +79,11 @@ internal sealed class MapImporterPanel : IDisposable
                 QueueImport(ImportAllAsync);
             }
 
+            if (GUILayout.Button("Ensure Modern Skybox", GUILayout.Height(26f)))
+            {
+                QueueImport(EnsureModernSkyboxAsync);
+            }
+
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Import Terrain Only", GUILayout.Height(24f)))
@@ -212,6 +217,24 @@ internal sealed class MapImporterPanel : IDisposable
             _status = exception.ToString();
             Debug.LogException(exception);
         }
+    }
+
+    private Task EnsureModernSkyboxAsync(MapImportExecutionContext context)
+    {
+        try
+        {
+            _status = "Ready to ensure modern skybox.";
+            context?.Report("Ensure Skybox", "L2ModernSkybox", 0.5f);
+            ModernSkyboxImporter.EnsureModernSkybox(AppendStatus);
+            context?.Report("Done", "L2ModernSkybox", 1f);
+        }
+        catch (Exception exception)
+        {
+            _status = exception.ToString();
+            Debug.LogException(exception);
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task ImportMeshesAsync(MapImportExecutionContext context)

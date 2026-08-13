@@ -8,7 +8,7 @@ internal static class MapContextImporter
     public static void ImportAsync(MapImportRequest request, Ue2MapSource source, Action<string> log, bool finalizeScene = true)
     {
         var mapContextBuilder = new SceneMapContextBuilder();
-        var mapContext = mapContextBuilder.Build(source.UnrFile);
+        var mapContext = mapContextBuilder.Build(source.UnrFile, source.ClientPath);
 
         if (mapContext == null)
         {

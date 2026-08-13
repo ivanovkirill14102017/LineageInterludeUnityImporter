@@ -15,6 +15,7 @@ internal static class MapImportFinalizer
         AssetDatabase.Refresh();
 
         EnsureCameraAtmosphereRig(log);
+        ModernSkyboxImporter.EnsureModernSkybox(log);
 
         Selection.activeObject = mapRoot;
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());

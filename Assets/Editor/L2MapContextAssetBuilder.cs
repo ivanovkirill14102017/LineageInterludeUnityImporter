@@ -61,6 +61,91 @@ internal static class L2MapContextAssetBuilder
                 HasDistanceFogEnd = x.DistanceFogEnd.HasValue,
                 DistanceFogEnd = x.DistanceFogEnd ?? 0f
             }).ToArray();
+        asset.SkyZones = source.Sky?.SkyZones == null
+            ? new L2MapAtmosphereContextAsset.SkyZoneData[0]
+            : source.Sky.SkyZones.Select(x => new L2MapAtmosphereContextAsset.SkyZoneData
+            {
+                ExportIndex = x.ExportIndex,
+                StableName = x.StableName ?? string.Empty,
+                Name = x.Name ?? string.Empty,
+                ClassName = x.ClassName ?? string.Empty,
+                Tag = x.Tag ?? string.Empty,
+                HasWorldLocation = x.WorldLocation.HasValue,
+                WorldLocationUnity = x.WorldLocation.HasValue ? x.WorldLocation.Value.TransformFromUnrealToUnityWithScale() : Vector3.zero,
+                HasWorldRotation = x.WorldRotationEulerDegrees.HasValue,
+                WorldRotationEulerDegrees = x.WorldRotationEulerDegrees.HasValue ? x.WorldRotationEulerDegrees.Value.ToDirectUnityVectorWithoutModification() : Vector3.zero,
+                StaticMeshReference = x.StaticMeshReference ?? string.Empty,
+                MeshReference = x.MeshReference ?? string.Empty,
+                TextureReference = x.TextureReference ?? string.Empty,
+                HasTexUPanSpeed = x.TexUPanSpeed.HasValue,
+                TexUPanSpeed = x.TexUPanSpeed ?? 0f,
+                HasTexVPanSpeed = x.TexVPanSpeed.HasValue,
+                TexVPanSpeed = x.TexVPanSpeed ?? 0f,
+                LensFlareReferences = x.LensFlareReferences ?? new string[0],
+                LensFlareOffset = x.LensFlareOffset ?? new float[0],
+                LensFlareScale = x.LensFlareScale ?? new float[0]
+            }).ToArray();
+        asset.SkySuns = source.Sky?.Suns == null
+            ? new L2MapAtmosphereContextAsset.SkyLightData[0]
+            : source.Sky.Suns.Select(x => new L2MapAtmosphereContextAsset.SkyLightData
+            {
+                ExportIndex = x.ExportIndex,
+                StableName = x.StableName ?? string.Empty,
+                Name = x.Name ?? string.Empty,
+                ClassName = x.ClassName ?? string.Empty,
+                HasWorldLocation = x.WorldLocation.HasValue,
+                WorldLocationUnity = x.WorldLocation.HasValue ? x.WorldLocation.Value.TransformFromUnrealToUnityWithScale() : Vector3.zero,
+                HasWorldRotation = x.WorldRotationEulerDegrees.HasValue,
+                WorldRotationEulerDegrees = x.WorldRotationEulerDegrees.HasValue ? x.WorldRotationEulerDegrees.Value.ToDirectUnityVectorWithoutModification() : Vector3.zero,
+                HasRadius = x.Radius.HasValue,
+                Radius = x.Radius ?? 0f,
+                SunAffect = x.SunAffect,
+                SkinReferences = x.SkinReferences ?? new string[0]
+            }).ToArray();
+        asset.SkyMoons = source.Sky?.Moons == null
+            ? new L2MapAtmosphereContextAsset.SkyLightData[0]
+            : source.Sky.Moons.Select(x => new L2MapAtmosphereContextAsset.SkyLightData
+            {
+                ExportIndex = x.ExportIndex,
+                StableName = x.StableName ?? string.Empty,
+                Name = x.Name ?? string.Empty,
+                ClassName = x.ClassName ?? string.Empty,
+                HasWorldLocation = x.WorldLocation.HasValue,
+                WorldLocationUnity = x.WorldLocation.HasValue ? x.WorldLocation.Value.TransformFromUnrealToUnityWithScale() : Vector3.zero,
+                HasWorldRotation = x.WorldRotationEulerDegrees.HasValue,
+                WorldRotationEulerDegrees = x.WorldRotationEulerDegrees.HasValue ? x.WorldRotationEulerDegrees.Value.ToDirectUnityVectorWithoutModification() : Vector3.zero,
+                HasRadius = x.Radius.HasValue,
+                Radius = x.Radius ?? 0f,
+                SunAffect = x.SunAffect,
+                SkinReferences = x.SkinReferences ?? new string[0]
+            }).ToArray();
+        asset.SkySourceReferences = source.Sky?.SourceReferences == null
+            ? new L2MapAtmosphereContextAsset.SkySourceReferenceData[0]
+            : source.Sky.SourceReferences.Select(x => new L2MapAtmosphereContextAsset.SkySourceReferenceData
+            {
+                Role = x.Role ?? string.Empty,
+                Reference = x.Reference ?? string.Empty,
+                PackageName = x.PackageName ?? string.Empty,
+                ObjectName = x.ObjectName ?? string.Empty,
+                ClassName = x.ClassName ?? string.Empty,
+                PackagePath = x.PackagePath ?? string.Empty,
+                ClientRelativePath = x.ClientRelativePath ?? string.Empty,
+                Uri = x.Uri ?? string.Empty
+            }).ToArray();
+        asset.SkySurfaceMaterials = source.Sky?.SurfaceMaterials == null
+            ? new L2MapAtmosphereContextAsset.SkySurfaceMaterialData[0]
+            : source.Sky.SurfaceMaterials.Select(x => new L2MapAtmosphereContextAsset.SkySurfaceMaterialData
+            {
+                ModelExportIndex = x.ModelExportIndex,
+                ModelName = x.ModelName ?? string.Empty,
+                MaterialReference = x.MaterialReference ?? string.Empty,
+                PolyFlags = x.PolyFlags,
+                PolyFlagNames = x.PolyFlagNames ?? new string[0],
+                SurfaceCount = x.SurfaceCount,
+                Environment = x.Environment,
+                FakeBackdrop = x.FakeBackdrop,
+                Unlit = x.Unlit
+            }).ToArray();
 
         EditorUtility.SetDirty(asset);
         return asset;
