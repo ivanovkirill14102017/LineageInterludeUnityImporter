@@ -20,7 +20,7 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
 
     [Header("Overlay")]
     public bool DrawOverlay = true;
-    public Vector2 OverlayOffset = new Vector2(16f, 16f);
+    public Vector2 OverlayOffset = new Vector2(300f, 16f);
 
     [Header("Debug")]
     [SerializeField] private string currentMapKey = string.Empty;
@@ -399,35 +399,28 @@ public sealed class L2CameraAtmosphereProbe : MonoBehaviour
 
         var lines = new List<string>
         {
-            "L2 Camera Atmosphere Probe",
-            "Source: " + probeSource,
+            "Atmosphere",
             "Map: " + (string.IsNullOrWhiteSpace(currentMapKey) ? "<none>" : currentMapKey),
-            "Zone: " + currentZone,
-            "Leaf: " + currentLeaf,
-            "ZoneInfo: " + (currentZoneHasInfo ? "yes" : "no"),
-            "DistanceFogEnabled: " + (currentDistanceFogEnabled ? "yes" : "no"),
-            "Observed Indoor: " + (observedIndoor ? "yes" : "no"),
-            "Indoor: " + (isIndoor ? "yes" : "no"),
-            string.Format("Indoor Weight: {0:0.##}", indoorWeight),
-            string.Format("Boundary Depth: {0:0.##}", signedTransitionDepth),
-            string.Format("World Scale: {0:0.###}", worldScaleFactor),
-            string.Format("Map Avg FogEnd: {0:0.##}", mapAverageIndoorFogEnd),
-            string.Format("Active FogEnd: {0:0.##}", activeSourceFogEnd),
-            string.Format("Refresh Interval: {0:0.##} sec", ContextRefreshIntervalSeconds)
+            "Zone: " + currentZone + " / Leaf: " + currentLeaf,
+            "Indoor: " + (isIndoor ? "yes" : "no") + string.Format(" ({0:0.##})", indoorWeight),
+            "Fog: " + (currentDistanceFogEnabled ? "on" : "off") + string.Format(" / End {0:0}", activeSourceFogEnd)
         };
 
         if (!string.IsNullOrWhiteSpace(currentZoneTag))
         {
-            lines.Add("ZoneTag: " + currentZoneTag);
+            lines.Add("Tag: " + currentZoneTag);
         }
 
         var content = string.Join("\n", lines.ToArray());
         var size = GUI.skin.box.CalcSize(new GUIContent(content));
+        var offset = Application.isPlaying
+            ? new Vector2(Mathf.Max(OverlayOffset.x, 300f), Mathf.Max(OverlayOffset.y, 16f))
+            : OverlayOffset;
         var rect = new Rect(
-            OverlayOffset.x,
-            OverlayOffset.y,
-            Mathf.Max(280f, size.x + 20f),
-            Mathf.Max(120f, size.y + 20f));
+            offset.x,
+            offset.y,
+            Mathf.Max(190f, size.x + 20f),
+            Mathf.Max(70f, size.y + 20f));
         GUI.Box(rect, content);
     }
 }

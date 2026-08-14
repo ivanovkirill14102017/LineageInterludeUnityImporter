@@ -347,6 +347,9 @@ internal static class L2BspAssetBuilder
 
                     var renderer = sectionGo.AddComponent<MeshRenderer>();
                     renderer.sharedMaterial = material;
+
+                    var collider = sectionGo.AddComponent<MeshCollider>();
+                    collider.sharedMesh = mesh;
                 }
             }
         }

@@ -10,6 +10,8 @@ using UnityEngine.SceneManagement;
 internal static class MapImportSceneManager
 {
     private const string WorkspaceScenePath = "Assets/MainWorkspace.unity";
+    private const string StreamingRootName = "L2SceneStreaming";
+    private const string MapStreamingPrefix = "L2MapStreaming_";
     private const int ChunkGridSize = 10;
 
     public static Scene PrepareMapImportScene(MapImportRequest request, Action<string> log)
@@ -44,12 +46,20 @@ internal static class MapImportSceneManager
     {
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
         var chunks = BuildChunkScenes(request, mapRoot, log);
-        ConfigureLoader(mapRoot, chunks);
+        RemoveMapLocalLoader(mapRoot);
         MapImportFinalizer.Complete(mapRoot, log);
 
         EditorSceneManager.SaveScene(mapRoot.scene);
+        var configuredWorkspaceLoader = ConfigureWorkspaceLoader(request, BuildMapSceneEntry(request, mapRoot, chunks), chunks, log);
+        SaveWorkspaceScene();
         CloseChunkScenes(chunks);
-        log?.Invoke($"[Scenes] Saved map scene with {chunks.Count} chunk scene references.");
+        if (configuredWorkspaceLoader)
+        {
+            CloseMapScene(mapRoot.scene);
+        }
+        log?.Invoke(configuredWorkspaceLoader
+            ? $"[Scenes] Saved map scene with {chunks.Count} chunk scene references. Streaming is controlled from {WorkspaceScenePath}."
+            : $"[Scenes] Saved map scene with {chunks.Count} chunk scene references.");
     }
 
     private static void EnsureWorkspaceSceneOpen(Action<string> log)
@@ -110,16 +120,24 @@ internal static class MapImportSceneManager
         var layout = ChunkLayout.FromObjects(movable);
         var chunks = CreateChunkScenes(request, layout);
         var rootsByChunk = new Dictionary<(int X, int Z, string Category), Transform>();
+        var partitionedCount = 0;
+        var keptInMapSceneCount = 0;
 
         foreach (var entry in movable)
         {
-            var index = layout.ResolveIndex(entry.Bounds.center);
+            if (!layout.TryResolveSingleCell(entry.Bounds, out var index))
+            {
+                keptInMapSceneCount++;
+                continue;
+            }
+
             var chunk = chunks[(index.Z * ChunkGridSize) + index.X];
             var categoryRoot = GetOrCreateChunkCategoryRoot(chunk.ScenePath, chunk.Scene, index.X, index.Z, entry.Category, rootsByChunk);
 
             entry.GameObject.transform.SetParent(null, true);
             SceneManager.MoveGameObjectToScene(entry.GameObject, chunk.Scene);
             entry.GameObject.transform.SetParent(categoryRoot, true);
+            partitionedCount++;
         }
 
         foreach (var chunk in chunks)
@@ -127,11 +145,13 @@ internal static class MapImportSceneManager
             EditorSceneManager.SaveScene(chunk.Scene, chunk.ScenePath);
         }
 
-        log?.Invoke($"[Scenes] Partitioned {movable.Length} objects into {chunks.Count} chunk scenes.");
+        log?.Invoke($"[Scenes] Partitioned {partitionedCount} objects into {chunks.Count} chunk scenes. Kept {keptInMapSceneCount} large/cross-cell objects in the map scene.");
         return chunks
             .Select(x => new L2ChunkedMapSceneLoader.ChunkScene
             {
                 ScenePath = x.ScenePath,
+                GridX = x.X,
+                GridZ = x.Z,
                 Center = x.Bounds.center,
                 Size = x.Bounds.size
             })
@@ -148,7 +168,7 @@ internal static class MapImportSceneManager
                 var scenePath = GetChunkScenePath(request, x, z);
                 var scene = OpenOrCreateScene(scenePath);
                 var bounds = layout.GetChunkBounds(x, z);
-                result.Add(new ChunkSceneHandle(scenePath, scene, bounds));
+                result.Add(new ChunkSceneHandle(x, z, scenePath, scene, bounds));
             }
         }
 
@@ -314,20 +334,137 @@ internal static class MapImportSceneManager
         return false;
     }
 
-    private static void ConfigureLoader(GameObject mapRoot, IReadOnlyList<L2ChunkedMapSceneLoader.ChunkScene> chunks)
+    private static void RemoveMapLocalLoader(GameObject mapRoot)
     {
-        var loader = mapRoot.GetComponent<L2ChunkedMapSceneLoader>();
-        if (loader == null)
+        var loader = mapRoot != null ? mapRoot.GetComponent<L2ChunkedMapSceneLoader>() : null;
+        if (loader != null)
         {
-            loader = mapRoot.AddComponent<L2ChunkedMapSceneLoader>();
+            UnityEngine.Object.DestroyImmediate(loader);
+            EditorUtility.SetDirty(mapRoot);
+        }
+    }
+
+    private static bool ConfigureWorkspaceLoader(
+        MapImportRequest request,
+        L2ChunkedMapSceneLoader.ChunkScene mapScene,
+        IReadOnlyList<L2ChunkedMapSceneLoader.ChunkScene> chunks,
+        Action<string> log)
+    {
+        var workspace = SceneManager.GetSceneByPath(WorkspaceScenePath);
+        if (!workspace.IsValid() || !workspace.isLoaded)
+        {
+            log?.Invoke($"[Scenes] Workspace scene is not loaded. Map scene streaming metadata was kept only in imported scenes.");
+            return false;
         }
 
+        var streamingRoot = GetOrCreateWorkspaceRoot(workspace, StreamingRootName);
+        var mapObject = GetOrCreateChild(streamingRoot.transform, $"{MapStreamingPrefix}{request.MapKey}");
+        var loader = mapObject.GetComponent<L2ChunkedMapSceneLoader>();
+        if (loader == null)
+        {
+            loader = mapObject.AddComponent<L2ChunkedMapSceneLoader>();
+        }
+
+        loader.CommonScenes = new[] { mapScene };
         loader.Chunks = chunks.ToArray();
         loader.LoadChunksInEditMode = true;
         loader.LoadChunksInPlayMode = true;
-        loader.LoadRadius = 240f;
-        loader.UnloadRadius = 340f;
+        loader.NeighborRadius = 1;
+        loader.Viewer = null;
+        EditorUtility.SetDirty(mapObject);
         EditorUtility.SetDirty(loader);
+        return true;
+    }
+
+    private static L2ChunkedMapSceneLoader.ChunkScene BuildMapSceneEntry(
+        MapImportRequest request,
+        GameObject mapRoot,
+        IReadOnlyList<L2ChunkedMapSceneLoader.ChunkScene> chunks)
+    {
+        var bounds = BuildSceneCoverageBounds(mapRoot, chunks);
+        return new L2ChunkedMapSceneLoader.ChunkScene
+        {
+            ScenePath = GetMapScenePath(request),
+            GridX = -1,
+            GridZ = -1,
+            Center = bounds.center,
+            Size = bounds.size
+        };
+    }
+
+    private static Bounds BuildSceneCoverageBounds(
+        GameObject mapRoot,
+        IReadOnlyList<L2ChunkedMapSceneLoader.ChunkScene> chunks)
+    {
+        var hasBounds = false;
+        var bounds = new Bounds(Vector3.zero, Vector3.one);
+        foreach (var chunk in chunks ?? Array.Empty<L2ChunkedMapSceneLoader.ChunkScene>())
+        {
+            if (chunk == null || chunk.Size.x <= 0f || chunk.Size.z <= 0f)
+            {
+                continue;
+            }
+
+            var chunkBounds = new Bounds(chunk.Center, chunk.Size);
+            if (!hasBounds)
+            {
+                bounds = chunkBounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(chunkBounds);
+            }
+        }
+
+        if (hasBounds)
+        {
+            return bounds;
+        }
+
+        return TryGetWorldBounds(mapRoot, out bounds)
+            ? bounds
+            : new Bounds(Vector3.zero, new Vector3(1000f, 1000f, 1000f));
+    }
+
+    private static GameObject GetOrCreateWorkspaceRoot(Scene workspace, string name)
+    {
+        var existing = workspace.GetRootGameObjects()
+            .FirstOrDefault(go => go != null && string.Equals(go.name, name, StringComparison.Ordinal));
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        var root = new GameObject(name);
+        SceneManager.MoveGameObjectToScene(root, workspace);
+        EditorUtility.SetDirty(root);
+        return root;
+    }
+
+    private static GameObject GetOrCreateChild(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child != null && string.Equals(child.name, name, StringComparison.Ordinal))
+            {
+                return child.gameObject;
+            }
+        }
+
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        EditorUtility.SetDirty(go);
+        return go;
+    }
+
+    private static void SaveWorkspaceScene()
+    {
+        var workspace = SceneManager.GetSceneByPath(WorkspaceScenePath);
+        if (workspace.IsValid() && workspace.isLoaded)
+        {
+            EditorSceneManager.SaveScene(workspace);
+        }
     }
 
     private static void CloseChunkScenes(IReadOnlyList<L2ChunkedMapSceneLoader.ChunkScene> chunks)
@@ -339,6 +476,20 @@ internal static class MapImportSceneManager
             {
                 EditorSceneManager.CloseScene(scene, true);
             }
+        }
+    }
+
+    private static void CloseMapScene(Scene mapScene)
+    {
+        if (mapScene.IsValid() && mapScene.isLoaded)
+        {
+            var workspace = SceneManager.GetSceneByPath(WorkspaceScenePath);
+            if (workspace.IsValid() && workspace.isLoaded)
+            {
+                EditorSceneManager.SetActiveScene(workspace);
+            }
+
+            EditorSceneManager.CloseScene(mapScene, true);
         }
     }
 
@@ -425,13 +576,17 @@ internal static class MapImportSceneManager
 
     private readonly struct ChunkSceneHandle
     {
-        public ChunkSceneHandle(string scenePath, Scene scene, Bounds bounds)
+        public ChunkSceneHandle(int x, int z, string scenePath, Scene scene, Bounds bounds)
         {
+            X = x;
+            Z = z;
             ScenePath = scenePath;
             Scene = scene;
             Bounds = bounds;
         }
 
+        public int X { get; }
+        public int Z { get; }
         public string ScenePath { get; }
         public Scene Scene { get; }
         public Bounds Bounds { get; }
@@ -474,6 +629,25 @@ internal static class MapImportSceneManager
             return (
                 Mathf.Clamp(localX, 0, ChunkGridSize - 1),
                 Mathf.Clamp(localZ, 0, ChunkGridSize - 1));
+        }
+
+        public bool TryResolveSingleCell(Bounds bounds, out (int X, int Z) index)
+        {
+            index = default;
+            if (bounds.size.x > _cellX || bounds.size.z > _cellZ)
+            {
+                return false;
+            }
+
+            var minIndex = ResolveIndex(bounds.min);
+            var maxIndex = ResolveIndex(bounds.max);
+            if (minIndex.X != maxIndex.X || minIndex.Z != maxIndex.Z)
+            {
+                return false;
+            }
+
+            index = minIndex;
+            return true;
         }
 
         public Bounds GetChunkBounds(int x, int z)

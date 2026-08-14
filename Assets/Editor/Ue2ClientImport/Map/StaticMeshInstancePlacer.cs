@@ -190,6 +190,9 @@ internal static class StaticMeshSceneObjectFactory
         renderer.sharedMaterials = asset.Materials;
         StaticMeshFlipbookUtility.ApplyFlipbooks(visual, renderer, asset.Flipbooks);
 
+        var collider = visual.AddComponent<MeshCollider>();
+        collider.sharedMesh = asset.RenderMesh;
+
         return visual;
     }
 }

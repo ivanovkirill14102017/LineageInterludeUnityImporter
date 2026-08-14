@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 
 internal static class ModernSkyboxImporter
 {
-    private const string SkyboxRoot = "Assets/L2Imported/Managed/Skybox";
+    private const string SkyboxRoot = "Assets/L2Global/ModernSkybox";
     private const string PrefabPath = SkyboxRoot + "/L2ModernSkybox.prefab";
     private const string MaterialPath = SkyboxRoot + "/L2ModernSkyDome.mat";
     private const string MeshPath = SkyboxRoot + "/L2ModernSkyDome.asset";

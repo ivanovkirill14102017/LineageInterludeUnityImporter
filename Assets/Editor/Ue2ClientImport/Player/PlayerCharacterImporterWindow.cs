@@ -122,7 +122,6 @@ internal sealed class PlayerCharacterImporterPanel
         try
         {
             ConstInfo.L2DbRootPath = NormalizeDbRoot(ConstInfo.L2DbRootPath);
-            EnsureCatalogLoaded();
 
             _status = $"Archetype import started for '{_gender} {_baseClass}'...";
             using var context = new MapImportExecutionContext("Import Player Character Archetype");
@@ -131,8 +130,8 @@ internal sealed class PlayerCharacterImporterPanel
                 ConstInfo.L2DbRootPath,
                 _baseClass,
                 _gender,
-                _appearanceOptions,
-                _equipmentCatalog,
+                HasLoadedAppearanceDataForCurrentArchetype() ? _appearanceOptions : null,
+                HasLoadedAppearanceDataForCurrentArchetype() ? _equipmentCatalog : null,
                 context,
                 AppendStatus);
             _status += $"\nDone. Prefab: {result.PrefabPath}";

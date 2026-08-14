@@ -53,7 +53,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         var variants = new List<L2CharacterVariantData>();
         foreach (var face in args.AppearanceOptions?.FaceOptions ?? Array.Empty<SceneCharacterFaceOptionData>())
         {
-            variants.Add(BuildVariant(
+            var variant = BuildVariant(
                 "Face",
                 $"Face {face.Id}",
                 $"face_{face.Id:D2}",
@@ -62,7 +62,11 @@ internal static class PlayerCharacterSlotCatalogBuilder
                 face.MeshResources,
                 face.TextureResources,
                 args,
-                progress));
+                progress);
+            if (variant != null)
+            {
+                variants.Add(variant);
+            }
         }
 
         return new L2CharacterSlotCatalogData
@@ -80,7 +84,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         {
             foreach (var hairColor in hairStyle.HairColorOptions ?? Array.Empty<SceneCharacterHairColorOptionData>())
             {
-                variants.Add(BuildVariant(
+                var variant = BuildVariant(
                     "Hair",
                     $"Hair {hairStyle.Id} / Color {hairColor.Id}",
                     $"hair_{hairStyle.Id:D2}_{hairColor.Id:D2}",
@@ -89,7 +93,11 @@ internal static class PlayerCharacterSlotCatalogBuilder
                     hairStyle.MeshResources,
                     hairColor.TextureResources,
                     args,
-                    progress));
+                    progress);
+                if (variant != null)
+                {
+                    variants.Add(variant);
+                }
             }
         }
 
@@ -110,7 +118,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
         var basePart = args.BaseAppearance?.Parts?.FirstOrDefault(x => x != null && x.Slot == slot);
         if (basePart != null && !IsWeaponSlot(slot))
         {
-            variants.Add(BuildVariant(
+            var baseVariant = BuildVariant(
                 slot.ToString(),
                 "<Base>",
                 $"{slot.ToString().ToLowerInvariant()}_base",
@@ -119,7 +127,11 @@ internal static class PlayerCharacterSlotCatalogBuilder
                 basePart.MeshResources,
                 basePart.TextureResources,
                 args,
-                progress));
+                progress);
+            if (baseVariant != null)
+            {
+                variants.Add(baseVariant);
+            }
         }
 
         var items = args.EquipmentCatalog?.Slots?
@@ -129,7 +141,7 @@ internal static class PlayerCharacterSlotCatalogBuilder
             .ToArray() ?? Array.Empty<SceneCharacterEquipmentCatalogItemData>();
         foreach (var item in items)
         {
-            variants.Add(BuildVariant(
+            var variant = BuildVariant(
                 slot.ToString(),
                 $"{item.ItemId} {item.DisplayName}",
                 $"{slot.ToString().ToLowerInvariant()}_{item.ItemId}",
@@ -138,7 +150,11 @@ internal static class PlayerCharacterSlotCatalogBuilder
                 item.MeshResources,
                 item.TextureResources,
                 args,
-                progress));
+                progress);
+            if (variant != null)
+            {
+                variants.Add(variant);
+            }
         }
 
         return new L2CharacterSlotCatalogData
@@ -170,8 +186,20 @@ internal static class PlayerCharacterSlotCatalogBuilder
         {
             args.Context?.ThrowIfCancellationRequested();
             var meshReference = meshes[i];
-            var location = ResolveMeshLocation(args.ClientRoot, args.PackageIndex, meshReference);
-            var sharedAsset = ResolveOrBuildPartAsset(location, args.BaseSharedAsset, args.PartAssetCache);
+            SceneResourceLocation location;
+            SceneSkeletalAsset sharedAsset;
+            try
+            {
+                location = ResolveMeshLocation(args.ClientRoot, args.PackageIndex, meshReference);
+                sharedAsset = ResolveOrBuildPartAsset(location, args.BaseSharedAsset, args.PartAssetCache);
+            }
+            catch (Exception ex) when (IsWeaponSlotName(slotName))
+            {
+                args.Log?.Invoke(
+                    $"[PlayerArchetype] Skipped weapon mesh '{meshReference.Reference}' for {displayName}: {ex.Message}");
+                continue;
+            }
+
             var tempAsset = L2SkeletalCharacterAssetFactory.Build(
                 $"{slotName}_{variantKey}_{i:D2}",
                 sharedAsset);
@@ -193,6 +221,12 @@ internal static class PlayerCharacterSlotCatalogBuilder
                 Mesh = mesh,
                 Materials = materials
             });
+        }
+
+        if (parts.Count == 0 && IsWeaponSlotName(slotName))
+        {
+            args.Log?.Invoke($"[PlayerArchetype] Skipped weapon variant '{displayName}' because none of its meshes were resolved.");
+            return null;
         }
 
         return new L2CharacterVariantData
@@ -446,6 +480,13 @@ internal static class PlayerCharacterSlotCatalogBuilder
         return slot == SceneCharacterPaperdollSlot.RightHand ||
                slot == SceneCharacterPaperdollSlot.LeftHand ||
                slot == SceneCharacterPaperdollSlot.LeftRightHand;
+    }
+
+    internal static bool IsWeaponSlotName(string slotName)
+    {
+        return string.Equals(slotName, SceneCharacterPaperdollSlot.RightHand.ToString(), StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(slotName, SceneCharacterPaperdollSlot.LeftHand.ToString(), StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(slotName, SceneCharacterPaperdollSlot.LeftRightHand.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     internal sealed class VariantBuildProgress

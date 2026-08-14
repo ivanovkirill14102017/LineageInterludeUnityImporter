@@ -28,6 +28,15 @@ internal static class CreatureAnimatorControllerBuilder
         var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
         if (controller != null)
         {
+            if (!HasValidBaseLayerStateMachine(controller))
+            {
+                var repairedNotes = PopulateController(controller, asset, clips);
+                AssetDatabase.SaveAssets();
+                notes = $"AnimatorController repaired: {controllerPath}. {repairedNotes}";
+                log?.Invoke($"[SkinnedPOC] AnimatorController repaired: {controllerPath}");
+                return controller;
+            }
+
             notes = $"AnimatorController reused: {controllerPath}.";
             log?.Invoke($"[SkinnedPOC] AnimatorController ready: {controllerPath}");
             return controller;
@@ -35,17 +44,19 @@ internal static class CreatureAnimatorControllerBuilder
 
         L2AssetManager.EnsureParentFolderExists(controllerPath);
         controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+        var createdNotes = PopulateController(controller, asset, clips);
 
-        var layer = controller.layers.Length > 0 ? controller.layers[0] : new AnimatorControllerLayer
-        {
-            name = "Base Layer",
-            stateMachine = new AnimatorStateMachine()
-        };
+        notes = $"AnimatorController created: {createdNotes}";
+        log?.Invoke($"[SkinnedPOC] AnimatorController created: {controllerPath}");
+        return controller;
+    }
 
-        if (layer.stateMachine == null)
-        {
-            layer.stateMachine = new AnimatorStateMachine();
-        }
+    private static string PopulateController(
+        AnimatorController controller,
+        L2SkeletalCharacterAsset asset,
+        CreatureAnimationClipBuilder.ClipBuildInfo[] clips)
+    {
+        var layer = EnsureBaseLayerStateMachineAsset(controller);
 
         ResetControllerParameters(controller);
         EnsureCoreParameters(controller);
@@ -96,11 +107,60 @@ internal static class CreatureAnimatorControllerBuilder
         EditorUtility.SetDirty(layer.stateMachine);
         EditorUtility.SetDirty(controller);
 
-        notes = defaultState != null
+        return defaultState != null
             ? $"AnimatorController created with {clips.Length} state(s); default state is '{defaultState.name}'."
             : "AnimatorController created without a default state.";
-        log?.Invoke($"[SkinnedPOC] AnimatorController created: {controllerPath}");
-        return controller;
+    }
+
+    private static bool HasValidBaseLayerStateMachine(AnimatorController controller)
+    {
+        return controller != null &&
+               controller.layers != null &&
+               controller.layers.Length > 0 &&
+               controller.layers[0].stateMachine != null;
+    }
+
+    private static AnimatorControllerLayer EnsureBaseLayerStateMachineAsset(AnimatorController controller)
+    {
+        var layers = controller.layers;
+        if (layers == null || layers.Length == 0)
+        {
+            layers = new[]
+            {
+                new AnimatorControllerLayer
+                {
+                    name = "Base Layer",
+                    stateMachine = CreateStateMachineAsset(controller, "Base Layer")
+                }
+            };
+            controller.layers = layers;
+            EditorUtility.SetDirty(controller);
+            return layers[0];
+        }
+
+        var layer = layers[0];
+        if (layer.stateMachine == null)
+        {
+            layer.stateMachine = CreateStateMachineAsset(
+                controller,
+                string.IsNullOrWhiteSpace(layer.name) ? "Base Layer" : layer.name);
+            layers[0] = layer;
+            controller.layers = layers;
+            EditorUtility.SetDirty(controller);
+        }
+
+        return layer;
+    }
+
+    private static AnimatorStateMachine CreateStateMachineAsset(AnimatorController controller, string layerName)
+    {
+        var stateMachine = new AnimatorStateMachine
+        {
+            name = string.IsNullOrWhiteSpace(layerName) ? "Base Layer" : layerName
+        };
+        AssetDatabase.AddObjectToAsset(stateMachine, controller);
+        EditorUtility.SetDirty(stateMachine);
+        return stateMachine;
     }
 
     private static void CreateSemanticTransitions(

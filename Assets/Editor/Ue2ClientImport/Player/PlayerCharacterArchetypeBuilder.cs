@@ -53,9 +53,6 @@ internal static class PlayerCharacterArchetypeBuilder
             skeletonObjectName,
             "PlayerCharacters");
 
-        L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.AssetOutputRoot);
-        L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.PrefabOutputRoot);
-
         var characterAssetPath = L2AssetManager.BuildAssetPathInFolder(
             skeletalAssetRoot,
             "PC",
@@ -81,12 +78,14 @@ internal static class PlayerCharacterArchetypeBuilder
             AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
         {
             log?.Invoke($"[PlayerArchetype] Reusing existing archetype/prefab: {prefabPath}");
-            InstantiatePrefabIfAvailable(prefabPath, log);
             importStopwatch.Stop();
             log?.Invoke($"[PlayerArchetype/Timing] Total archetype import took {importStopwatch.Elapsed.TotalSeconds:F2}s");
             context?.Report("Player Archetype", "Done", 1f);
             return new ImportResult(prefabPath, archetypeAssetPath);
         }
+
+        L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.AssetOutputRoot);
+        L2AssetManager.EnsureFolderExists(PlayerCharacterImportBuilder.PrefabOutputRoot);
 
         appearanceOptions ??= new SceneCharacterAppearanceOptionsBuilder().Build(clientRoot, baseClass, gender);
         equipmentCatalog ??= new SceneCharacterEquipmentCatalogBuilder().Build(clientRoot, dbRoot, baseClass, gender);
@@ -231,7 +230,7 @@ internal static class PlayerCharacterArchetypeBuilder
             meshReference.ClassName);
     }
 
-    private static IEnumerable<SceneResourceReference> EnumerateCanonicalMeshReferences(
+    internal static IEnumerable<SceneResourceReference> EnumerateCanonicalMeshReferences(
         SceneCharacterAppearanceData baseAppearance,
         SceneCharacterAppearanceOptionsData appearanceOptions,
         SceneCharacterEquipmentCatalogData equipmentCatalog)
@@ -241,10 +240,7 @@ internal static class PlayerCharacterArchetypeBuilder
             SceneCharacterPaperdollSlot.Chest,
             SceneCharacterPaperdollSlot.Legs,
             SceneCharacterPaperdollSlot.Gloves,
-            SceneCharacterPaperdollSlot.Feet,
-            SceneCharacterPaperdollSlot.RightHand,
-            SceneCharacterPaperdollSlot.LeftHand,
-            SceneCharacterPaperdollSlot.LeftRightHand
+            SceneCharacterPaperdollSlot.Feet
         };
 
         foreach (var part in baseAppearance?.Parts ?? Array.Empty<SceneCharacterResolvedPartData>())
