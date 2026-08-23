@@ -501,7 +501,7 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             string.IsNullOrWhiteSpace(archetypeNameSuffix)
                 ? "archetype"
                 : $"archetype_{archetypeNameSuffix}");
-        archetype = UnityAssetDatabaseUtility.CreateAssetIfMissing(archetype, archetypeAssetPath);
+        archetype = UnityAssetDatabaseUtility.CreateOrReplaceAsset(archetype, archetypeAssetPath);
         var prefabPath = L2AssetManager.BuildClientPackageAssetPath(
             prepared.PrefabRoot,
             prepared.ReferenceText,

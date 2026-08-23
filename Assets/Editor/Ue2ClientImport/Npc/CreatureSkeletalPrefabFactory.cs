@@ -40,6 +40,7 @@ internal static class CreatureSkeletalPrefabFactory
                     .Parts?.FirstOrDefault()?
                     .Mesh;
                 CreatureSkeletalImportUtility.CreateLabel(root.transform, labelMesh, displayLabel);
-            });
+            },
+            replaceExisting: true);
     }
 }

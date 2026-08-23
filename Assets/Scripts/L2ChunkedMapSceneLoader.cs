@@ -229,8 +229,6 @@ public sealed class L2ChunkedMapSceneLoader : MonoBehaviour
         }
 
 #if UNITY_EDITOR
-        L2GeneratedAnimatorControllerIntegrity.EnsureCreatureControllersValidOnce();
-
         if (!Application.isPlaying)
         {
             EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);

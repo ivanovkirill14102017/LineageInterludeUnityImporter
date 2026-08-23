@@ -21,7 +21,8 @@ internal static class L2ModularCharacterPrefabFactory
         string prefabPath,
         string rootName,
         Action<BuildResult> customize,
-        Action<GameObject> beforeSave = null)
+        Action<GameObject> beforeSave = null,
+        bool replaceExisting = false)
     {
         if (archetype?.BaseAsset == null)
         {
@@ -33,7 +34,7 @@ internal static class L2ModularCharacterPrefabFactory
             throw new ArgumentNullException(nameof(customize));
         }
 
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null && !replaceExisting)
         {
             return;
         }

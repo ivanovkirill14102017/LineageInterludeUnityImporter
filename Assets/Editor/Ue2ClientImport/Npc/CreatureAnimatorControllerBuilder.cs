@@ -26,28 +26,21 @@ internal static class CreatureAnimatorControllerBuilder
             "AnimatorControllers");
 
         var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
-        if (controller != null)
+        var created = false;
+        if (controller == null)
         {
-            if (!HasValidBaseLayerStateMachine(controller))
-            {
-                var repairedNotes = PopulateController(controller, asset, clips);
-                AssetDatabase.SaveAssets();
-                notes = $"AnimatorController repaired: {controllerPath}. {repairedNotes}";
-                log?.Invoke($"[SkinnedPOC] AnimatorController repaired: {controllerPath}");
-                return controller;
-            }
-
-            notes = $"AnimatorController reused: {controllerPath}.";
-            log?.Invoke($"[SkinnedPOC] AnimatorController ready: {controllerPath}");
-            return controller;
+            L2AssetManager.EnsureParentFolderExists(controllerPath);
+            controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+            created = true;
         }
 
-        L2AssetManager.EnsureParentFolderExists(controllerPath);
-        controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
         var createdNotes = PopulateController(controller, asset, clips);
-
-        notes = $"AnimatorController created: {createdNotes}";
-        log?.Invoke($"[SkinnedPOC] AnimatorController created: {controllerPath}");
+        notes = created
+            ? $"AnimatorController created: {createdNotes}"
+            : $"AnimatorController rebuilt: {controllerPath}. {createdNotes}";
+        log?.Invoke(created
+            ? $"[SkinnedPOC] AnimatorController created: {controllerPath}"
+            : $"[SkinnedPOC] AnimatorController rebuilt: {controllerPath}");
         return controller;
     }
 
@@ -112,13 +105,6 @@ internal static class CreatureAnimatorControllerBuilder
             : "AnimatorController created without a default state.";
     }
 
-    private static bool HasValidBaseLayerStateMachine(AnimatorController controller)
-    {
-        return controller != null &&
-               controller.layers != null &&
-               controller.layers.Length > 0 &&
-               controller.layers[0].stateMachine != null;
-    }
 
     private static AnimatorControllerLayer EnsureBaseLayerStateMachineAsset(AnimatorController controller)
     {

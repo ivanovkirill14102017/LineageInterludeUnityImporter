@@ -152,7 +152,7 @@ internal static class PlayerCharacterArchetypeBuilder
         archetype.BaseAsset = baseAsset;
         archetype.AnimatorController = controller;
         archetype.Slots = slots;
-        archetype = UnityAssetDatabaseUtility.CreateAssetIfMissing(archetype, archetypeAssetPath);
+        archetype = UnityAssetDatabaseUtility.CreateOrReplaceAsset(archetype, archetypeAssetPath);
 
         context?.Report("Player Archetype", "Create wardrobe prefab", 0.96f);
         CreateWardrobePrefab(baseAsset, archetype, prefabPath, characterName, log);
@@ -423,7 +423,8 @@ internal static class PlayerCharacterArchetypeBuilder
                 EditorUtility.SetDirty(wardrobe);
                 EditorUtility.SetDirty(build.Animator);
                 EditorUtility.SetDirty(build.Root);
-            });
+            },
+            replaceExisting: true);
         log?.Invoke($"[PlayerArchetype] Wardrobe prefab ready: {prefabPath}");
     }
 }

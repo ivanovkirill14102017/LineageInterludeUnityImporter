@@ -9,6 +9,7 @@ using L2Viewer.SceneDomain.Services;
 using L2Viewer.SceneDomain.Services.CharacterServices;
 using L2Viewer.SceneDomain.Services.Utility;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 
 internal static class CreatureMapImporter
@@ -127,7 +128,7 @@ internal static class CreatureMapImporter
                     ComputeProgress(0.20f, 0.52f, preparedBuilds.Count + prefabPaths.Count, uniquePrefabs.Length));
                 var expectedPrefabPath = BuildPrefabPath(spawn);
                 var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(expectedPrefabPath);
-                if (existingPrefab != null)
+                if (ShouldReuseExistingPrefab(existingPrefab, spawn))
                 {
                     prefabPaths[prefabKey] = expectedPrefabPath;
                     log($"[Creatures] Reusing existing prefab for '{spawn.DisplayName}': {expectedPrefabPath}");
@@ -223,36 +224,33 @@ internal static class CreatureMapImporter
 
         context?.Report("Creatures", $"Build meshes/clips/controllers/prefabs for {preparedBuilds.Count} prefabs", 0.78f);
         var finalizePrefabBatchStopwatch = Stopwatch.StartNew();
-        UnityAssetDatabaseUtility.RunAssetEditingBatch(() =>
+        for (var i = 0; i < preparedBuilds.Count; i++)
         {
-            for (var i = 0; i < preparedBuilds.Count; i++)
+            context?.ThrowIfCancellationRequested();
+            try
             {
-                context?.ThrowIfCancellationRequested();
-                try
-                {
-                    var weaponSlots = BuildCreatureWeaponSlots(
-                        preparedBuilds[i].Build,
-                        preparedBuilds[i].Spawn,
-                        clientRoot,
-                        packageIndex,
-                        weaponCatalog,
-                        log,
-                        context);
-                    var build = L2SkeletalAnimatorPrefabBuilder.CompletePreparedBuild(
-                        preparedBuilds[i].Build,
-                        prefabNameSuffix: null,
-                        displayLabel: preparedBuilds[i].DisplayName,
-                        log,
-                        finalizeAssets: false,
-                        extraSlots: weaponSlots);
-                    prefabPaths[preparedBuilds[i].PrefabKey] = build.PrefabPath;
-                }
-                catch (Exception ex)
-                {
-                    log($"[Creatures] Failed to complete prefab build for '{preparedBuilds[i].DisplayName}' ({preparedBuilds[i].Build.ReferenceText}): {ex.Message}");
-                }
+                var weaponSlots = BuildCreatureWeaponSlots(
+                    preparedBuilds[i].Build,
+                    preparedBuilds[i].Spawn,
+                    clientRoot,
+                    packageIndex,
+                    weaponCatalog,
+                    log,
+                    context);
+                var build = L2SkeletalAnimatorPrefabBuilder.CompletePreparedBuild(
+                    preparedBuilds[i].Build,
+                    prefabNameSuffix: null,
+                    displayLabel: preparedBuilds[i].DisplayName,
+                    log,
+                    finalizeAssets: false,
+                    extraSlots: weaponSlots);
+                prefabPaths[preparedBuilds[i].PrefabKey] = build.PrefabPath;
             }
-        });
+            catch (Exception ex)
+            {
+                log($"[Creatures] Failed to complete prefab build for '{preparedBuilds[i].DisplayName}' ({preparedBuilds[i].Build.ReferenceText}): {ex.Message}");
+            }
+        }
         finalizePrefabBatchStopwatch.Stop();
         log($"[Creatures/Timing] Final skeletal asset batch (mesh/clip/controller/prefab) took {finalizePrefabBatchStopwatch.Elapsed.TotalSeconds:F2}s");
 
@@ -505,6 +503,11 @@ internal static class CreatureMapImporter
             return false;
         }
 
+        if (!PrefabHasUsableAnimatorController(prefab))
+        {
+            return false;
+        }
+
         if (!CharacterAssetExpectsTextures(characterAsset))
         {
             return true;
@@ -517,6 +520,18 @@ internal static class CreatureMapImporter
         }
 
         return renderer.sharedMaterials.All(MaterialHasRenderableTexture);
+    }
+
+    private static bool PrefabHasUsableAnimatorController(GameObject prefab)
+    {
+        var controller = prefab
+            .GetComponentInChildren<L2CreatureWardrobe>(true)
+            ?.Archetype
+            ?.AnimatorController as AnimatorController;
+        return controller != null &&
+               controller.layers != null &&
+               controller.layers.Length > 0 &&
+               controller.layers[0].stateMachine != null;
     }
 
     private static bool CharacterAssetExpectsTextures(L2SkeletalCharacterAsset asset)
