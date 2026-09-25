@@ -107,4 +107,12 @@ InitTestScene*.unity*
 
 L2Imported
 Assests/L2Imported
+Assests/L2Import_Animations
+Assests/L2Import_Materials
+Assests/L2Import_Meshes
+Assests/L2Import_Textures
 /External_
+/Assets/L2Import_Animations
+/Assets/L2Import_Materials
+/Assets/L2Import_Meshes
+/Assets/L2Import_Textures
