@@ -3,6 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [ExecuteAlways]
 [DisallowMultipleComponent]
@@ -26,6 +29,13 @@ public sealed class L2SkillVisualController : MonoBehaviour
 
     private readonly List<GameObject> _runtimeInstances = new List<GameObject>();
     private Coroutine _playbackRoutine;
+#if UNITY_EDITOR
+    private bool _editorPreviewActive;
+    private int _editorPreviewIndex;
+    private double _editorNextStageTime;
+    private bool _editorStopAfterCurrentStage;
+    private HashSet<int> _editorSkipIndexes;
+#endif
 
     public string[] GetStageDisplayNames()
     {
@@ -60,6 +70,46 @@ public sealed class L2SkillVisualController : MonoBehaviour
         PlayParticleSystems(binding.StageRoot);
     }
 
+    public void PreviewStageAt(int index)
+    {
+        SetSelectedStage(index, preview: false);
+        PreviewSelectedStage();
+    }
+
+    public void PlayStageAt(int index)
+    {
+        SetSelectedStage(index, preview: false);
+        if (!Application.isPlaying)
+        {
+#if UNITY_EDITOR
+            PreviewStagesInEditor(SelectedStageIndex, stopAfterCurrentStage: true);
+#else
+            PreviewSelectedStage();
+#endif
+            return;
+        }
+
+        PlaySelectedStage();
+    }
+
+    public void PlayAllStagesFrom(int index)
+    {
+        SetSelectedStage(index, preview: false);
+        if (!Application.isPlaying)
+        {
+#if UNITY_EDITOR
+            PreviewStagesInEditor(SelectedStageIndex, stopAfterCurrentStage: false);
+#else
+            PreviewSelectedStage();
+#endif
+            return;
+        }
+
+        Stop();
+        IsPlaying = true;
+        _playbackRoutine = StartCoroutine(PlayAllStagesRoutine(SelectedStageIndex));
+    }
+
     public void PlaySelectedStage()
     {
         if (!Application.isPlaying)
@@ -83,13 +133,17 @@ public sealed class L2SkillVisualController : MonoBehaviour
     {
         if (!Application.isPlaying)
         {
+#if UNITY_EDITOR
+            PreviewStagesInEditor(0, stopAfterCurrentStage: false);
+#else
             PreviewSelectedStage();
+#endif
             return;
         }
 
         Stop();
         IsPlaying = true;
-        _playbackRoutine = StartCoroutine(PlayAllStagesRoutine());
+        _playbackRoutine = StartCoroutine(PlayAllStagesRoutine(0));
     }
 
     public void Stop()
@@ -100,6 +154,9 @@ public sealed class L2SkillVisualController : MonoBehaviour
             _playbackRoutine = null;
         }
 
+#if UNITY_EDITOR
+        StopEditorPreview();
+#endif
         IsPlaying = false;
         ClearRuntimeInstances();
         DeactivateTemplateStages();
@@ -216,11 +273,11 @@ public sealed class L2SkillVisualController : MonoBehaviour
         _playbackRoutine = null;
     }
 
-    private IEnumerator PlayAllStagesRoutine()
+    private IEnumerator PlayAllStagesRoutine(int startIndex)
     {
         var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
         var skipIndexes = new HashSet<int>();
-        for (var i = 0; i < bindings.Length; i++)
+        for (var i = Mathf.Clamp(startIndex, 0, Math.Max(0, bindings.Length)); i < bindings.Length; i++)
         {
             if (skipIndexes.Contains(i))
             {
@@ -263,7 +320,7 @@ public sealed class L2SkillVisualController : MonoBehaviour
         }
 
         var instance = SpawnStageInstance(binding, ResolveStagePosition(binding.Role), ResolveStageRotation(binding.Role));
-        if (instance != null && RuntimeInstanceLifetime > 0f)
+        if (instance != null && RuntimeInstanceLifetime > 0f && Application.isPlaying)
         {
             Destroy(instance, RuntimeInstanceLifetime);
         }
@@ -303,6 +360,91 @@ public sealed class L2SkillVisualController : MonoBehaviour
         var travelTime = distance / Math.Max(0.01f, ProjectileSpeed);
         return Math.Max(StageIntervalSeconds, travelTime);
     }
+
+#if UNITY_EDITOR
+    public void PreviewStagesInEditor(int startIndex, bool stopAfterCurrentStage)
+    {
+        if (Application.isPlaying)
+        {
+            PlayAllStagesFrom(startIndex);
+            return;
+        }
+
+        Stop();
+        DeactivateTemplateStages();
+        ClearRuntimeInstances();
+        var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
+        IsPlaying = true;
+        _editorPreviewActive = true;
+        _editorPreviewIndex = Mathf.Clamp(startIndex, 0, Math.Max(0, bindings.Length));
+        _editorNextStageTime = EditorApplication.timeSinceStartup;
+        _editorStopAfterCurrentStage = stopAfterCurrentStage;
+        _editorSkipIndexes = new HashSet<int>();
+        EditorApplication.update -= TickEditorPreview;
+        EditorApplication.update += TickEditorPreview;
+    }
+
+    private void TickEditorPreview()
+    {
+        if (!_editorPreviewActive || Application.isPlaying)
+        {
+            StopEditorPreview();
+            return;
+        }
+
+        var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
+        while (_editorPreviewIndex < bindings.Length && _editorSkipIndexes.Contains(_editorPreviewIndex))
+        {
+            _editorPreviewIndex++;
+        }
+
+        if (_editorPreviewIndex >= bindings.Length)
+        {
+            StopEditorPreview();
+            IsPlaying = false;
+            return;
+        }
+
+        var now = EditorApplication.timeSinceStartup;
+        if (now < _editorNextStageTime)
+        {
+            return;
+        }
+
+        var binding = bindings[_editorPreviewIndex];
+        if (binding != null && IsProjectileRole(binding.Role))
+        {
+            var impactIndex = FindLinkedImpactStageIndex(_editorPreviewIndex);
+            if (impactIndex >= 0)
+            {
+                _editorSkipIndexes.Add(impactIndex);
+            }
+        }
+
+        var duration = PlayStageBinding(binding);
+        _editorNextStageTime = now + Math.Max(0.01f, duration);
+        _editorPreviewIndex++;
+        if (_editorStopAfterCurrentStage)
+        {
+            _editorPreviewIndex = bindings.Length;
+        }
+
+        SceneView.RepaintAll();
+    }
+
+    private void StopEditorPreview()
+    {
+        if (!_editorPreviewActive)
+        {
+            return;
+        }
+
+        EditorApplication.update -= TickEditorPreview;
+        _editorPreviewActive = false;
+        _editorStopAfterCurrentStage = false;
+        _editorSkipIndexes = null;
+    }
+#endif
 
     private L2SkillVisualStageBinding GetSelectedBinding()
     {

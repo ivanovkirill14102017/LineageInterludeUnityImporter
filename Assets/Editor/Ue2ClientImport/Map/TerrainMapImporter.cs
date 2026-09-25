@@ -1,8 +1,5 @@
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
-using L2Viewer.SceneDomain.Services;
-using L2Viewer.SceneDomain.Services.MaterialServices;
 
 internal static class TerrainMapImporter
 {
@@ -13,76 +10,38 @@ internal static class TerrainMapImporter
         bool finalizeScene = true,
         bool buildTerrainVegetation = true)
     {
-        log("[Terrain] START Build terrain import data");
-        var terrainBuilder = new TerrainImportBuilder(new BspTextureManager(source.ClientPath));
-        var terrains = terrainBuilder.Build(source.UnrFile);
-        log("[Terrain] DONE Build terrain import data");
-
-        if (terrains == null || terrains.Length == 0)
-        {
-            throw new InvalidOperationException("TerrainInfo was not found in the map.");
-        }
-
-        var terrainImport = terrains[0];
-        log($"TerrainInfo found: {terrainImport.ObjectName}, height size {terrainImport.HeightWidth}x{terrainImport.HeightHeight}, layers {terrainImport.Layers.Length}");
-
-        log("[Terrain] START Scene root preparation");
+        var terrain = StaticMeshImportPipeline.ReadTerrainSurface(source);
         var mapRoot = UnitySceneObjectUtility.CreateMapRoot(request.ObjectName);
-        var terrainRootName = $"{request.ObjectName}_Terrain";
-        if (UnitySceneObjectUtility.ObjectExists(terrainRootName))
+        var vegetation = buildTerrainVegetation
+            ? StaticMeshImportPipeline.Analyze(source)
+            : null;
+        if (vegetation != null)
         {
-            log($"[Terrain] Skipping import because '{terrainRootName}' already exists.");
-            return Task.CompletedTask;
+            StaticMeshImportPipeline.PrepareTerrainVegetationResources(
+                vegetation,
+                terrain,
+                mapRoot,
+                source,
+                request);
         }
 
         MapImportAssetPreparation.PrepareTerrainOutputFolder(request.OutputDir);
-        log("[Terrain] DONE Scene root preparation");
-
-        log("[Terrain] START Build terrain assets and object");
-        TerrainAssetBuilder.BuildTerrain(terrainImport, request, mapRoot);
-        log("[Terrain] DONE Build terrain assets and object");
-
-        if (buildTerrainVegetation)
+        TerrainAssetBuilder.BuildTerrain(terrain, request, mapRoot);
+        if (vegetation != null)
         {
-            log("[Terrain] START Terrain vegetation analysis");
-            var analysisStopwatch = Stopwatch.StartNew();
-            var instancedResult = StaticMeshSceneAnalyzer.BuildInstancedMeshes(source, log);
-            analysisStopwatch.Stop();
-            log($"[Terrain] DONE Terrain vegetation analysis ({analysisStopwatch.Elapsed.TotalSeconds:F2}s)");
-
-            log("[Terrain] START Terrain vegetation build");
-            var vegetationStopwatch = Stopwatch.StartNew();
-            L2StaticMeshAssetBuilder.BuildStaticMeshes(
-                instancedResult,
+            StaticMeshImportPipeline.PopulateTerrainVegetation(
+                vegetation,
+                terrain,
                 mapRoot,
-                source.ClientPath,
-                request.MapKey,
-                request.OutputDir,
-            log,
-            request.ReuseExistingMaterialTextureAssets,
-            placeRegularInstances: false,
-            placeTerrainDecorations: false,
-            convertTerrainDecorationsToTerrainVegetation: true,
-            convertTreeInstancesToTerrainVegetation: true,
-            placeTreeInstancesAsRegularInstances: false,
-            terrainImport: terrainImport,
-            populateTerrainVegetation: true,
-            removeExistingConvertedTerrainVegetationFallback: false);
-            vegetationStopwatch.Stop();
-            log($"[Terrain] DONE Terrain vegetation build ({vegetationStopwatch.Elapsed.TotalSeconds:F2}s)");
-        }
-        else
-        {
-            log("[Terrain] Skipping terrain vegetation build in this pass. It will be handled by the static-mesh stage.");
+                source,
+                request);
         }
 
         if (finalizeScene)
         {
-            log("[Terrain] START Finalize");
             MapImportFinalizer.Complete(mapRoot, log);
-            log("[Terrain] DONE Finalize");
         }
-        log("Import finished.");
+
         return Task.CompletedTask;
     }
 }

@@ -16,6 +16,7 @@ internal static class L2ParticleAssetBuilder
 {
     private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
     private const float NeutralParticleStartSize = 1f;
+    private const byte DefaultParticleDrawStyle = 3;
     private static readonly JsonSerializerSettings DiagnosticJsonSettings = new()
     {
         Formatting = Formatting.Indented,
@@ -93,8 +94,8 @@ internal static class L2ParticleAssetBuilder
             var needsRefresh = ImportedTextureAssetUtility.PrepareTextureAssetFile(
                 resolvedTexture.Key,
                 resolvedTexture.Value.Texture,
-                $"{outputDir}/Particles/Textures",
-                "Particles/Textures",
+                L2AssetManager.SharedTexturesRoot,
+                "ParticleTextures",
                 traits: null,
                 reuseExisting: true,
                 out var texturePath,
@@ -155,9 +156,10 @@ internal static class L2ParticleAssetBuilder
             layer.SpinsPerSecondRange,
             startLocationRange: null,
             sphereRadiusRange: null,
-            particleMaterial: ResolveParticleMaterial(layer.TextureReference, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences),
+            particleMaterial: ResolveParticleMaterial(layer.TextureReference, layer.DrawStyle, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences),
             alignment: ResolveSpriteAlignment(layer.UseDirectionAs),
             sizeScale: layer.UseSizeScale ? layer.SizeScale : Array.Empty<UnrParticleSizeScale>());
+        ConfigureTextureSheetAnimation(particleSystem.textureSheetAnimation, layer);
         return true;
     }
 
@@ -178,6 +180,8 @@ internal static class L2ParticleAssetBuilder
             return false;
         }
 
+        material = CreateOrUpdateMeshEmitterMaterial(material, layer.StaticMeshReference!, layer.DrawStyle, outputDir);
+
         ConfigureCommonParticleSystem(
             particleSystem,
             layer.MaxParticles,
@@ -195,7 +199,9 @@ internal static class L2ParticleAssetBuilder
             startLocationRange: null,
             sphereRadiusRange: null,
             particleMaterial: material,
-            alignment: ParticleSystemRenderSpace.Local);
+            alignment: ParticleSystemRenderSpace.Local,
+            sizeScale: layer.SizeScale,
+            isMeshEmitter: true);
 
         var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
         renderer.mesh = mesh;
@@ -238,7 +244,7 @@ internal static class L2ParticleAssetBuilder
             layer.RevolutionsPerSecondRange,
             layer.StartLocationRange,
             sphereRadiusRange: null,
-            particleMaterial: ResolveParticleMaterial(null, outputDir, resolvedTextures, textureAssets, materialAssets),
+            particleMaterial: ResolveParticleMaterial(null, layer.DrawStyle, outputDir, resolvedTextures, textureAssets, materialAssets),
             alignment: ParticleSystemRenderSpace.View);
         return true;
     }
@@ -270,7 +276,7 @@ internal static class L2ParticleAssetBuilder
             spinsPerSecondRange: null,
             layer.StartLocationRange,
             layer.SphereRadiusRange,
-            particleMaterial: ResolveParticleMaterial(layer.TextureReference, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences),
+            particleMaterial: ResolveParticleMaterial(layer.TextureReference, drawStyle: null, outputDir, resolvedTextures, textureAssets, materialAssets, missingTextureReferences),
             alignment: ParticleSystemRenderSpace.View);
         return true;
     }
@@ -293,7 +299,8 @@ internal static class L2ParticleAssetBuilder
         UnrFloatRange? sphereRadiusRange,
         Material particleMaterial,
         ParticleSystemRenderSpace alignment,
-        UnrParticleSizeScale[]? sizeScale = null)
+        UnrParticleSizeScale[]? sizeScale = null,
+        bool isMeshEmitter = false)
     {
         var lifetimeMin = lifetimeRange?.Min ?? 1f;
         var lifetimeMax = Math.Max(lifetimeMin, lifetimeRange?.Max ?? lifetimeMin);
@@ -306,9 +313,10 @@ internal static class L2ParticleAssetBuilder
         main.scalingMode = ParticleSystemScalingMode.Local;
         main.startLifetime = new ParticleSystem.MinMaxCurve(Math.Max(0.01f, lifetimeMin), Math.Max(0.01f, lifetimeMax));
         main.startSpeed = new ParticleSystem.MinMaxCurve(0f, 0f);
-        main.startSize3D = false;
-        main.startSize = BuildSizeCurve(startSizeRange, NeutralParticleStartSize, NeutralParticleStartSize);
-        main.startRotation = BuildRotationCurve(startSpinRange);
+        ConfigureStartSize(main, startSizeRange, isMeshEmitter);
+        ConfigureStartRotation(main, startSpinRange, isMeshEmitter);
+
+
         main.startColor = BuildStartColor(opacity, colorScale, applyOpacity: !ShouldDriveAlphaOverLifetime(colorScale, fadeInEndTime, fadeOutStartTime));
 
         var emission = particleSystem.emission;
@@ -331,7 +339,7 @@ internal static class L2ParticleAssetBuilder
         ConfigureSizeOverLifetime(sizeOverLifetime, sizeScale);
 
         var rotationOverLifetime = particleSystem.rotationOverLifetime;
-        ConfigureRotationOverLifetime(rotationOverLifetime, spinParticles, spinsPerSecondRange);
+        ConfigureRotationOverLifetime(rotationOverLifetime, spinParticles, spinsPerSecondRange, isMeshEmitter);
 
         var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
         renderer.sharedMaterial = particleMaterial;
@@ -384,30 +392,30 @@ internal static class L2ParticleAssetBuilder
 
     private static Material ResolveParticleMaterial(
         string? textureReference,
+        byte? drawStyle,
         string outputDir,
         IReadOnlyDictionary<string, BspTextureManager.ResolvedTexture> resolvedTextures,
         IDictionary<string, Texture2D> textureAssets,
         IDictionary<string, Material> materialAssets,
         ISet<string>? missingTextureReferences = null)
     {
-        var materialKey = string.IsNullOrWhiteSpace(textureReference) ? "__default__" : textureReference;
+        var resolvedDrawStyle = drawStyle ?? DefaultParticleDrawStyle;
+        var materialKey = $"{(string.IsNullOrWhiteSpace(textureReference) ? "__default__" : textureReference)}|ds={resolvedDrawStyle}";
         if (materialAssets.TryGetValue(materialKey, out var cached))
         {
             return cached;
         }
 
-        var material = AssetDatabase.LoadAssetAtPath<Material>(BuildParticleMaterialPath(outputDir, textureReference));
+        var materialPath = BuildParticleMaterialPath(textureReference, resolvedDrawStyle);
+        var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
         if (material == null)
         {
             var shader = ResolveParticleShader();
             material = new Material(shader);
-            L2MaterialUtility.ConfigureTransparent(
-                material,
-                UnityEngine.Rendering.BlendMode.SrcAlpha,
-                UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha,
-                premultiplyKeyword: false);
             material.enableInstancing = true;
         }
+
+        ConfigureParticleDrawStyle(material, resolvedDrawStyle);
 
         var texture = ResolveParticleTexture(textureReference, outputDir, resolvedTextures, textureAssets, missingTextureReferences);
         if (texture != null)
@@ -416,7 +424,7 @@ internal static class L2ParticleAssetBuilder
         }
 
         L2MaterialUtility.SetBaseColor(material, Color.white);
-        material = UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, BuildParticleMaterialPath(outputDir, textureReference));
+        material = UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, materialPath);
         materialAssets[materialKey] = material;
         return material;
     }
@@ -444,31 +452,119 @@ internal static class L2ParticleAssetBuilder
             return null;
         }
 
-        var texturePath = BuildParticleTexturePath(outputDir, textureReference);
+        var texturePath = BuildParticleTexturePath(textureReference);
         var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
 
         textureAssets[textureReference] = texture;
         return texture;
     }
 
-    private static string BuildParticleTexturePath(string outputDir, string textureReference)
+    private static string BuildParticleTexturePath(string textureReference)
     {
         return L2AssetManager.BuildClientPackageAssetPath(
-            $"{outputDir}/Particles/Textures",
+            L2AssetManager.SharedTexturesRoot,
             textureReference,
             "TEX",
             "png",
-            "Particles/Textures");
+            "ParticleTextures");
     }
 
-    private static string BuildParticleMaterialPath(string outputDir, string? textureReference)
+    private static string BuildParticleMaterialPath(string? textureReference, byte drawStyle)
     {
         return L2AssetManager.BuildClientPackageAssetPath(
-            $"{outputDir}/Particles/Materials",
-            textureReference ?? "DefaultParticle",
+            L2AssetManager.ManagedParticleMaterialsRoot,
+            $"{textureReference ?? "DefaultParticle"}_PTDS_{drawStyle}",
             "MAT",
             "mat",
-            "Particles/Materials");
+            "ParticleMaterials");
+    }
+
+    private static Material CreateOrUpdateMeshEmitterMaterial(
+        Material source,
+        string staticMeshReference,
+        byte? drawStyle,
+        string outputDir)
+    {
+        var resolvedDrawStyle = drawStyle ?? DefaultParticleDrawStyle;
+        var materialPath = BuildParticleMaterialPath($"{staticMeshReference}_MeshEmitter", resolvedDrawStyle);
+        var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+        if (material == null)
+        {
+            material = new Material(source);
+        }
+        else
+        {
+            material.CopyPropertiesFromMaterial(source);
+            material.shader = source.shader;
+        }
+
+        material.enableInstancing = true;
+        ConfigureParticleDrawStyle(material, resolvedDrawStyle);
+        return UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, materialPath);
+    }
+
+    private static void ConfigureParticleDrawStyle(Material material, byte drawStyle)
+    {
+        switch (drawStyle)
+        {
+            case 0:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.One, UnityEngine.Rendering.BlendMode.Zero, false);
+                break;
+            case 1:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.SrcAlpha, UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, false);
+                break;
+            case 2:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.DstColor, UnityEngine.Rendering.BlendMode.Zero, false, true);
+                break;
+            case 3:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.One, UnityEngine.Rendering.BlendMode.One, false);
+                break;
+            case 4:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.DstColor, UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, false, true);
+                break;
+            case 5:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.Zero, UnityEngine.Rendering.BlendMode.OneMinusSrcColor, false);
+                break;
+            case 6:
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.One, UnityEngine.Rendering.BlendMode.One, false);
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported Unreal EParticleDrawStyle value {drawStyle}.");
+        }
+    }
+
+    private static void ConfigureTextureSheetAnimation(
+        ParticleSystem.TextureSheetAnimationModule textureSheet,
+        SceneSpriteEmitterLayerData layer)
+    {
+        var tilesX = Math.Max(1, layer.TextureUSubdivisions ?? 1);
+        var tilesY = Math.Max(1, layer.TextureVSubdivisions ?? 1);
+        if (tilesX <= 1 && tilesY <= 1)
+        {
+            textureSheet.enabled = false;
+            return;
+        }
+
+        var frameCount = Math.Max(1, tilesX * tilesY);
+        var startFrame = Mathf.Clamp(layer.SubdivisionStart ?? 0, 0, frameCount - 1);
+        var endFrame = Mathf.Clamp(layer.SubdivisionEnd ?? startFrame, startFrame, frameCount - 1);
+        textureSheet.enabled = true;
+        textureSheet.mode = ParticleSystemAnimationMode.Grid;
+        textureSheet.numTilesX = tilesX;
+        textureSheet.numTilesY = tilesY;
+        textureSheet.animation = ParticleSystemAnimationType.WholeSheet;
+        textureSheet.cycleCount = 1;
+        if (layer.UseRandomSubdivision && endFrame > startFrame)
+        {
+            textureSheet.startFrame = new ParticleSystem.MinMaxCurve(startFrame, endFrame);
+            textureSheet.frameOverTime = new ParticleSystem.MinMaxCurve(0f);
+            return;
+        }
+
+        textureSheet.startFrame = new ParticleSystem.MinMaxCurve(0f);
+        textureSheet.frameOverTime = endFrame > startFrame
+            ? new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, startFrame, 1f, endFrame))
+            : new ParticleSystem.MinMaxCurve(startFrame);
     }
 
     private static Shader ResolveParticleShader()
@@ -514,6 +610,60 @@ internal static class L2ParticleAssetBuilder
         var min = ComputeDominantAxisValue(range, useMax: false) * Mathf.PI * 2f;
         var max = ComputeDominantAxisValue(range, useMax: true) * Mathf.PI * 2f;
         return new ParticleSystem.MinMaxCurve(min, max);
+    }
+
+    private static void ConfigureStartSize(
+        ParticleSystem.MainModule main,
+        UnrRangeVector? range,
+        bool isMeshEmitter)
+    {
+        if (!isMeshEmitter)
+        {
+            main.startSize3D = false;
+            main.startSize = BuildSizeCurve(range, NeutralParticleStartSize, NeutralParticleStartSize);
+            return;
+        }
+
+        main.startSize3D = true;
+        if (range == null)
+        {
+            main.startSizeX = new ParticleSystem.MinMaxCurve(NeutralParticleStartSize);
+            main.startSizeY = new ParticleSystem.MinMaxCurve(NeutralParticleStartSize);
+            main.startSizeZ = new ParticleSystem.MinMaxCurve(NeutralParticleStartSize);
+            return;
+        }
+
+        // MeshEmitter StartSizeRange is a dimensionless mesh multiplier. The mesh
+        // vertices already contain the Unreal-to-Unity world scale.
+        main.startSizeX = BuildMeshSizeCurve(range.X);
+        main.startSizeY = BuildMeshSizeCurve(range.Z);
+        main.startSizeZ = BuildMeshSizeCurve(range.Y);
+    }
+
+    private static ParticleSystem.MinMaxCurve BuildMeshSizeCurve(UnrFloatRange range)
+    {
+        var first = Math.Max(0.001f, Math.Abs(range.Min));
+        var second = Math.Max(0.001f, Math.Abs(range.Max));
+        return new ParticleSystem.MinMaxCurve(Math.Min(first, second), Math.Max(first, second));
+    }
+
+    private static void ConfigureStartRotation(
+        ParticleSystem.MainModule main,
+        UnrRangeVector? range,
+        bool isMeshEmitter)
+    {
+        if (!isMeshEmitter)
+        {
+            main.startRotation3D = false;
+            main.startRotation = BuildRotationCurve(range);
+            return;
+        }
+
+        var spin = BuildRotationCurve(range);
+        main.startRotation3D = true;
+        main.startRotationX = new ParticleSystem.MinMaxCurve(0f);
+        main.startRotationY = spin;
+        main.startRotationZ = new ParticleSystem.MinMaxCurve(0f);
     }
 
     private static Color BuildStartColor(float? opacity, UnrParticleColorScale[] colorScale, bool applyOpacity)
@@ -694,7 +844,8 @@ internal static class L2ParticleAssetBuilder
     private static void ConfigureRotationOverLifetime(
         ParticleSystem.RotationOverLifetimeModule rotationOverLifetime,
         bool spinParticles,
-        UnrRangeVector? spinsPerSecondRange)
+        UnrRangeVector? spinsPerSecondRange,
+        bool isMeshEmitter)
     {
         if (!spinParticles || spinsPerSecondRange == null)
         {
@@ -702,11 +853,22 @@ internal static class L2ParticleAssetBuilder
             return;
         }
 
-        rotationOverLifetime.enabled = true;
-        rotationOverLifetime.separateAxes = false;
-        rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(
+        var spin = new ParticleSystem.MinMaxCurve(
             ComputeDominantAxisValue(spinsPerSecondRange, useMax: false) * Mathf.PI * 2f,
             ComputeDominantAxisValue(spinsPerSecondRange, useMax: true) * Mathf.PI * 2f);
+
+        rotationOverLifetime.enabled = true;
+        rotationOverLifetime.separateAxes = isMeshEmitter;
+        if (isMeshEmitter)
+        {
+            rotationOverLifetime.x = new ParticleSystem.MinMaxCurve(0f);
+            rotationOverLifetime.y = spin;
+            rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(0f);
+        }
+        else
+        {
+            rotationOverLifetime.z = spin;
+        }
     }
 
     private static float ComputeScalarRangeValue(UnrRangeVector range, bool useMax)

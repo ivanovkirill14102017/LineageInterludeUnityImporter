@@ -23,7 +23,7 @@ internal static class TerrainTextureAssetBuilder
             var sourceLayer = usefulLayers[index];
             var referenceText = ResolveTextureReference(sourceLayer, index);
             var diffuseTexturePath = L2AssetManager.BuildClientPackageAssetPath(
-                L2AssetManager.SharedTexturesRoot,
+                L2AssetManager.SharedTerrainTexturesRoot,
                 referenceText,
                 "TEX",
                 "png",

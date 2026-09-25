@@ -43,6 +43,14 @@ internal static class PlayerCharacterPartAssetBuilder
 
     public static SceneSkeletalAsset BuildMeshOnlyAsset(SceneResourceLocation location, SceneSkeletalAsset baseAsset)
     {
+        return BuildMeshOnlyAsset(location, baseAsset, SceneCharacterPartBinding.MeshSkinning);
+    }
+
+    public static SceneSkeletalAsset BuildMeshOnlyAsset(
+        SceneResourceLocation location,
+        SceneSkeletalAsset baseAsset,
+        SceneCharacterPartBinding binding)
+    {
         if (location == null)
         {
             throw new ArgumentNullException(nameof(location));
@@ -71,7 +79,7 @@ internal static class PlayerCharacterPartAssetBuilder
 
         var meshSkeleton = BuildSkeleton(meshObject);
         var geometry = BuildGeometry(meshObject);
-        var remappedGeometry = RemapGeometryWeights(geometry, meshSkeleton, baseAsset.Skeleton);
+        var boundGeometry = ApplyBinding(geometry, meshSkeleton, binding);
         var materialSource = SceneSkeletalMeshCodec.DecodeSkeletalMesh(meshObject, location.PackagePath);
 
         return new SceneSkeletalAsset
@@ -82,8 +90,8 @@ internal static class PlayerCharacterPartAssetBuilder
             AnimationObjectName = baseAsset.AnimationObjectName,
             Source = "Mesh-only skeletal part asset reusing base player animation set",
             Details = $"Mesh={meshObject.ObjectName}\r\nAnimation={baseAsset.AnimationObjectName}\r\nMode=MeshOnlyPart",
-            Skeleton = baseAsset.Skeleton,
-            Mesh = remappedGeometry,
+            Skeleton = meshSkeleton,
+            Mesh = boundGeometry,
             AnimationSet = baseAsset.AnimationSet,
             MaterialBindings = BuildMaterialBindings(meshObject, location.PackagePath),
             PrimaryTextureReference = materialSource?.TextureRef,
@@ -249,6 +257,45 @@ internal static class PlayerCharacterPartAssetBuilder
         }
     }
 
+    private static SceneSkeletalGeometry ApplyBinding(
+        SceneSkeletalGeometry geometry,
+        SceneSkeletalSkeleton skeleton,
+        SceneCharacterPartBinding binding)
+    {
+        if (binding == SceneCharacterPartBinding.MeshSkinning)
+        {
+            return geometry;
+        }
+
+        if (binding != SceneCharacterPartBinding.RigidHead)
+        {
+            throw new ArgumentOutOfRangeException(nameof(binding), binding, null);
+        }
+
+        var headBone = skeleton.Bones.Single(x =>
+            string.Equals(x.Name, "Bip01_head", StringComparison.OrdinalIgnoreCase));
+        var weights = geometry.Points
+            .Select((_, pointIndex) => new SceneSkeletalWeight
+            {
+                Weight = 1f,
+                PointIndex = pointIndex,
+                BoneIndex = headBone.Index
+            })
+            .ToArray();
+
+        return new SceneSkeletalGeometry
+        {
+            Name = geometry.Name,
+            Points = geometry.Points,
+            Wedges = geometry.Wedges,
+            Faces = geometry.Faces,
+            Weights = weights,
+            SubMeshes = geometry.SubMeshes,
+            BoundsMin = geometry.BoundsMin,
+            BoundsMax = geometry.BoundsMax
+        };
+    }
+
     internal static SceneSkeletalGeometry RemapGeometryWeights(
         SceneSkeletalGeometry geometry,
         SceneSkeletalSkeleton sourceSkeleton,
@@ -257,6 +304,18 @@ internal static class PlayerCharacterPartAssetBuilder
         var sourceBonesByIndex = sourceSkeleton.Bones
             .OrderBy(x => x.Index)
             .ToArray();
+        var targetBonesByIndex = targetSkeleton.Bones
+            .OrderBy(x => x.Index)
+            .ToArray();
+        if (sourceBonesByIndex.Length <= targetBonesByIndex.Length &&
+            sourceBonesByIndex.Select((bone, index) =>
+                    bone.ParentIndex == targetBonesByIndex[index].ParentIndex &&
+                    string.Equals(bone.Name, targetBonesByIndex[index].Name, StringComparison.OrdinalIgnoreCase))
+                .All(x => x))
+        {
+            return geometry;
+        }
+
         var targetBoneIndexByName = targetSkeleton.Bones
             .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(x => x.Key, x => x.First().Index, StringComparer.OrdinalIgnoreCase);
@@ -338,6 +397,13 @@ internal static class PlayerCharacterPartAssetBuilder
     private static RuntimeVertex[] BuildVertices(UkxSkeletalMeshObject mesh)
     {
         var lod = mesh.LodModels.Length > 0 ? mesh.LodModels[0] : null;
+        if (lod != null && HasStandardLodVertices(lod) && lod.VertInfluences.Length > 0)
+        {
+            var standardVertices = new List<RuntimeVertex>();
+            BuildStandardVertices(lod.Points, lod.Wedges, lod.Faces, lod.VertInfluences, standardVertices);
+            return standardVertices.ToArray();
+        }
+
         if (lod != null && HasModernSectionVertices(lod))
         {
             var modernVertices = new List<RuntimeVertex>();

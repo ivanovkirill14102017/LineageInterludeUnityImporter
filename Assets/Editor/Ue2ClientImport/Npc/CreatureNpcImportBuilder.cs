@@ -76,8 +76,15 @@ internal static class CreatureNpcImportBuilder
 
     public static ImportResult ImportByIdentifier(string clientRoot, string creatureIdentifier, Action<string> log)
     {
-        var resolved = CreatureMeshLocator.ResolveByIdentifier(clientRoot, creatureIdentifier, log);
-        var characterName = string.IsNullOrWhiteSpace(creatureIdentifier)
+        var visual = new SceneCreatureVisualResolver().Resolve(clientRoot, creatureIdentifier);
+        var resolved = visual == null
+            ? CreatureMeshLocator.ResolveByIdentifier(clientRoot, creatureIdentifier, log)
+            : new CreatureMeshLocator.ResolvedCreaturePackage(
+                visual.MeshResource.PackagePath,
+                new SceneSkeletalMeshResolver().ResolveAssetNamed(visual.MeshResource.PackagePath, visual.MeshResource.ObjectName));
+        var characterName = visual != null
+            ? visual.MeshResource.ObjectName
+            : string.IsNullOrWhiteSpace(creatureIdentifier)
             ? resolved.SharedAsset.MeshObjectName
             : CreatureIdentifierUtility.NormalizeCreatureIdentifier(creatureIdentifier);
         characterName = string.IsNullOrWhiteSpace(characterName)
@@ -98,7 +105,8 @@ internal static class CreatureNpcImportBuilder
             referenceText,
             prefabNameSuffix: null,
             displayLabel: characterName,
-            log);
+            log,
+            attachedEffects: visual?.AttachedEffects);
         log?.Invoke($"Prefab ready: {result.PrefabPath}");
 
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(result.PrefabPath);
@@ -128,8 +136,15 @@ public static class CreatureNpcBatchImportCommand
         }
 
         var clientRoot = ConstInfo.L2GameClientPath;
-        var resolved = CreatureMeshLocator.ResolveByIdentifier(clientRoot, creatureId, Debug.Log);
-        var characterName = string.IsNullOrWhiteSpace(creatureId)
+        var visual = new SceneCreatureVisualResolver().Resolve(clientRoot, creatureId);
+        var resolved = visual == null
+            ? CreatureMeshLocator.ResolveByIdentifier(clientRoot, creatureId, Debug.Log)
+            : new CreatureMeshLocator.ResolvedCreaturePackage(
+                visual.MeshResource.PackagePath,
+                new SceneSkeletalMeshResolver().ResolveAssetNamed(visual.MeshResource.PackagePath, visual.MeshResource.ObjectName));
+        var characterName = visual != null
+            ? visual.MeshResource.ObjectName
+            : string.IsNullOrWhiteSpace(creatureId)
             ? resolved.SharedAsset.MeshObjectName
             : CreatureIdentifierUtility.NormalizeCreatureIdentifier(creatureId);
         characterName = string.IsNullOrWhiteSpace(characterName)
@@ -149,7 +164,8 @@ public static class CreatureNpcBatchImportCommand
             referenceText,
             prefabNameSuffix: null,
             displayLabel: characterName,
-            Debug.Log);
+            Debug.Log,
+            attachedEffects: visual?.AttachedEffects);
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[CreatureNpcBatchImportCommand] Imported '{characterName}'.");
@@ -314,7 +330,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         string displayLabel,
         Action<string> log,
         BuildContext context = null,
-        bool finalizeAssets = true)
+        bool finalizeAssets = true,
+        IReadOnlyList<SceneCreatureAttachedEffectData> attachedEffects = null)
     {
         if (sharedAsset == null)
         {
@@ -337,7 +354,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
             prefabNameSuffix,
             displayLabel,
             log,
-            finalizeAssets);
+            finalizeAssets,
+            attachedEffects: attachedEffects);
     }
 
     public static PreparedBuildData PrepareFromResolvedAsset(
@@ -380,12 +398,11 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         log?.Invoke($"[CreatureAnimator] Character asset ready: {characterAssetPath}");
 
         var materials = includeMaterials
-            ? CreatureSkeletalMaterialImporter.CreateMaterials(
-                characterAsset,
-                referenceText,
-                $"{assetObjectRoot}/Materials",
-                log,
-                activeContext)
+             ? CreatureSkeletalMaterialImporter.CreateMaterials(
+                 characterAsset,
+                 referenceText,
+                 log,
+                 activeContext)
             : Array.Empty<Material>();
         return new PreparedBuildData(
             referenceText,
@@ -411,7 +428,6 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         var materials = CreatureSkeletalMaterialImporter.CreateMaterials(
             prepared.CharacterAsset,
             prepared.ReferenceText,
-            $"{prepared.AssetRoot}/Materials",
             log,
             prepared.Context);
         return new PreparedBuildData(
@@ -433,7 +449,8 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         Action<string> log,
         bool finalizeAssets = true,
         string archetypeNameSuffix = null,
-        IReadOnlyList<L2CharacterSlotCatalogData> extraSlots = null)
+        IReadOnlyList<L2CharacterSlotCatalogData> extraSlots = null,
+        IReadOnlyList<SceneCreatureAttachedEffectData> attachedEffects = null)
     {
         if (prepared == null)
         {
@@ -442,18 +459,23 @@ internal static class L2SkeletalAnimatorPrefabBuilder
 
         var characterAsset = prepared.CharacterAsset;
         var materials = prepared.Materials ?? Array.Empty<Material>();
-        var skinnedMesh = CreatureSkinnedMeshBuilder.Build(characterAsset, materials, log, out _);
-        var meshPath = L2AssetManager.BuildAssetPathInFolder(
-            $"{prepared.AssetRoot}/Meshes",
+        var meshPath = L2AssetManager.BuildClientPackageAssetPath(
+            L2AssetManager.SharedSkeletalMeshesRoot,
+            prepared.ReferenceText,
             "SM",
-            characterAsset.MeshObjectName ?? prepared.CharacterName,
             "asset",
-            "skinned");
-        skinnedMesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(skinnedMesh, meshPath);
+            "SkeletalMeshes");
+        var skinnedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+        if (skinnedMesh == null)
+        {
+            skinnedMesh = CreatureSkinnedMeshBuilder.Build(characterAsset, materials, log, out _);
+            skinnedMesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(skinnedMesh, meshPath);
+        }
+
         log?.Invoke($"[CreatureAnimator] Skinned mesh ready: {meshPath}");
 
         var sequenceNames = CreatureSkeletalImportUtility.GetAllSequenceNames(characterAsset);
-        var clips = CreatureAnimationClipBuilder.Build(characterAsset, prepared.ReferenceText, prepared.AssetRoot, sequenceNames, log, out _);
+        var clips = CreatureAnimationClipBuilder.Build(characterAsset, sequenceNames, log, out _);
         var controller = CreatureAnimatorControllerBuilder.Build(characterAsset, prepared.ReferenceText, prepared.PrefabRoot, clips, log, out _);
         var archetype = ScriptableObject.CreateInstance<L2CreatureCharacterArchetypeAsset>();
         archetype.ArchetypeName = prepared.CharacterName;
@@ -480,7 +502,9 @@ internal static class L2SkeletalAnimatorPrefabBuilder
                             {
                                 Name = "Body_00",
                                 Mesh = skinnedMesh,
-                                Materials = materials
+                                Materials = materials,
+                                BoneNames = characterAsset.Bones.Select(x => x.Name).ToArray(),
+                                BoneParentIndices = characterAsset.Bones.Select(x => x.ParentIndex).ToArray()
                             }
                         }
                     }
@@ -512,7 +536,15 @@ internal static class L2SkeletalAnimatorPrefabBuilder
         CreatureSkeletalPrefabFactory.Create(
             archetype,
             prefabPath,
-            string.IsNullOrWhiteSpace(displayLabel) ? prepared.CharacterName : displayLabel);
+            string.IsNullOrWhiteSpace(displayLabel) ? prepared.CharacterName : displayLabel,
+            attachedEffects == null || attachedEffects.Count == 0
+                ? null
+                : new CreatureSkeletalPrefabFactory.EffectDecoration(
+                    attachedEffects,
+                    prepared.Context.ClientRoot,
+                    prepared.AssetRoot,
+                    prepared.CharacterName,
+                    log));
 
         if (finalizeAssets)
         {

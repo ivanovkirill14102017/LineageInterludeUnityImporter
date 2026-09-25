@@ -1,5 +1,9 @@
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
+[ExecuteAlways]
 [DisallowMultipleComponent]
 public sealed class L2SkillProjectileRuntime : MonoBehaviour
 {
@@ -18,6 +22,9 @@ public sealed class L2SkillProjectileRuntime : MonoBehaviour
     private float _elapsed;
     private bool _initialized;
     private bool _impactSpawned;
+#if UNITY_EDITOR
+    private double _lastEditorUpdateTime;
+#endif
 
     public void Initialize(
         L2SkillVisualController owner,
@@ -41,6 +48,9 @@ public sealed class L2SkillProjectileRuntime : MonoBehaviour
         _elapsed = 0f;
         _initialized = true;
         _impactSpawned = false;
+#if UNITY_EDITOR
+        _lastEditorUpdateTime = EditorApplication.timeSinceStartup;
+#endif
         transform.position = Origin;
         FaceTowards(Target - Origin);
     }
@@ -52,7 +62,8 @@ public sealed class L2SkillProjectileRuntime : MonoBehaviour
             return;
         }
 
-        _elapsed += Time.deltaTime;
+        var deltaTime = ResolveDeltaTime();
+        _elapsed += deltaTime;
         var t = Mathf.Clamp01(_elapsed / _duration);
         var position = Vector3.Lerp(Origin, Target, t);
         if (ArcHeight > 0f)
@@ -80,8 +91,42 @@ public sealed class L2SkillProjectileRuntime : MonoBehaviour
             _initialized = false;
             if (DestroyOnArrival)
             {
-                Destroy(gameObject);
+                DestroyRuntimeObject(gameObject);
             }
+        }
+    }
+
+    private float ResolveDeltaTime()
+    {
+        if (Application.isPlaying)
+        {
+            return Time.deltaTime;
+        }
+
+#if UNITY_EDITOR
+        var now = EditorApplication.timeSinceStartup;
+        var delta = Mathf.Clamp((float)(now - _lastEditorUpdateTime), 0.001f, 0.1f);
+        _lastEditorUpdateTime = now;
+        return delta;
+#else
+        return Time.deltaTime;
+#endif
+    }
+
+    private static void DestroyRuntimeObject(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
         }
     }
 
@@ -103,7 +148,10 @@ public sealed class L2SkillProjectileRuntime : MonoBehaviour
         _owner?.TrackRuntimeInstance(impact);
         if (ImpactLifetime > 0f)
         {
-            Destroy(impact, ImpactLifetime);
+            if (Application.isPlaying)
+            {
+                Destroy(impact, ImpactLifetime);
+            }
         }
     }
 

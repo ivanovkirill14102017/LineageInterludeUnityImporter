@@ -29,7 +29,6 @@ internal static class CreatureSkeletalMaterialImporter
     public static Material[] CreateMaterials(
         L2SkeletalCharacterAsset asset,
         string referenceText,
-        string assetRoot,
         Action<string> log,
         L2SkeletalAnimatorPrefabBuilder.BuildContext context)
     {
@@ -48,11 +47,18 @@ internal static class CreatureSkeletalMaterialImporter
         {
             var materialId = materialIds[i];
             var materialPath = L2AssetManager.BuildClientPackageAssetPath(
-                assetRoot,
+                L2AssetManager.ManagedSkeletalMaterialsRoot,
                 $"{referenceText}.Material{materialId:00}",
                 "MAT",
                 "mat",
                 "SkeletalMaterials");
+            var existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            if (existingMaterial != null)
+            {
+                materials[i] = existingMaterial;
+                continue;
+            }
+
             var material = new Material(shader)
             {
                 name = Path.GetFileNameWithoutExtension(materialPath),

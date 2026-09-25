@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
 using UnityEditor;
@@ -36,7 +35,11 @@ internal static class L2BspAssetBuilder
         bool reuseExistingMaterialTextureAssets = true)
     {
         var rootDir = $"{outputDir}/{assetSubdirName}";
-        var meshDir = $"{rootDir}/Meshes";
+        var meshDir = L2AssetManager.BuildClientPackageObjectRoot(
+            L2AssetManager.UnrealMeshesRoot,
+            mapKey,
+            assetSubdirName,
+            "Bsp");
         var materialDir = L2AssetManager.SharedMaterialsRoot;
         var textureDir = L2AssetManager.SharedTexturesRoot;
 
@@ -54,57 +57,28 @@ internal static class L2BspAssetBuilder
         var textureManager = new L2Viewer.SceneDomain.Services.MaterialServices.BspTextureManager(clientPath);
         var materialResolver = new L2Viewer.SceneDomain.Services.MaterialServices.SceneMaterialResolver(clientPath, textureManager);
 
-        log($"Building {assetSubdirName} BSP with {bspScene.Models.Length} models...");
-
-        log("[BSP] START Material graph resolve");
-        context?.Report("BSP", "Material graph resolve", 0.32f);
-        var materialResolveStopwatch = Stopwatch.StartNew();
         var materialRefs = CollectMaterialRequests(bspScene);
-        log($"BSP material requests: {materialRefs.Count}");
         var resolvedMaterialsBatch = materialResolver.ResolveMany(mapKey, materialRefs);
-        materialResolveStopwatch.Stop();
-        log($"BSP material graph resolve took {materialResolveStopwatch.Elapsed.TotalSeconds:F2}s");
-        log("[BSP] DONE Material graph resolve");
-
-        log("[BSP] START Texture resolve");
         context?.ThrowIfCancellationRequested();
-        context?.Report("BSP", "Texture resolve", 0.42f);
-        var textureResolveStopwatch = Stopwatch.StartNew();
         var textureRefs = CollectTextureRequests(resolvedMaterialsBatch);
-        log($"BSP texture requests: {textureRefs.Count}");
         var resolvedTexturesBatch = textureManager.ResolveMany(textureRefs);
-        textureResolveStopwatch.Stop();
-        log($"BSP texture resolve took {textureResolveStopwatch.Elapsed.TotalSeconds:F2}s");
-        log("[BSP] DONE Texture resolve");
-
-        log("[BSP] START Section preparation");
         context?.ThrowIfCancellationRequested();
-        context?.Report("BSP", "Section preparation", 0.52f);
-        var sectionPreparationStopwatch = Stopwatch.StartNew();
         var sectionEntries = CollectSectionEntries(
             bspScene,
             resolvedMaterialsBatch,
             meshDir,
             includePortalLike,
             includeInvisibleLike);
-        sectionPreparationStopwatch.Stop();
-        log($"BSP sections to import: {sectionEntries.Count}");
-        log($"BSP section preparation took {sectionPreparationStopwatch.Elapsed.TotalSeconds:F2}s");
-        log("[BSP] DONE Section preparation");
-
-        log("[BSP] START Geometry asset build");
         context?.ThrowIfCancellationRequested();
-        context?.Report("BSP", "Geometry asset build", 0.64f);
-        var geometryStopwatch = Stopwatch.StartNew();
-        var meshAssets = BuildMeshAssets(sectionEntries, resolvedTexturesBatch, context);
-        geometryStopwatch.Stop();
-        log($"BSP geometry asset build took {geometryStopwatch.Elapsed.TotalSeconds:F2}s");
-        log("[BSP] DONE Geometry asset build");
+        PrepareTextureAssets(
+            sectionEntries,
+            resolvedTexturesBatch,
+            mapKey,
+            textureDir,
+            textureCache,
+            reuseExistingMaterialTextureAssets,
+            log);
 
-        log("[BSP] START Material asset build");
-        context?.ThrowIfCancellationRequested();
-        context?.Report("BSP", "Material asset build", 0.76f);
-        var materialAssetStopwatch = Stopwatch.StartNew();
         var materialAssets = BuildMaterialAssets(
             sectionEntries,
             resolvedTexturesBatch,
@@ -117,14 +91,9 @@ internal static class L2BspAssetBuilder
             log,
             reuseExistingMaterialTextureAssets,
             context);
-        materialAssetStopwatch.Stop();
-        log($"BSP material asset build took {materialAssetStopwatch.Elapsed.TotalSeconds:F2}s");
-        log("[BSP] DONE Material asset build");
-
-        log("[BSP] START Object placement");
         context?.ThrowIfCancellationRequested();
-        context?.Report("BSP", "Object placement", 0.88f);
-        var placementStopwatch = Stopwatch.StartNew();
+        var meshAssets = BuildMeshAssets(sectionEntries, resolvedTexturesBatch, context);
+
         BuildSceneHierarchy(
             bspScene,
             parent,
@@ -134,9 +103,6 @@ internal static class L2BspAssetBuilder
             includePortalLike,
             includeInvisibleLike,
             context);
-        placementStopwatch.Stop();
-        log($"BSP object placement took {placementStopwatch.Elapsed.TotalSeconds:F2}s");
-        log("[BSP] DONE Object placement");
     }
 
     private static Dictionary<string, Mesh> BuildMeshAssets(
@@ -151,8 +117,15 @@ internal static class L2BspAssetBuilder
             foreach (var entry in sectionEntries)
             {
                 context?.ThrowIfCancellationRequested();
+                var existing = AssetDatabase.LoadAssetAtPath<Mesh>(entry.MeshAssetPath);
+                if (existing != null)
+                {
+                    meshAssets[entry.MeshAssetPath] = existing;
+                    continue;
+                }
+
                 var mesh = BuildSectionMesh(entry.Section, entry.ResolvedMaterial, resolvedTexturesBatch, entry.SectionName);
-                mesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(mesh, entry.MeshAssetPath);
+                mesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(mesh, entry.MeshAssetPath);
                 meshAssets[entry.MeshAssetPath] = mesh;
             }
         });
@@ -174,15 +147,6 @@ internal static class L2BspAssetBuilder
         MapImportExecutionContext context = null)
     {
         var materialAssets = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
-
-        PrepareTextureAssets(
-            sectionEntries,
-            resolvedTexturesBatch,
-            mapKey,
-            textureDir,
-            textureCache,
-            reuseExistingMaterialTextureAssets,
-            log);
 
         foreach (var entry in sectionEntries)
         {
@@ -556,8 +520,7 @@ internal static class L2BspAssetBuilder
         var traits = resolvedMaterial == null
             ? null
             : L2Viewer.SceneDomain.Services.MaterialServices.MaterialHeuristics.GetKnownTraits(resolvedMaterial);
-        var blendHint = traits?.BlendModeHint.ToString() ?? "Opaque";
-        var materialKey = $"{section.MaterialReference ?? section.StableName}_{blendHint}";
+        var materialKey = section.MaterialReference ?? section.StableName;
         if (materialCache.TryGetValue(materialKey, out var cached))
         {
             return cached;
@@ -572,8 +535,7 @@ internal static class L2BspAssetBuilder
             materialReference,
             "MAT",
             "mat",
-            $"{mapKey}/BspMaterials",
-            blendHint);
+            $"{mapKey}/BspMaterials");
         if (reuseExistingMaterialTextureAssets)
         {
             var existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);

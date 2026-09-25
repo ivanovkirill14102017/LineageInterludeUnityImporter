@@ -105,7 +105,7 @@ internal static class L2ModularCharacterPrefabFactory
         return bindings.ToArray();
     }
 
-    private static Transform ResolveSlotParent(Transform root, string slotName, IReadOnlyList<Transform> bones)
+    internal static Transform ResolveSlotParent(Transform root, string slotName, IReadOnlyList<Transform> bones)
     {
         if (string.Equals(slotName, "RightHand", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(slotName, "LeftRightHand", StringComparison.OrdinalIgnoreCase) ||

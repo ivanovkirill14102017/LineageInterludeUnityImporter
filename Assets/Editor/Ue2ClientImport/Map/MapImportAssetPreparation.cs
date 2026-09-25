@@ -16,7 +16,6 @@ internal static class MapImportAssetPreparation
         }
 
         L2AssetManager.EnsureFolderExists(outputDir);
-        L2AssetManager.EnsureFolderExists($"{outputDir}/Meshes");
     }
 
     public static void EnsureMapOutputFolderExists(string outputDir)

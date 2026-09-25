@@ -120,7 +120,21 @@ public sealed class L2SkillVisualLayerData
     public string StaticMeshReference;
     public L2ResourceReferenceData StaticMeshResourceReference;
     public L2ResourceLocationData StaticMeshResource;
+    public L2SkillVisualMeshPartData[] MeshParts = Array.Empty<L2SkillVisualMeshPartData>();
     public string TextureReference;
+    public bool HasDrawStyle;
+    public byte DrawStyle;
+    public bool UseMeshBlendMode;
+    public bool HasTextureUSubdivisions;
+    public int TextureUSubdivisions;
+    public bool HasTextureVSubdivisions;
+    public int TextureVSubdivisions;
+    public bool HasSubdivisionStart;
+    public int SubdivisionStart;
+    public bool HasSubdivisionEnd;
+    public int SubdivisionEnd;
+    public bool UseRandomSubdivision;
+    public bool BlendBetweenSubdivisions;
     public L2ResourceReferenceData TextureResourceReference;
     public L2ResourceLocationData TextureResource;
     public bool HasOpacity;
@@ -149,6 +163,18 @@ public sealed class L2SkillVisualLayerData
     public L2RangeVectorData SpinsPerSecondRange;
     public L2ParticleColorScaleData[] ColorScale = Array.Empty<L2ParticleColorScaleData>();
     public L2ParticleSizeScaleData[] SizeScale = Array.Empty<L2ParticleSizeScaleData>();
+}
+
+[Serializable]
+public sealed class L2SkillVisualMeshPartData
+{
+    public int SubMeshIndex;
+    public int MaterialId;
+    public int TriangleCount;
+    public string MaterialReference;
+    public L2ResourceLocationData MaterialResource;
+    public string PrimaryTextureReference;
+    public L2ResourceLocationData PrimaryTextureResource;
 }
 
 [Serializable]

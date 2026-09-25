@@ -19,7 +19,7 @@ RenderSettings:
   m_FogMode: 1
   m_FogDensity: 0.01
   m_LinearFogStart: 0
-  m_LinearFogEnd: 457.14288
+  m_LinearFogEnd: 685.7143
   m_AmbientSkyColor: {r: 0.161, g: 0.22399999, b: 0.322, a: 0.35}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 1
+  m_ReflectionIntensity: 0.214
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
   m_UseRadianceAmbientProbe: 0
@@ -287,6 +287,38 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &277020755
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 277020756}
+  m_Layer: 0
+  m_Name: L2SceneStreaming
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &277020756
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 277020755}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1053614514}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &278859419
@@ -718,8 +750,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 522832509}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.070747726, y: 0.82601166, z: -0.10959402, w: -0.54835075}
-  m_LocalPosition: {x: 8158.249, y: -191.89966, z: -841.11}
+  m_LocalRotation: {x: 0.0026536335, y: 0.95693386, z: 0.003575531, w: -0.29027206}
+  m_LocalPosition: {x: 648.858, y: -190.46333, z: 3762.7046}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -924,19 +956,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 329940538279213744, guid: f36227b8e8bf144499a739f504b45f01, type: 3}
       propertyPath: m_LocalRotation.w
-      value: -0.5483508
+      value: -0.29027206
       objectReference: {fileID: 0}
     - target: {fileID: 329940538279213744, guid: f36227b8e8bf144499a739f504b45f01, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0.07074773
+      value: -0.0026536335
       objectReference: {fileID: 0}
     - target: {fileID: 329940538279213744, guid: f36227b8e8bf144499a739f504b45f01, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0.8260117
+      value: -0.95693386
       objectReference: {fileID: 0}
     - target: {fileID: 329940538279213744, guid: f36227b8e8bf144499a739f504b45f01, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0.109594025
+      value: -0.003575531
       objectReference: {fileID: 0}
     - target: {fileID: 329940538279213744, guid: f36227b8e8bf144499a739f504b45f01, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -971,6 +1003,60 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f36227b8e8bf144499a739f504b45f01, type: 3}
+--- !u!1 &1053614513
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1053614514}
+  - component: {fileID: 1053614515}
+  m_Layer: 0
+  m_Name: 20_20
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1053614514
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1053614513}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 277020756}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1053614515
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1053614513}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23d6c6fb8ad84e44a94cbf592c70d47c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::L2MapSceneLoader
+  LoadMapsInEditMode: 1
+  LoadMapsInPlayMode: 1
+  NeighborRadius: 1
+  Viewer: {fileID: 0}
+  Maps:
+  - ScenePath: Assets/L2Imported/20_20/Scenes/20_20.unity
+    GridX: -1
+    GridZ: -1
+    Center: {x: 723.5202, y: 204.37201, z: 2320.428}
+    Size: {x: 1698.692, y: 1981.608, z: 4796.329}
 --- !u!1 &1456285196
 GameObject:
   m_ObjectHideFlags: 0
@@ -1220,10 +1306,10 @@ MonoBehaviour:
   fogSourceScale: 1
   effectiveIndoorFogAttenuationDistance: 125
   effectiveIndoorVolumetricFogDistance: 5
-  targetFogAttenuationDistance: 457.14288
-  currentFogAttenuationDistance: 457.14288
-  targetVolumetricFogDistance: 457.14288
-  currentVolumetricFogDistance: 457.14288
+  targetFogAttenuationDistance: 685.7143
+  currentFogAttenuationDistance: 685.7143
+  targetVolumetricFogDistance: 685.7143
+  currentVolumetricFogDistance: 685.7143
 --- !u!4 &1970690611
 Transform:
   m_ObjectHideFlags: 0
@@ -1364,3 +1450,4 @@ SceneRoots:
   - {fileID: 1625496075}
   - {fileID: 278859423}
   - {fileID: 1975645470}
+  - {fileID: 277020756}

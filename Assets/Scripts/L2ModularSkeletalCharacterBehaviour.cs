@@ -113,6 +113,13 @@ public abstract class L2ModularSkeletalCharacterBehaviour : MonoBehaviour
 
     protected virtual void OnEnable()
     {
+#if UNITY_EDITOR
+        if (!Application.isPlaying && EditorUtility.IsPersistent(this))
+        {
+            return;
+        }
+#endif
+
         ApplyAppearance();
         if (Application.isPlaying)
         {
@@ -122,9 +129,9 @@ public abstract class L2ModularSkeletalCharacterBehaviour : MonoBehaviour
 
     protected virtual void OnValidate()
     {
-        ApplyAppearance();
         if (Application.isPlaying)
         {
+            ApplyAppearance();
             ApplyAnimation();
         }
     }
@@ -173,14 +180,150 @@ public abstract class L2ModularSkeletalCharacterBehaviour : MonoBehaviour
 
             AssignRuntimeMesh(renderer, parts[i].Mesh);
             renderer.sharedMaterials = parts[i].Materials ?? Array.Empty<Material>();
-            renderer.rootBone = RootBone;
-            renderer.bones = Bones ?? Array.Empty<Transform>();
+            if (parts[i].UsesOwnSkeleton)
+            {
+                ApplyOwnSkeleton(renderer, parts[i]);
+            }
+            else
+            {
+                RemoveOwnSkeleton(renderer);
+                renderer.rootBone = RootBone;
+                renderer.bones = ResolvePartBones(parts[i]);
+            }
             renderer.updateWhenOffscreen = true;
             renderer.localBounds = renderer.sharedMesh != null ? renderer.sharedMesh.bounds : default;
             renderer.transform.localPosition = Vector3.zero;
             renderer.transform.localRotation = Quaternion.identity;
             renderer.transform.localScale = Vector3.one;
             renderer.enabled = parts[i].Mesh != null;
+        }
+    }
+
+    private Transform[] ResolvePartBones(L2CharacterVariantPartData part)
+    {
+        return L2SkeletalBoneBinding.Resolve(
+            Bones,
+            SkeletonRoot,
+            part.BoneNames,
+            part.BoneParentIndices,
+            part.Name);
+    }
+
+    private void ApplyOwnSkeleton(SkinnedMeshRenderer renderer, L2CharacterVariantPartData part)
+    {
+        var names = part.BoneNames ?? Array.Empty<string>();
+        var parents = part.BoneParentIndices ?? Array.Empty<int>();
+        var bindPoses = part.Mesh != null ? part.Mesh.bindposes : Array.Empty<Matrix4x4>();
+        if (names.Length != parents.Length || names.Length != bindPoses.Length)
+        {
+            throw new InvalidOperationException(
+                $"Attached part '{part.Name}' has {names.Length} bones, {parents.Length} parents and {bindPoses.Length} bind poses.");
+        }
+
+        if (TryReuseOwnSkeleton(renderer, names, parents))
+        {
+            return;
+        }
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying && EditorUtility.IsPersistent(renderer))
+        {
+            return;
+        }
+#endif
+
+        RemoveOwnSkeleton(renderer);
+
+        var skeletonRoot = new GameObject("PartSkeleton").transform;
+        skeletonRoot.SetParent(renderer.transform, false);
+        var bones = new Transform[names.Length];
+        for (var index = 0; index < names.Length; index++)
+        {
+            bones[index] = new GameObject(names[index]).transform;
+        }
+
+        Transform rootBone = null;
+        for (var index = 0; index < bones.Length; index++)
+        {
+            var parentIndex = parents[index];
+            var parent = parentIndex >= 0 && parentIndex < bones.Length
+                ? bones[parentIndex]
+                : skeletonRoot;
+            var localBindMatrix = parentIndex >= 0 && parentIndex < bindPoses.Length
+                ? bindPoses[parentIndex] * bindPoses[index].inverse
+                : bindPoses[index].inverse;
+            bones[index].SetParent(parent, false);
+            bones[index].localPosition = localBindMatrix.GetColumn(3);
+            bones[index].localRotation = localBindMatrix.rotation;
+            bones[index].localScale = localBindMatrix.lossyScale;
+            if (parentIndex < 0 && rootBone == null)
+            {
+                rootBone = bones[index];
+            }
+        }
+
+        renderer.rootBone = rootBone ?? skeletonRoot;
+        renderer.bones = bones;
+    }
+
+    private static bool TryReuseOwnSkeleton(
+        SkinnedMeshRenderer renderer,
+        string[] names,
+        int[] parents)
+    {
+        var skeletonRoot = renderer != null ? renderer.transform.Find("PartSkeleton") : null;
+        var bones = renderer != null ? renderer.bones : Array.Empty<Transform>();
+        if (skeletonRoot == null || bones.Length != names.Length)
+        {
+            return false;
+        }
+
+        Transform rootBone = null;
+        for (var index = 0; index < bones.Length; index++)
+        {
+            var bone = bones[index];
+            var expectedParent = parents[index] >= 0 && parents[index] < bones.Length
+                ? bones[parents[index]]
+                : skeletonRoot;
+            if (bone == null ||
+                !string.Equals(bone.name, names[index], StringComparison.Ordinal) ||
+                bone.parent != expectedParent)
+            {
+                return false;
+            }
+
+            if (parents[index] < 0 && rootBone == null)
+            {
+                rootBone = bone;
+            }
+        }
+
+        renderer.rootBone = rootBone ?? skeletonRoot;
+        return true;
+    }
+
+    private void RemoveOwnSkeleton(SkinnedMeshRenderer renderer)
+    {
+        var skeleton = renderer != null ? renderer.transform.Find("PartSkeleton") : null;
+        if (skeleton == null)
+        {
+            return;
+        }
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying && EditorUtility.IsPersistent(skeleton))
+        {
+            return;
+        }
+#endif
+
+        if (Application.isPlaying)
+        {
+            Destroy(skeleton.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(skeleton.gameObject);
         }
     }
 

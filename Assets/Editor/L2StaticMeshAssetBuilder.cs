@@ -434,7 +434,7 @@ internal static class L2StaticMeshAssetBuilder
                 }
 
                 var meshAssetPath = L2AssetManager.BuildClientPackageAssetPath(
-                    meshDir,
+                    L2AssetManager.ManagedStaticMeshCollidersRoot,
                     meshReference,
                     "SMC",
                     "asset",

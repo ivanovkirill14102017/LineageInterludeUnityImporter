@@ -37,18 +37,19 @@ internal static class StaticMeshMaterialImporter
                     textureCatalog.TraitsByBindingKey.TryGetValue(bindingKey, out var traits);
                     textureCatalog.PrimaryTextureReferenceByBindingKey.TryGetValue(bindingKey, out var textureReference);
                     var texture = ResolvePrimaryTexture(textureReference, textureCatalog);
-                    var blendHint = traits?.BlendModeHint.ToString() ?? "Opaque";
-                    var materialKey = $"{textureReference ?? $"Tex_Mat{materialId}"}_{blendHint}";
+                    var materialReference = ResolveSurfaceReference(subMesh, meshReference, materialId);
+                    var materialKey = materialReference ?? "<UnrealNullMaterial>";
 
                     if (!materialCache.TryGetValue(materialKey, out var material))
                     {
-                        var materialPath = L2AssetManager.BuildClientPackageAssetPath(
-                            materialDir,
-                            textureReference,
-                            "MAT",
-                            "mat",
-                            $"{mapKey}/StaticMeshMaterials",
-                            blendHint);
+                        var materialPath = materialReference == null
+                            ? BuildNullMaterialPath()
+                            : L2AssetManager.BuildClientPackageAssetPath(
+                                materialDir,
+                                materialReference,
+                                "MAT",
+                                "mat",
+                                $"{mapKey}/StaticMeshMaterials");
 
                         material = reuseExistingMaterialTextureAssets
                             ? AssetDatabase.LoadAssetAtPath<Material>(materialPath)
@@ -84,6 +85,55 @@ internal static class StaticMeshMaterialImporter
         });
 
         return catalog;
+    }
+
+    private static string ResolveSurfaceReference(
+        SceneStaticMeshSubMeshDefinition subMesh,
+        string meshReference,
+        int materialId)
+    {
+        if (subMesh == null)
+        {
+            throw new System.InvalidOperationException(
+                $"Static mesh '{meshReference}' has geometry for material slot {materialId}, but SceneDomain did not return its submesh description.");
+        }
+
+        var materialReference = subMesh.MaterialResource?.Reference ?? subMesh.MaterialReference;
+        if (!string.IsNullOrWhiteSpace(materialReference))
+        {
+            return materialReference;
+        }
+
+        if (subMesh.Material?.RootClass == L2Viewer.UtxFile.MaterialGraphRootClass.Texture)
+        {
+            return subMesh.PrimaryTextureResource?.Reference
+                ?? subMesh.PrimaryTextureReference
+                ?? throw new System.InvalidOperationException(
+                    $"Static mesh '{meshReference}' material slot {materialId} is a Texture root without its own resource reference.");
+        }
+
+        if (subMesh.Material == null &&
+            subMesh.MaterialResource == null &&
+            string.IsNullOrWhiteSpace(subMesh.MaterialReference) &&
+            subMesh.PrimaryTextureResource == null &&
+            string.IsNullOrWhiteSpace(subMesh.PrimaryTextureReference))
+        {
+            return null;
+        }
+
+        throw new System.InvalidOperationException(
+            $"Static mesh '{meshReference}' material slot {materialId} has a material graph without its root resource reference. " +
+            $"RootClass={subMesh.Material?.RootClass.ToString() ?? "<null>"}.");
+    }
+
+    private static string BuildNullMaterialPath()
+    {
+        L2AssetManager.EnsureFolderExists(L2AssetManager.ManagedStaticMeshMaterialsRoot);
+        return L2AssetManager.BuildAssetPathInFolder(
+            L2AssetManager.ManagedStaticMeshMaterialsRoot,
+            "MAT",
+            "NullMaterial",
+            "mat");
     }
 
     private static Texture2D ResolvePrimaryTexture(string textureReference, StaticMeshTextureCatalog textureCatalog)

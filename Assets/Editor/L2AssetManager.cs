@@ -8,17 +8,31 @@ using L2Viewer.PackageCore;
 internal static class L2AssetManager
 {
     public static string SharedPackagesRoot => $"{MapImportPaths.OutputRoot}/ClientPackages";
-    public static string SharedAnimationsRoot => $"{SharedPackagesRoot}/Animations";
-    public static string SharedStaticMeshesRoot => $"{SharedPackagesRoot}/StaticMeshes";
-    public static string SharedSkeletalCharactersRoot => SharedAnimationsRoot;
+    public static string UnrealTexturesRoot => "Assets/L2Import_Textures";
+    public static string UnrealMaterialsRoot => "Assets/L2Import_Materials";
+    public static string UnrealMeshesRoot => "Assets/L2Import_Meshes";
+    public static string UnrealAnimationsRoot => "Assets/L2Import_Animations";
+    public static string SharedAnimationsRoot => UnrealAnimationsRoot;
+    public static string SharedStaticMeshesRoot => UnrealMeshesRoot;
+    public static string SharedSkeletalMeshesRoot => UnrealMeshesRoot;
+    public static string SharedSkeletalCharactersRoot => $"{SharedPackagesRoot}/SkeletalCharacters";
     public static string ManagedStaticMeshPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshPrefabs";
     public static string ManagedTerrainDetailPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/TerrainDetailPrefabs";
     public static string ManagedTerrainTreePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/TerrainTreePrefabs";
     public static string ManagedTerrainTreeMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/TerrainTreeMaterials";
     public static string ManagedCreaturePrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/CreaturePrefabs";
     public static string ManagedPlayerCharacterPrefabsRoot => $"{MapImportPaths.OutputRoot}/Managed/PlayerCharacterPrefabs";
-    public static string SharedMaterialsRoot => $"{SharedPackagesRoot}/Materials";
-    public static string SharedTexturesRoot => $"{SharedPackagesRoot}/Textures";
+    public static string ManagedParticleMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/ParticleMaterials";
+    public static string ManagedSkeletalMeshAdaptationsRoot => $"{MapImportPaths.OutputRoot}/Managed/SkeletalMeshAdaptations";
+    public static string ManagedSkeletalMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/SkeletalMaterials";
+    public static string ManagedSkillMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/SkillMaterials";
+    public static string ManagedParticleMeshesRoot => $"{MapImportPaths.OutputRoot}/Managed/ParticleMeshes";
+    public static string ManagedStaticMeshCollidersRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshColliders";
+    public static string ManagedStaticMeshMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/StaticMeshMaterials";
+    public static string ManagedFallbackMaterialsRoot => $"{MapImportPaths.OutputRoot}/Managed/FallbackMaterials";
+    public static string SharedMaterialsRoot => UnrealMaterialsRoot;
+    public static string SharedTexturesRoot => UnrealTexturesRoot;
+    public static string SharedTerrainTexturesRoot => $"{SharedPackagesRoot}/Textures";
     public static string SharedTerrainLayersRoot => $"{SharedPackagesRoot}/TerrainLayers";
 
     public static Texture2D CreateTextureAsset(TextureData textureData, string assetPath, bool linear, bool generateAlphaIfMissing = false)

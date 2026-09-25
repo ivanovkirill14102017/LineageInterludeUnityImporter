@@ -59,9 +59,6 @@ internal static class PlayerCharacterSkeletonMergeUtility
             .OrderBy(x => x.Index)
             .Select((bone, index) => CloneBone(bone, index, bone.ParentIndex))
             .ToList();
-        var mergedBoneIndexByName = mergedBones
-            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(x => x.Key, x => x.First().Index, StringComparer.OrdinalIgnoreCase);
 
         foreach (var skeleton in additionalSkeletons ?? Array.Empty<SceneSkeletalSkeleton>())
         {
@@ -74,14 +71,15 @@ internal static class PlayerCharacterSkeletonMergeUtility
                 .OrderBy(x => x.Index)
                 .ToArray();
             var sourceRemap = new Dictionary<int, int>();
+            var sourceUsedTargetIndices = new HashSet<int>();
             for (var boneIndex = 0; boneIndex < sourceBones.Length; boneIndex++)
             {
                 EnsureBoneIncluded(
                     boneIndex,
                     sourceBones,
                     mergedBones,
-                    mergedBoneIndexByName,
-                    sourceRemap);
+                    sourceRemap,
+                    sourceUsedTargetIndices);
             }
         }
 
@@ -95,9 +93,9 @@ internal static class PlayerCharacterSkeletonMergeUtility
     private static int EnsureBoneIncluded(
         int sourceBoneIndex,
         SceneSkeletalBone[] sourceBones,
-        ICollection<SceneSkeletalBone> mergedBones,
-        IDictionary<string, int> mergedBoneIndexByName,
-        IDictionary<int, int> sourceRemap)
+        IList<SceneSkeletalBone> mergedBones,
+        IDictionary<int, int> sourceRemap,
+        ISet<int> sourceUsedTargetIndices)
     {
         if (sourceRemap.TryGetValue(sourceBoneIndex, out var existingIndex))
         {
@@ -105,13 +103,6 @@ internal static class PlayerCharacterSkeletonMergeUtility
         }
 
         var sourceBone = sourceBones[sourceBoneIndex];
-        if (!string.IsNullOrWhiteSpace(sourceBone.Name) &&
-            mergedBoneIndexByName.TryGetValue(sourceBone.Name, out existingIndex))
-        {
-            sourceRemap[sourceBoneIndex] = existingIndex;
-            return existingIndex;
-        }
-
         var parentIndex = -1;
         if (sourceBone.ParentIndex >= 0 && sourceBone.ParentIndex < sourceBones.Length && sourceBone.ParentIndex != sourceBoneIndex)
         {
@@ -119,19 +110,28 @@ internal static class PlayerCharacterSkeletonMergeUtility
                 sourceBone.ParentIndex,
                 sourceBones,
                 mergedBones,
-                mergedBoneIndexByName,
-                sourceRemap);
+                sourceRemap,
+                sourceUsedTargetIndices);
+        }
+
+        for (var index = 0; index < mergedBones.Count; index++)
+        {
+            var candidate = mergedBones[index];
+            if (!sourceUsedTargetIndices.Contains(index) &&
+                candidate.ParentIndex == parentIndex &&
+                string.Equals(candidate.Name, sourceBone.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                sourceRemap[sourceBoneIndex] = index;
+                sourceUsedTargetIndices.Add(index);
+                return index;
+            }
         }
 
         var mergedIndex = mergedBones.Count;
         var mergedBone = CloneBone(sourceBone, mergedIndex, parentIndex);
         mergedBones.Add(mergedBone);
-        if (!string.IsNullOrWhiteSpace(mergedBone.Name) && !mergedBoneIndexByName.ContainsKey(mergedBone.Name))
-        {
-            mergedBoneIndexByName[mergedBone.Name] = mergedIndex;
-        }
-
         sourceRemap[sourceBoneIndex] = mergedIndex;
+        sourceUsedTargetIndices.Add(mergedIndex);
         return mergedIndex;
     }
 

@@ -47,10 +47,8 @@ internal static class L2SceneVolumeAssetBuilder
         }
 
         var materialCache = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
-        var waterTextureDir = $"{outputDir}/Volumes/Textures";
         var waterMaterialDir = $"{outputDir}/Volumes/Materials";
         L2AssetManager.EnsureFolderExists($"{outputDir}/Volumes");
-        L2AssetManager.EnsureFolderExists(waterTextureDir);
         L2AssetManager.EnsureFolderExists(waterMaterialDir);
         var count = 0;
 
@@ -102,7 +100,6 @@ internal static class L2SceneVolumeAssetBuilder
                     renderer.sharedMaterial = GetVolumeMaterial(
                         volume,
                         waterTextures,
-                        waterTextureDir,
                         waterMaterialDir,
                         materialCache);
                 }
@@ -158,7 +155,6 @@ internal static class L2SceneVolumeAssetBuilder
     private static Material GetVolumeMaterial(
         L2Viewer.SceneDomain.Models.SceneVolumeData volume,
         Dictionary<int, (L2Viewer.PackageCore.TextureData Texture, string ReferenceText)> waterTextures,
-        string waterTextureDir,
         string waterMaterialDir,
         Dictionary<string, Material> cache)
     {
@@ -176,8 +172,17 @@ internal static class L2SceneVolumeAssetBuilder
 
         var shader = L2MaterialUtility.FindBestLitShader();
         var safeTextureName = waterTexture.ReferenceText;
-        var texturePath = AssetDatabase.GenerateUniqueAssetPath($"{waterTextureDir}/TEX_{safeTextureName}.png");
-        var texture = L2AssetManager.CreateTextureAsset(waterTexture.Texture, texturePath, false, true);
+        var texturePath = L2AssetManager.BuildClientPackageAssetPath(
+            L2AssetManager.SharedTexturesRoot,
+            waterTexture.ReferenceText,
+            "TEX",
+            "png",
+            "WaterVolumeTextures");
+        var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+        if (texture == null)
+        {
+            texture = L2AssetManager.CreateTextureAsset(waterTexture.Texture, texturePath, false, true);
+        }
 
         var material = new Material(shader)
         {

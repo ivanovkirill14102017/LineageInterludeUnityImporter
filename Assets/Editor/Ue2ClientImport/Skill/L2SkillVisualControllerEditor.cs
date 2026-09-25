@@ -6,6 +6,8 @@ using UnityEngine;
 [CustomEditor(typeof(L2SkillVisualController))]
 public sealed class L2SkillVisualControllerEditor : Editor
 {
+    private bool _showAdvanced;
+
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
@@ -15,66 +17,136 @@ public sealed class L2SkillVisualControllerEditor : Editor
         DrawSkillAssetDropdown(controller);
         serializedObject.Update();
 
+        DrawAnchors();
+        DrawPlaybackSettings(controller);
+        DrawTimeline(controller);
+        DrawAdvanced(controller);
+
+        serializedObject.ApplyModifiedProperties();
+    }
+
+    private void DrawAnchors()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Preview Rig", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.CastPoint)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.TargetPoint)));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.StageContainer)));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.RuntimeContainer)));
+    }
 
+    private void DrawPlaybackSettings(L2SkillVisualController controller)
+    {
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Playback", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.PlayOnEnable)));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.LoopSelectedStage)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.PlayImpactAfterProjectile)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.StageIntervalSeconds)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.ProjectileSpeed)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.ProjectileArcHeight)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.RuntimeInstanceLifetime)));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.IsPlaying)));
 
-        DrawStageDropdown(controller);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.StageBindings)), true);
-
-        EditorGUILayout.Space();
         using (new EditorGUILayout.HorizontalScope())
         {
-            using (new EditorGUI.DisabledScope(controller.StageBindings == null || controller.StageBindings.Length == 0))
+            using (new EditorGUI.DisabledScope(!HasStages(controller)))
             {
-                if (GUILayout.Button(Application.isPlaying ? "Play Selected" : "Preview Selected"))
+                if (GUILayout.Button("Play Full Visual"))
                 {
-                    serializedObject.ApplyModifiedProperties();
-                    controller.PlaySelectedStage();
-                    EditorUtility.SetDirty(controller);
-                    serializedObject.Update();
-                }
-
-                if (GUILayout.Button("Play Sequence"))
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    controller.PlayAllStages();
-                    EditorUtility.SetDirty(controller);
-                    serializedObject.Update();
+                    ApplyAndRun(controller, c => c.PlayAllStages());
                 }
 
                 if (GUILayout.Button("Stop"))
                 {
-                    serializedObject.ApplyModifiedProperties();
-                    controller.Stop();
-                    EditorUtility.SetDirty(controller);
-                    serializedObject.Update();
+                    ApplyAndRun(controller, c => c.Stop());
                 }
             }
         }
 
-        if (GUILayout.Button("Rebuild Stage Bindings From Children"))
+        using (new EditorGUI.DisabledScope(controller.Skill == null))
+        {
+            if (GUILayout.Button("Reload Visual From Asset"))
+            {
+                ApplyAndRun(controller, c => c.ApplySkillTemplate(c.Skill));
+            }
+        }
+    }
+
+    private void DrawTimeline(L2SkillVisualController controller)
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Visual Steps", EditorStyles.boldLabel);
+
+        var bindings = controller.StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
+        if (bindings.Length == 0)
+        {
+            EditorGUILayout.HelpBox("No visual steps are configured on this controller.", MessageType.Info);
+            return;
+        }
+
+        var selected = Mathf.Clamp(controller.SelectedStageIndex, 0, bindings.Length - 1);
+        var nextSelected = EditorGUILayout.Popup("Selected Step", selected, controller.GetStageDisplayNames());
+        if (nextSelected != selected)
         {
             serializedObject.ApplyModifiedProperties();
-            Undo.RegisterFullObjectHierarchyUndo(controller.gameObject, "Rebuild skill stage bindings");
-            controller.RebuildStageBindingsFromChildren();
+            Undo.RecordObject(controller, "Change selected skill visual step");
+            controller.SetSelectedStage(nextSelected, preview: false);
             EditorUtility.SetDirty(controller);
             serializedObject.Update();
         }
 
-        serializedObject.ApplyModifiedProperties();
+        for (var i = 0; i < bindings.Length; i++)
+        {
+            var binding = bindings[i];
+            if (binding == null)
+            {
+                continue;
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var wasSelected = i == controller.SelectedStageIndex;
+                var labelStyle = wasSelected ? EditorStyles.boldLabel : EditorStyles.label;
+                EditorGUILayout.LabelField(BuildStepLabel(i, binding), labelStyle, GUILayout.MinWidth(220f));
+
+                if (GUILayout.Button("View", GUILayout.Width(54f)))
+                {
+                    ApplyAndRun(controller, c => c.PreviewStageAt(i));
+                }
+
+                if (GUILayout.Button("Play", GUILayout.Width(54f)))
+                {
+                    ApplyAndRun(controller, c => c.PlayStageAt(i));
+                }
+
+                if (GUILayout.Button("From", GUILayout.Width(54f)))
+                {
+                    ApplyAndRun(controller, c => c.PlayAllStagesFrom(i));
+                }
+            }
+        }
+    }
+
+    private void DrawAdvanced(L2SkillVisualController controller)
+    {
+        EditorGUILayout.Space();
+        _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "Advanced", true);
+        if (!_showAdvanced)
+        {
+            return;
+        }
+
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.PlayOnEnable)));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.LoopSelectedStage)));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.IsPlaying)));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.StageContainer)));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.RuntimeContainer)));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.StageBindings)), true);
+
+        if (GUILayout.Button("Rebuild Steps From Children"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RegisterFullObjectHierarchyUndo(controller.gameObject, "Rebuild skill visual steps");
+            controller.RebuildStageBindingsFromChildren();
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
     }
 
     private void DrawSkillAssetDropdown(L2SkillVisualController controller)
@@ -124,25 +196,26 @@ public sealed class L2SkillVisualControllerEditor : Editor
         }
     }
 
-    private void DrawStageDropdown(L2SkillVisualController controller)
+    private static bool HasStages(L2SkillVisualController controller)
     {
-        var stageNames = controller.GetStageDisplayNames();
-        if (stageNames.Length == 0)
-        {
-            EditorGUILayout.HelpBox("No stage bindings are configured on this controller.", MessageType.Info);
-            return;
-        }
+        return controller.StageBindings != null && controller.StageBindings.Length > 0;
+    }
 
-        var selected = Mathf.Clamp(controller.SelectedStageIndex, 0, stageNames.Length - 1);
-        var nextSelected = EditorGUILayout.Popup("Selected Stage", selected, stageNames);
-        if (nextSelected != selected)
-        {
-            serializedObject.ApplyModifiedProperties();
-            Undo.RecordObject(controller, "Change selected skill stage");
-            controller.SetSelectedStage(nextSelected, preview: false);
-            EditorUtility.SetDirty(controller);
-            serializedObject.Update();
-        }
+    private static string BuildStepLabel(int index, L2SkillVisualStageBinding binding)
+    {
+        var name = string.IsNullOrWhiteSpace(binding.StageName)
+            ? binding.StageRoot != null ? binding.StageRoot.name : $"Step {index}"
+            : binding.StageName;
+        return $"{index + 1:00}. {binding.Role} - {name}";
+    }
+
+    private void ApplyAndRun(L2SkillVisualController controller, Action<L2SkillVisualController> action)
+    {
+        serializedObject.ApplyModifiedProperties();
+        Undo.RegisterFullObjectHierarchyUndo(controller.gameObject, "Preview skill visual");
+        action(controller);
+        EditorUtility.SetDirty(controller);
+        serializedObject.Update();
     }
 
     private void ApplySkillTemplateWithUndo(L2SkillVisualController controller, L2SkillVisualAsset nextSkill)

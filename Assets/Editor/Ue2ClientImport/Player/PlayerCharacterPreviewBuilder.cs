@@ -44,6 +44,8 @@ internal static class PlayerCharacterPreviewBuilder
         public string Name { get; set; }
         public Mesh Mesh { get; set; }
         public Material[] Materials { get; set; }
+        public string[] BoneNames { get; set; }
+        public int[] BoneParentIndices { get; set; }
     }
 
     public static ImportResult Import(
@@ -91,8 +93,6 @@ internal static class PlayerCharacterPreviewBuilder
         var sequenceNames = CreatureSkeletalImportUtility.GetAllSequenceNames(baseAsset);
         var clips = CreatureAnimationClipBuilder.Build(
             baseAsset,
-            referenceText,
-            PlayerCharacterImportBuilder.PrefabOutputRoot,
             sequenceNames,
             log,
             out _);
@@ -226,7 +226,7 @@ internal static class PlayerCharacterPreviewBuilder
                 }
 
                 var location = ResolveMeshLocation(clientRoot, packageIndex, meshReference);
-                var sharedAsset = BuildPartSharedAsset(location, baseSharedAsset, log);
+                var sharedAsset = BuildPartSharedAsset(location, baseSharedAsset, part.Binding, log);
                 var partName = $"{CreatureSkeletalImportUtility.SanitizeName(part.Slot.ToString())}_{i:D2}_{meshReference.ObjectName}";
                 var partAsset = L2SkeletalCharacterAssetFactory.Build(partName, sharedAsset);
                 ApplyPartTextureOverrides(partAsset, part, i, buildContext);
@@ -243,24 +243,42 @@ internal static class PlayerCharacterPreviewBuilder
 
                 var materials = CreatureSkeletalMaterialImporter.CreateMaterials(
                     partAsset,
-                    variantToken,
-                    $"{derivedAssetRoot}/Materials",
+                    $"{location.Reference}.{variantToken}",
                     log,
                     buildContext);
-                var mesh = CreatureSkinnedMeshBuilder.Build(partAsset, materials, log, out _);
                 var meshAssetPath = L2AssetManager.BuildAssetPathInFolder(
-                    $"{derivedAssetRoot}/Meshes",
+                    L2AssetManager.BuildClientPackageObjectRoot(
+                        L2AssetManager.ManagedSkeletalMeshAdaptationsRoot,
+                        Path.GetFileNameWithoutExtension(location.PackagePath),
+                        location.ObjectName,
+                        "PlayerCharacterParts"),
                     "SM",
                     meshReference.ObjectName ?? partName,
                     "asset",
                     $"{variantToken}_mesh");
-                mesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(mesh, meshAssetPath);
+                var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshAssetPath);
+                if (mesh == null || part.Binding == SceneCharacterPartBinding.RigidHead)
+                {
+                    var builtMesh = CreatureSkinnedMeshBuilder.Build(partAsset, materials, log, out _);
+                    if (mesh == null)
+                    {
+                        mesh = UnityAssetDatabaseUtility.CreateAssetIfMissing(builtMesh, meshAssetPath);
+                    }
+                    else
+                    {
+                        EditorUtility.CopySerialized(builtMesh, mesh);
+                        UnityEngine.Object.DestroyImmediate(builtMesh);
+                        EditorUtility.SetDirty(mesh);
+                    }
+                }
 
                 renderParts.Add(new PartRenderData
                 {
                     Name = partName,
                     Mesh = mesh,
-                    Materials = materials
+                    Materials = materials,
+                    BoneNames = partAsset.Bones.Select(x => x.Name).ToArray(),
+                    BoneParentIndices = partAsset.Bones.Select(x => x.ParentIndex).ToArray()
                 });
             }
         }
@@ -271,11 +289,12 @@ internal static class PlayerCharacterPreviewBuilder
     private static SceneSkeletalAsset BuildPartSharedAsset(
         SceneResourceLocation location,
         SceneSkeletalAsset baseSharedAsset,
+        SceneCharacterPartBinding binding,
         Action<string> log)
     {
         log?.Invoke(
             $"[PlayerPreview] Building mesh-only part '{location.Reference}' on top of base player skeleton/animations.");
-        return PlayerCharacterPartAssetBuilder.BuildMeshOnlyAsset(location, baseSharedAsset);
+        return PlayerCharacterPartAssetBuilder.BuildMeshOnlyAsset(location, baseSharedAsset, binding);
     }
 
     private static string BuildDerivedAssetRoot(SceneResourceLocation location)
@@ -521,7 +540,12 @@ internal static class PlayerCharacterPreviewBuilder
                 renderer.sharedMesh = part.Mesh;
                 renderer.sharedMaterials = part.Materials ?? Array.Empty<Material>();
                 renderer.rootBone = rootBone;
-                renderer.bones = boneTransforms;
+                renderer.bones = L2SkeletalBoneBinding.Resolve(
+                    boneTransforms,
+                    skeletonRoot,
+                    part.BoneNames,
+                    part.BoneParentIndices,
+                    part.Name);
                 renderer.updateWhenOffscreen = true;
                 renderer.localBounds = part.Mesh.bounds;
             }

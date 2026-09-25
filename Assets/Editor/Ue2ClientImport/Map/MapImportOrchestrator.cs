@@ -106,7 +106,7 @@ internal static class MapImportOrchestrator
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
             MapImportSceneManager.PrepareMapImportScene(request, log);
             context?.Report("Import Creatures", request.MapKey, 0.10f);
-            await ImportSectionIfMissing(request, "Creatures", log, () => CreatureMapImporter.ImportAsync(request, source, log, context));
+            await CreatureMapImporter.ImportAsync(request, source, log, context);
             context?.Report("Finalize", request.MapKey, 1f);
         }, "Import Creatures", log, context);
     }
@@ -119,10 +119,10 @@ internal static class MapImportOrchestrator
             var source = await Ue2MapLoader.LoadAsync(request, log, context);
             MapImportSceneManager.PrepareMapImportScene(request, log);
 
-            context?.Report("Import Terrain", request.MapKey, 0.08f);
-            await ImportSectionIfMissing(request, "Terrain", log, () => TerrainMapImporter.ImportAsync(request, source, log, finalizeScene: false, buildTerrainVegetation: true));
-            context?.Report("Import Static Meshes", request.MapKey, 0.22f);
+            context?.Report("Import Static Meshes", request.MapKey, 0.08f);
             await ImportSectionIfMissing(request, "StaticMeshes", log, () => StaticMeshMapImporter.ImportAsync(request, source, log, context, finalizeScene: false, convertTerrainDecorationsToTerrainVegetation: true));
+            context?.Report("Import Terrain", request.MapKey, 0.22f);
+            await ImportSectionIfMissing(request, "Terrain", log, () => TerrainMapImporter.ImportAsync(request, source, log, finalizeScene: false, buildTerrainVegetation: true));
             context?.Report("Import BSP", request.MapKey, 0.38f);
             await ImportSectionIfMissing(request, "BSP", log, () => BspMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
             context?.Report("Import Lights", request.MapKey, 0.54f);
@@ -136,14 +136,14 @@ internal static class MapImportOrchestrator
                 return Task.CompletedTask;
             });
             context?.Report("Import Creatures", request.MapKey, 0.88f);
-            await ImportSectionIfMissing(request, "Creatures", log, () => CreatureMapImporter.ImportAsync(request, source, log, context, finalizeScene: false));
+            await CreatureMapImporter.ImportAsync(request, source, log, context, finalizeScene: false);
             context?.Report("Finalize", request.MapKey, 0.98f);
             await ImportSectionIfMissing(request, "Context", log, () =>
             {
                 MapContextImporter.ImportAsync(request, source, log, finalizeScene: false);
                 return Task.CompletedTask;
             });
-            MapImportSceneManager.FinalizeChunkedMapImport(request, log);
+            MapImportSceneManager.FinalizeMapImport(request, log);
             context?.Report("Done", request.MapKey, 1f);
         }, "Import All", log, context);
     }

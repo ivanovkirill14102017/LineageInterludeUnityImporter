@@ -7,8 +7,6 @@ using L2Viewer.SceneDomain.Models;
 using L2Viewer.SceneDomain.Services;
 using L2Viewer.SceneDomain.Services.MaterialServices;
 using L2Viewer.UnrFile;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using UnityEditor;
 using UnityEngine;
 using NumericsVector3 = System.Numerics.Vector3;
@@ -18,18 +16,14 @@ internal static class SkillVisualImportBuilder
 {
     public const string AssetOutputRoot = "Assets/L2Imported/ClientPackages/Skills";
     public const string PrefabOutputRoot = "Assets/L2Imported/Managed/SkillVisualPrefabs";
-    public const string TextureOutputRoot = "Assets/L2Imported/ClientPackages/Skills/Textures";
-    public const string MaterialOutputRoot = "Assets/L2Imported/ClientPackages/Skills/Materials";
+    public static string TextureOutputRoot => L2AssetManager.SharedTexturesRoot;
+    public static string MaterialOutputRoot => L2AssetManager.ManagedSkillMaterialsRoot;
+    public static string MeshEmitterOutputRoot => L2AssetManager.ManagedParticleMeshesRoot;
 
     private const float UnrealToUnityScale = L2WorldScale.BakeUnrealToUnityScale;
     private const float NeutralParticleStartSize = 1f;
     private const string DefaultMaterialKey = "__default__";
-
-    private static readonly JsonSerializerSettings DiagnosticJsonSettings = new()
-    {
-        Formatting = Formatting.Indented,
-        ContractResolver = new SkillDiagnosticContractResolver()
-    };
+    private const byte DefaultParticleDrawStyle = 3;
 
     public sealed class ImportResult
     {
@@ -51,7 +45,6 @@ internal static class SkillVisualImportBuilder
         int skillId,
         Action<string>? log = null,
         bool buildPrefab = true,
-        bool reuseExistingAssets = true,
         MapImportExecutionContext? context = null)
     {
         if (skillId <= 0)
@@ -86,7 +79,7 @@ internal static class SkillVisualImportBuilder
         {
             context?.ThrowIfCancellationRequested();
             context?.Report("Skill Visual", "Import prefab dependencies", 0.48f);
-            dependencies = ImportDependencies(fullClientRoot, sceneData, reuseExistingAssets, log, context);
+            dependencies = ImportDependencies(fullClientRoot, sceneData, log, context);
 
             context?.ThrowIfCancellationRequested();
             context?.Report("Skill Visual", "Build preview prefab", 0.78f);
@@ -118,13 +111,12 @@ internal static class SkillVisualImportBuilder
     private static SkillVisualDependencyContext ImportDependencies(
         string clientRoot,
         SceneSkillVisualData sceneData,
-        bool reuseExistingAssets,
         Action<string>? log,
         MapImportExecutionContext? context)
     {
-        var textures = ImportLayerTextures(clientRoot, sceneData, reuseExistingAssets, log);
-        var materials = BuildSkillMaterials(textures);
-        var staticMeshPrefabs = ImportStaticMeshDependencies(clientRoot, sceneData, reuseExistingAssets, log, context);
+        var textures = ImportLayerTextures(clientRoot, sceneData, log);
+        var materials = BuildSkillMaterials(sceneData, textures);
+        var staticMeshPrefabs = ImportStaticMeshDependencies(clientRoot, sceneData, log, context);
 
         return new SkillVisualDependencyContext(textures, materials, staticMeshPrefabs);
     }
@@ -132,7 +124,6 @@ internal static class SkillVisualImportBuilder
     private static IReadOnlyDictionary<string, Texture2D> ImportLayerTextures(
         string clientRoot,
         SceneSkillVisualData sceneData,
-        bool reuseExistingAssets,
         Action<string>? log)
     {
         var requests = sceneData.Stages
@@ -169,7 +160,7 @@ internal static class SkillVisualImportBuilder
                 TextureOutputRoot,
                 "Skills/Textures",
                 traits: null,
-                reuseExisting: reuseExistingAssets,
+                reuseExisting: true,
                 out var texturePath,
                 out var loadedTexture);
             if (loadedTexture != null)
@@ -206,40 +197,45 @@ internal static class SkillVisualImportBuilder
         return textureAssets;
     }
 
-    private static IReadOnlyDictionary<string, Material> BuildSkillMaterials(IReadOnlyDictionary<string, Texture2D> textures)
+    private static IReadOnlyDictionary<string, Material> BuildSkillMaterials(
+        SceneSkillVisualData sceneData,
+        IReadOnlyDictionary<string, Texture2D> textures)
     {
-        var materials = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase)
-        {
-            [DefaultMaterialKey] = CreateOrUpdateSkillMaterial(DefaultMaterialKey, null)
-        };
+        var materials = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
+        var defaultKey = BuildParticleMaterialKey(DefaultMaterialKey, DefaultParticleDrawStyle);
+        materials[defaultKey] = CreateOrUpdateSkillMaterial(DefaultMaterialKey, null, DefaultParticleDrawStyle);
 
-        foreach (var texture in textures)
+        foreach (var layer in sceneData.Stages.SelectMany(x => x.Layers))
         {
-            if (texture.Value == null)
+            var textureReference = ResolveTextureReference(layer);
+            if (string.IsNullOrWhiteSpace(textureReference) ||
+                !textures.TryGetValue(textureReference, out var texture) ||
+                texture == null)
             {
                 continue;
             }
 
-            materials[texture.Key] = CreateOrUpdateSkillMaterial(texture.Key, texture.Value);
+            var drawStyle = ResolveParticleDrawStyle(layer.DrawStyle);
+            var materialKey = BuildParticleMaterialKey(textureReference, drawStyle);
+            if (!materials.ContainsKey(materialKey))
+            {
+                materials[materialKey] = CreateOrUpdateSkillMaterial(textureReference, texture, drawStyle);
+            }
         }
 
         return materials;
     }
 
-    private static Material CreateOrUpdateSkillMaterial(string reference, Texture2D? texture)
+    private static Material CreateOrUpdateSkillMaterial(string reference, Texture2D? texture, byte drawStyle)
     {
-        var materialPath = BuildSkillMaterialPath(reference);
+        var materialPath = BuildSkillMaterialPath(reference, drawStyle);
         var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
         if (material == null)
         {
             material = new Material(ResolveParticleShader());
         }
 
-        L2MaterialUtility.ConfigureTransparent(
-            material,
-            UnityEngine.Rendering.BlendMode.SrcAlpha,
-            UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha,
-            premultiplyKeyword: false);
+        ConfigureParticleDrawStyle(material, drawStyle);
         material.enableInstancing = true;
         L2MaterialUtility.SetBaseColor(material, Color.white);
         if (texture != null)
@@ -250,10 +246,61 @@ internal static class SkillVisualImportBuilder
         return UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, materialPath);
     }
 
+    private static byte ResolveParticleDrawStyle(byte? drawStyle)
+    {
+        return drawStyle ?? DefaultParticleDrawStyle;
+    }
+
+    private static string BuildParticleMaterialKey(string reference, byte drawStyle)
+    {
+        return $"{reference}|PTDS:{drawStyle}";
+    }
+
+    private static void ConfigureParticleDrawStyle(Material material, byte drawStyle)
+    {
+        switch (drawStyle)
+        {
+            case 0: // PTDS_Regular
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.One, UnityEngine.Rendering.BlendMode.Zero, false);
+                return;
+            case 1: // PTDS_AlphaBlend
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.SrcAlpha, UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, false);
+                SetUrpBlendMode(material, 0f);
+                return;
+            case 2: // PTDS_Modulated
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.DstColor, UnityEngine.Rendering.BlendMode.Zero, false, true);
+                SetUrpBlendMode(material, 3f);
+                return;
+            case 3: // PTDS_Translucent: black source pixels are transparent.
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.One, UnityEngine.Rendering.BlendMode.One, false);
+                SetUrpBlendMode(material, 2f);
+                return;
+            case 4: // PTDS_AlphaModulate_MightNotFogCorrectly
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.DstColor, UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, false, true);
+                return;
+            case 5: // PTDS_Darken
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.Zero, UnityEngine.Rendering.BlendMode.OneMinusSrcColor, false);
+                return;
+            case 6: // PTDS_Brighten
+                L2MaterialUtility.ConfigureTransparent(material, UnityEngine.Rendering.BlendMode.One, UnityEngine.Rendering.BlendMode.One, false);
+                SetUrpBlendMode(material, 2f);
+                return;
+            default:
+                throw new InvalidOperationException($"Unsupported Unreal EParticleDrawStyle value {drawStyle}.");
+        }
+    }
+
+    private static void SetUrpBlendMode(Material material, float blendMode)
+    {
+        if (material.HasProperty("_Blend"))
+        {
+            material.SetFloat("_Blend", blendMode);
+        }
+    }
+
     private static IReadOnlyDictionary<string, GameObject> ImportStaticMeshDependencies(
         string clientRoot,
         SceneSkillVisualData sceneData,
-        bool reuseExistingAssets,
         Action<string>? log,
         MapImportExecutionContext? context)
     {
@@ -284,7 +331,7 @@ internal static class SkillVisualImportBuilder
                 clientRoot,
                 "Skills",
                 log ?? (_ => { }),
-                reuseExistingAssets,
+                true,
                 context);
         }
         catch (Exception ex)
@@ -318,37 +365,10 @@ internal static class SkillVisualImportBuilder
             var runtimeContainer = new GameObject("Runtime");
             runtimeContainer.transform.SetParent(prefabRoot.transform, false);
 
-            AttachDiagnostic(prefabRoot, SerializeRawDiagnostic(new
-            {
-                sceneData.SkillId,
-                DisplayName = ResolveDisplayName(sceneData),
-                sceneData.ResolvedEffectStem,
-                sceneData.ResolvedEffectStems,
-                sceneData.Warnings
-            }));
-
             var stageBindings = new List<L2SkillVisualStageBinding>();
             foreach (var stage in sceneData.Stages.OrderBy(x => x.StageOrder).ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase))
             {
-                var stageObject = new GameObject(BuildStageObjectName(stage));
-                stageObject.transform.SetParent(stageContainer.transform, false);
-                AttachDiagnostic(stageObject, SerializeRawDiagnostic(stage));
-
-                foreach (var layer in stage.Layers.OrderBy(x => x.ExportIndex).ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase))
-                {
-                    BuildLayerObject(layer, stageObject.transform, dependencies, log);
-                }
-
-                var playbackRole = InferPlaybackRole(stage);
-                stageObject.SetActive(false);
-                stageBindings.Add(new L2SkillVisualStageBinding
-                {
-                    StageKey = stage.StageKey ?? string.Empty,
-                    StageOrder = stage.StageOrder,
-                    StageName = stage.ObjectName ?? stageObject.name,
-                    Role = playbackRole,
-                    StageRoot = stageObject
-                });
+                stageBindings.AddRange(BuildStagePlaybackBindings(stage, stageContainer.transform, dependencies, log));
             }
 
             controller.Skill = asset;
@@ -385,8 +405,6 @@ internal static class SkillVisualImportBuilder
         Action<string>? log)
     {
         var particleSystem = CreateParticleSystemObject(BuildLayerObjectName(layer), parent, ResolveLayerRenderMode(layer));
-        AttachDiagnostic(particleSystem.gameObject, SerializeRawDiagnostic(layer));
-
         var material = ResolveLayerMaterial(layer, dependencies);
         ConfigureLayerParticleSystem(particleSystem, layer, material, ResolveLayerAlignment(layer));
 
@@ -394,10 +412,16 @@ internal static class SkillVisualImportBuilder
         {
             var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
             renderer.renderMode = ParticleSystemRenderMode.Mesh;
-            if (TryResolveMeshEmitterAsset(layer.StaticMeshReference, out var mesh, out var meshMaterial, out _))
+            if (TryResolveMeshEmitterAsset(layer.StaticMeshReference, out var mesh, out var meshMaterials, out _))
             {
-                renderer.mesh = mesh;
-                renderer.sharedMaterial = meshMaterial != null ? meshMaterial : material;
+                ConfigureMeshEmitterRenderer(
+                    particleSystem,
+                    renderer,
+                    layer,
+                    mesh!,
+                    meshMaterials,
+                    material,
+                    log);
             }
             else
             {
@@ -405,6 +429,117 @@ internal static class SkillVisualImportBuilder
                 log?.Invoke($"[Skill/Prefab] Missing mesh asset for layer '{layer.ObjectName}' ref='{layer.StaticMeshReference}'.");
             }
         }
+    }
+
+    private static IEnumerable<L2SkillVisualStageBinding> BuildStagePlaybackBindings(
+        SceneSkillVisualStageData stage,
+        Transform stageContainer,
+        SkillVisualDependencyContext dependencies,
+        Action<string>? log)
+    {
+        var orderedLayers = stage.Layers
+            .OrderBy(x => x.ExportIndex)
+            .ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var playbackRole = InferPlaybackRole(stage);
+
+        if (IsTargetPlaybackRole(playbackRole))
+        {
+            var projectileLayers = orderedLayers.Where(IsProjectileLayer).ToArray();
+            if (projectileLayers.Length > 0 && projectileLayers.Length < orderedLayers.Length)
+            {
+                var impactLayers = orderedLayers.Except(projectileLayers).ToArray();
+                yield return BuildStagePlaybackBinding(
+                    stage,
+                    stageContainer,
+                    dependencies,
+                    log,
+                    projectileLayers,
+                    L2SkillVisualStagePlaybackRole.Projectile,
+                    stage.StageOrder,
+                    "Projectile");
+                yield return BuildStagePlaybackBinding(
+                    stage,
+                    stageContainer,
+                    dependencies,
+                    log,
+                    impactLayers,
+                    L2SkillVisualStagePlaybackRole.Impact,
+                    stage.StageOrder + 1,
+                    "Impact");
+                yield break;
+            }
+        }
+
+        yield return BuildStagePlaybackBinding(
+            stage,
+            stageContainer,
+            dependencies,
+            log,
+            orderedLayers,
+            playbackRole,
+            stage.StageOrder,
+            null);
+    }
+
+    private static L2SkillVisualStageBinding BuildStagePlaybackBinding(
+        SceneSkillVisualStageData stage,
+        Transform stageContainer,
+        SkillVisualDependencyContext dependencies,
+        Action<string>? log,
+        IReadOnlyList<SceneSkillVisualLayerData> layers,
+        L2SkillVisualStagePlaybackRole role,
+        int order,
+        string? roleSuffix)
+    {
+        var stageObjectName = BuildStageObjectName(stage);
+        if (!string.IsNullOrWhiteSpace(roleSuffix))
+        {
+            stageObjectName = $"{stageObjectName}_{roleSuffix}";
+        }
+
+        var stageObject = new GameObject(stageObjectName);
+        stageObject.transform.SetParent(stageContainer, false);
+        foreach (var layer in layers)
+        {
+            BuildLayerObject(layer, stageObject.transform, dependencies, log);
+        }
+
+        var baseStageKey = stage.StageKey ?? string.Empty;
+        var baseStageName = stage.ObjectName ?? stageObject.name;
+        var suffix = roleSuffix ?? string.Empty;
+        stageObject.SetActive(false);
+        return new L2SkillVisualStageBinding
+        {
+            StageKey = string.IsNullOrWhiteSpace(suffix) ? baseStageKey : $"{baseStageKey}_{suffix.ToLowerInvariant()}",
+            StageOrder = order,
+            StageName = string.IsNullOrWhiteSpace(suffix) ? baseStageName : $"{baseStageName}_{suffix}",
+            Role = role,
+            StageRoot = stageObject
+        };
+    }
+
+    private static bool IsTargetPlaybackRole(L2SkillVisualStagePlaybackRole role)
+    {
+        return role == L2SkillVisualStagePlaybackRole.Target ||
+               role == L2SkillVisualStagePlaybackRole.Impact;
+    }
+
+    private static bool IsProjectileLayer(SceneSkillVisualLayerData layer)
+    {
+        var text = string.Join(" ",
+            layer.LayerName ?? string.Empty,
+            layer.ObjectName ?? string.Empty,
+            layer.ClassName ?? string.Empty,
+            layer.StaticMeshReference ?? string.Empty);
+
+        return text.IndexOf("projectile", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("arrow", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("bolt", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("shot", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("spear", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("missile", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               string.Equals(layer.ClassName, "BeamEmitter", StringComparison.OrdinalIgnoreCase);
     }
 
     private static ParticleSystem CreateParticleSystemObject(string name, Transform parent, ParticleSystemRenderMode renderMode)
@@ -423,6 +558,7 @@ internal static class SkillVisualImportBuilder
         Material material,
         ParticleSystemRenderSpace alignment)
     {
+        var isMeshEmitter = !string.IsNullOrWhiteSpace(layer.StaticMeshReference);
         var lifetimeMin = layer.LifetimeRange?.Min ?? 1f;
         var lifetimeMax = Math.Max(lifetimeMin, layer.LifetimeRange?.Max ?? lifetimeMin);
         var maxParticles = Math.Max(1, layer.MaxParticles ?? 32);
@@ -436,9 +572,8 @@ internal static class SkillVisualImportBuilder
         main.scalingMode = ParticleSystemScalingMode.Local;
         main.startLifetime = new ParticleSystem.MinMaxCurve(Math.Max(0.01f, lifetimeMin), Math.Max(0.01f, lifetimeMax));
         main.startSpeed = new ParticleSystem.MinMaxCurve(0f, 0f);
-        main.startSize3D = false;
-        main.startSize = BuildSizeCurve(layer.StartSizeRange, NeutralParticleStartSize, NeutralParticleStartSize);
-        main.startRotation = BuildRotationCurve(layer.StartSpinRange);
+        ConfigureStartSize(main, layer.StartSizeRange, isMeshEmitter);
+        ConfigureStartRotation(main, layer.StartSpinRange, isMeshEmitter);
         main.startColor = BuildStartColor(layer.Opacity, layer.ColorScale, applyOpacity: !ShouldDriveAlphaOverLifetime(layer));
 
         var emission = particleSystem.emission;
@@ -448,6 +583,7 @@ internal static class SkillVisualImportBuilder
         ConfigureShape(particleSystem.shape, layer.StartLocationRange);
         ConfigureVelocityOverLifetime(particleSystem.velocityOverLifetime, layer.StartVelocityRange);
         ConfigureForceOverLifetime(particleSystem.forceOverLifetime, layer.Acceleration);
+        ConfigureTextureSheetAnimation(particleSystem.textureSheetAnimation, layer);
         ConfigureColorOverLifetime(
             particleSystem.colorOverLifetime,
             layer.Opacity,
@@ -456,7 +592,7 @@ internal static class SkillVisualImportBuilder
             layer.FadeOut ? layer.FadeOutStartTime : null,
             lifetimeMax);
         ConfigureSizeOverLifetime(particleSystem.sizeOverLifetime, layer.SizeScale);
-        ConfigureRotationOverLifetime(particleSystem.rotationOverLifetime, layer.SpinsPerSecondRange);
+        ConfigureRotationOverLifetime(particleSystem.rotationOverLifetime, layer.SpinsPerSecondRange, isMeshEmitter);
 
         var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
         renderer.sharedMaterial = material;
@@ -484,6 +620,46 @@ internal static class SkillVisualImportBuilder
             Math.Abs(startLocationRange.X.Max - startLocationRange.X.Min) * UnrealToUnityScale,
             Math.Abs(startLocationRange.Z.Max - startLocationRange.Z.Min) * UnrealToUnityScale,
             Math.Abs(startLocationRange.Y.Max - startLocationRange.Y.Min) * UnrealToUnityScale);
+    }
+
+    private static void ConfigureTextureSheetAnimation(ParticleSystem.TextureSheetAnimationModule textureSheet, SceneSkillVisualLayerData layer)
+    {
+        var tilesX = Math.Max(1, layer.TextureUSubdivisions ?? 1);
+        var tilesY = Math.Max(1, layer.TextureVSubdivisions ?? 1);
+        if (tilesX <= 1 && tilesY <= 1)
+        {
+            textureSheet.enabled = false;
+            return;
+        }
+
+        var frameCount = Math.Max(1, tilesX * tilesY);
+        var startFrame = Mathf.Clamp(layer.SubdivisionStart ?? 0, 0, frameCount - 1);
+        var endFrame = Mathf.Clamp(layer.SubdivisionEnd ?? startFrame, startFrame, frameCount - 1);
+
+        textureSheet.enabled = true;
+        textureSheet.mode = ParticleSystemAnimationMode.Grid;
+        textureSheet.numTilesX = tilesX;
+        textureSheet.numTilesY = tilesY;
+        textureSheet.animation = ParticleSystemAnimationType.WholeSheet;
+        textureSheet.cycleCount = 1;
+
+        if (layer.UseRandomSubdivision && endFrame > startFrame)
+        {
+            textureSheet.startFrame = new ParticleSystem.MinMaxCurve(startFrame, endFrame);
+            textureSheet.frameOverTime = new ParticleSystem.MinMaxCurve(0f);
+            return;
+        }
+
+        textureSheet.startFrame = new ParticleSystem.MinMaxCurve(0f);
+        if (endFrame > startFrame)
+        {
+            var curve = AnimationCurve.Linear(0f, startFrame, 1f, endFrame);
+            textureSheet.frameOverTime = new ParticleSystem.MinMaxCurve(1f, curve);
+        }
+        else
+        {
+            textureSheet.frameOverTime = new ParticleSystem.MinMaxCurve(startFrame);
+        }
     }
 
     private static void ConfigureVelocityOverLifetime(ParticleSystem.VelocityOverLifetimeModule velocity, UnrRangeVector? startVelocityRange)
@@ -604,7 +780,10 @@ internal static class SkillVisualImportBuilder
         sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
     }
 
-    private static void ConfigureRotationOverLifetime(ParticleSystem.RotationOverLifetimeModule rotationOverLifetime, UnrRangeVector? spinsPerSecondRange)
+    private static void ConfigureRotationOverLifetime(
+        ParticleSystem.RotationOverLifetimeModule rotationOverLifetime,
+        UnrRangeVector? spinsPerSecondRange,
+        bool isMeshEmitter)
     {
         if (spinsPerSecondRange == null)
         {
@@ -612,11 +791,76 @@ internal static class SkillVisualImportBuilder
             return;
         }
 
-        rotationOverLifetime.enabled = true;
-        rotationOverLifetime.separateAxes = false;
-        rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(
+        var spin = new ParticleSystem.MinMaxCurve(
             ComputeDominantAxisValue(spinsPerSecondRange, useMax: false) * Mathf.PI * 2f,
             ComputeDominantAxisValue(spinsPerSecondRange, useMax: true) * Mathf.PI * 2f);
+
+        rotationOverLifetime.enabled = true;
+        rotationOverLifetime.separateAxes = isMeshEmitter;
+        if (isMeshEmitter)
+        {
+            rotationOverLifetime.x = new ParticleSystem.MinMaxCurve(0f);
+            rotationOverLifetime.y = spin;
+            rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(0f);
+        }
+        else
+        {
+            rotationOverLifetime.z = spin;
+        }
+    }
+
+    private static void ConfigureStartSize(
+        ParticleSystem.MainModule main,
+        UnrRangeVector? range,
+        bool isMeshEmitter)
+    {
+        if (!isMeshEmitter)
+        {
+            main.startSize3D = false;
+            main.startSize = BuildSizeCurve(range, NeutralParticleStartSize, NeutralParticleStartSize);
+            return;
+        }
+
+        main.startSize3D = true;
+        if (range == null)
+        {
+            main.startSizeX = new ParticleSystem.MinMaxCurve(NeutralParticleStartSize);
+            main.startSizeY = new ParticleSystem.MinMaxCurve(NeutralParticleStartSize);
+            main.startSizeZ = new ParticleSystem.MinMaxCurve(NeutralParticleStartSize);
+            return;
+        }
+
+        // MeshEmitter StartSizeRange is a dimensionless mesh multiplier. The mesh
+        // vertices already contain the Unreal-to-Unity world scale.
+        main.startSizeX = BuildMeshSizeCurve(range.X);
+        main.startSizeY = BuildMeshSizeCurve(range.Z);
+        main.startSizeZ = BuildMeshSizeCurve(range.Y);
+    }
+
+    private static ParticleSystem.MinMaxCurve BuildMeshSizeCurve(UnrFloatRange range)
+    {
+        var first = Math.Max(0.001f, Math.Abs(range.Min));
+        var second = Math.Max(0.001f, Math.Abs(range.Max));
+        return new ParticleSystem.MinMaxCurve(Math.Min(first, second), Math.Max(first, second));
+    }
+
+    private static void ConfigureStartRotation(
+        ParticleSystem.MainModule main,
+        UnrRangeVector? range,
+        bool isMeshEmitter)
+    {
+        if (!isMeshEmitter)
+        {
+            main.startRotation3D = false;
+            main.startRotation = BuildRotationCurve(range);
+            return;
+        }
+
+        var spin = BuildRotationCurve(range);
+        main.startRotation3D = true;
+        main.startRotationX = new ParticleSystem.MinMaxCurve(0f);
+        main.startRotationY = spin;
+        main.startRotationZ = new ParticleSystem.MinMaxCurve(0f);
     }
 
     private static ParticleSystem.MinMaxCurve BuildSizeCurve(UnrRangeVector? range, float fallbackMin, float fallbackMax)
@@ -768,22 +1012,25 @@ internal static class SkillVisualImportBuilder
     private static Material ResolveLayerMaterial(SceneSkillVisualLayerData layer, SkillVisualDependencyContext dependencies)
     {
         var textureReference = ResolveTextureReference(layer);
+        var drawStyle = ResolveParticleDrawStyle(layer.DrawStyle);
+        var materialKey = BuildParticleMaterialKey(textureReference ?? DefaultMaterialKey, drawStyle);
         if (!string.IsNullOrWhiteSpace(textureReference) &&
-            dependencies.Materials.TryGetValue(textureReference, out var material) &&
+            dependencies.Materials.TryGetValue(materialKey, out var material) &&
             material != null)
         {
             return material;
         }
 
-        return dependencies.Materials.TryGetValue(DefaultMaterialKey, out var defaultMaterial) && defaultMaterial != null
+        var defaultKey = BuildParticleMaterialKey(DefaultMaterialKey, DefaultParticleDrawStyle);
+        return dependencies.Materials.TryGetValue(defaultKey, out var defaultMaterial) && defaultMaterial != null
             ? defaultMaterial
-            : CreateOrUpdateSkillMaterial(DefaultMaterialKey, null);
+            : CreateOrUpdateSkillMaterial(DefaultMaterialKey, null, DefaultParticleDrawStyle);
     }
 
-    private static bool TryResolveMeshEmitterAsset(string? staticMeshReference, out Mesh? mesh, out Material? material, out string resolvedAssetPath)
+    private static bool TryResolveMeshEmitterAsset(string? staticMeshReference, out Mesh? mesh, out Material?[] materials, out string resolvedAssetPath)
     {
         mesh = null;
-        material = null;
+        materials = Array.Empty<Material?>();
         resolvedAssetPath = string.Empty;
 
         if (string.IsNullOrWhiteSpace(staticMeshReference))
@@ -802,12 +1049,14 @@ internal static class SkillVisualImportBuilder
         {
             var meshFilter = prefab.GetComponentInChildren<MeshFilter>();
             var meshRenderer = prefab.GetComponentInChildren<MeshRenderer>();
-            if (meshFilter != null && meshFilter.sharedMesh != null && meshRenderer != null && meshRenderer.sharedMaterials.Length > 0)
+            if (meshFilter != null && meshFilter.sharedMesh != null)
             {
                 mesh = meshFilter.sharedMesh;
-                material = meshRenderer.sharedMaterials.FirstOrDefault(x => x != null);
+                materials = meshRenderer != null
+                    ? meshRenderer.sharedMaterials.Cast<Material?>().ToArray()
+                    : Array.Empty<Material?>();
                 resolvedAssetPath = prefabPath;
-                return mesh != null;
+                return true;
             }
         }
 
@@ -820,6 +1069,158 @@ internal static class SkillVisualImportBuilder
         mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
         resolvedAssetPath = meshPath;
         return mesh != null;
+    }
+
+    private static void ConfigureMeshEmitterRenderer(
+        ParticleSystem particleSystem,
+        ParticleSystemRenderer renderer,
+        SceneSkillVisualLayerData layer,
+        Mesh mesh,
+        Material?[] meshMaterials,
+        Material fallbackMaterial,
+        Action<string>? log)
+    {
+        var meshParts = layer.MeshParts?.OrderBy(x => x.SubMeshIndex).ToArray() ?? Array.Empty<SceneSkillVisualMeshPartData>();
+        if (meshParts.Length == 0)
+        {
+            throw new InvalidOperationException($"SceneDomain did not provide mesh parts for skill layer {layer.ObjectName} static mesh {layer.StaticMeshReference}.");
+        }
+
+        ConfigureMeshEmitterPart(renderer, mesh, meshMaterials, fallbackMaterial, layer, meshParts[0], log);
+
+        for (var partIndex = 1; partIndex < meshParts.Length; partIndex++)
+        {
+            var meshPart = meshParts[partIndex];
+            var childName = $"{particleSystem.gameObject.name}_Submesh{meshPart.SubMeshIndex:D2}_Mat{meshPart.MaterialId}";
+            var child = CreateParticleSystemObject(childName, particleSystem.transform.parent, ParticleSystemRenderMode.Mesh);
+            CopyParticleSystemSettings(particleSystem, child);
+            var childRenderer = child.GetComponent<ParticleSystemRenderer>();
+            childRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            ConfigureMeshEmitterPart(childRenderer, mesh, meshMaterials, fallbackMaterial, layer, meshPart, log);
+        }
+    }
+
+    private static void ConfigureMeshEmitterPart(
+        ParticleSystemRenderer renderer,
+        Mesh mesh,
+        Material?[] meshMaterials,
+        Material fallbackMaterial,
+        SceneSkillVisualLayerData layer,
+        SceneSkillVisualMeshPartData meshPart,
+        Action<string>? log)
+    {
+        var staticMeshReference = layer.StaticMeshReference!;
+        if (meshPart.SubMeshIndex < 0 || meshPart.SubMeshIndex >= mesh.subMeshCount)
+        {
+            throw new InvalidOperationException($"SceneDomain mesh part index {meshPart.SubMeshIndex} is outside Unity mesh {mesh.name} submesh count {mesh.subMeshCount} for {staticMeshReference}.");
+        }
+
+        renderer.renderMode = ParticleSystemRenderMode.Mesh;
+        renderer.mesh = EnsureParticleEmitterMesh(mesh, staticMeshReference, meshPart.SubMeshIndex, log);
+        var sourceMaterial = ResolveMeshEmitterMaterial(meshMaterials, meshPart.SubMeshIndex, fallbackMaterial);
+        renderer.sharedMaterial = layer.UseMeshBlendMode
+            ? sourceMaterial
+            : CreateOrUpdateMeshEmitterMaterial(sourceMaterial, staticMeshReference, meshPart.SubMeshIndex, ResolveParticleDrawStyle(layer.DrawStyle));
+    }
+
+    private static Material CreateOrUpdateMeshEmitterMaterial(
+        Material sourceMaterial,
+        string staticMeshReference,
+        int subMeshIndex,
+        byte drawStyle)
+    {
+        var materialReference = $"{staticMeshReference}_Submesh{subMeshIndex:D2}";
+        var materialPath = BuildSkillMaterialPath(materialReference, drawStyle);
+        var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+        if (material == null)
+        {
+            material = new Material(sourceMaterial);
+        }
+        else
+        {
+            material.shader = sourceMaterial.shader;
+            material.CopyPropertiesFromMaterial(sourceMaterial);
+        }
+
+        ConfigureParticleDrawStyle(material, drawStyle);
+        material.enableInstancing = true;
+        return UnityAssetDatabaseUtility.CreateOrReplaceAsset(material, materialPath);
+    }
+
+    private static Material ResolveMeshEmitterMaterial(Material?[] materials, int subMeshIndex, Material fallbackMaterial)
+    {
+        if (materials != null && subMeshIndex >= 0 && subMeshIndex < materials.Length && materials[subMeshIndex] != null)
+        {
+            return materials[subMeshIndex]!;
+        }
+
+        return materials?.FirstOrDefault(x => x != null) ?? fallbackMaterial;
+    }
+
+    private static void CopyParticleSystemSettings(ParticleSystem source, ParticleSystem target)
+    {
+        EditorUtility.CopySerialized(source, target);
+        var sourceRenderer = source.GetComponent<ParticleSystemRenderer>();
+        var targetRenderer = target.GetComponent<ParticleSystemRenderer>();
+        if (sourceRenderer != null && targetRenderer != null)
+        {
+            EditorUtility.CopySerialized(sourceRenderer, targetRenderer);
+        }
+    }
+
+    private static Mesh EnsureParticleEmitterMesh(Mesh sourceMesh, string staticMeshReference, int subMeshIndex, Action<string>? log)
+    {
+        if (sourceMesh.subMeshCount <= 1)
+        {
+            return sourceMesh;
+        }
+
+        var meshPath = L2AssetManager.BuildClientPackageAssetPath(
+            MeshEmitterOutputRoot,
+            staticMeshReference,
+            "SME",
+            "asset",
+            "SkillMeshEmitters",
+            subMeshIndex.ToString("D2"));
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+        if (existing != null && existing.subMeshCount == 1)
+        {
+            return existing;
+        }
+
+        var particleMesh = CreateSingleSubmeshParticleMesh(sourceMesh, subMeshIndex, $"SME_{sourceMesh.name}_{subMeshIndex:D2}");
+        particleMesh = UnityAssetDatabaseUtility.CreateOrReplaceAsset(particleMesh, meshPath);
+        log?.Invoke($"[Skill/Prefab] Created single-submesh particle mesh: {meshPath}");
+        return particleMesh;
+    }
+
+    private static Mesh CreateSingleSubmeshParticleMesh(Mesh sourceMesh, int subMeshIndex, string name)
+    {
+        var mesh = new Mesh
+        {
+            name = name,
+            indexFormat = sourceMesh.indexFormat,
+            vertices = sourceMesh.vertices,
+            normals = sourceMesh.normals,
+            tangents = sourceMesh.tangents,
+            colors = sourceMesh.colors,
+            colors32 = sourceMesh.colors32,
+            uv = sourceMesh.uv,
+            uv2 = sourceMesh.uv2,
+            uv3 = sourceMesh.uv3,
+            uv4 = sourceMesh.uv4,
+            bounds = sourceMesh.bounds
+        };
+
+        mesh.subMeshCount = 1;
+        mesh.SetTriangles(sourceMesh.GetTriangles(subMeshIndex), 0, calculateBounds: false);
+        mesh.RecalculateBounds();
+        if (mesh.normals == null || mesh.normals.Length != mesh.vertexCount)
+        {
+            mesh.RecalculateNormals();
+        }
+
+        return mesh;
     }
 
     private static ParticleSystemRenderMode ResolveLayerRenderMode(SceneSkillVisualLayerData layer)
@@ -1062,7 +1463,21 @@ internal static class SkillVisualImportBuilder
             StaticMeshReference = value.StaticMeshReference ?? string.Empty,
             StaticMeshResourceReference = ConvertResourceReference(value.StaticMeshResourceReference),
             StaticMeshResource = ConvertResourceLocation(value.StaticMeshResource),
+            MeshParts = value.MeshParts?.Select(ConvertMeshPart).ToArray() ?? Array.Empty<L2SkillVisualMeshPartData>(),
             TextureReference = value.TextureReference ?? string.Empty,
+            HasDrawStyle = value.DrawStyle.HasValue,
+            DrawStyle = value.DrawStyle ?? DefaultParticleDrawStyle,
+            UseMeshBlendMode = value.UseMeshBlendMode,
+            HasTextureUSubdivisions = value.TextureUSubdivisions.HasValue,
+            TextureUSubdivisions = value.TextureUSubdivisions ?? 0,
+            HasTextureVSubdivisions = value.TextureVSubdivisions.HasValue,
+            TextureVSubdivisions = value.TextureVSubdivisions ?? 0,
+            HasSubdivisionStart = value.SubdivisionStart.HasValue,
+            SubdivisionStart = value.SubdivisionStart ?? 0,
+            HasSubdivisionEnd = value.SubdivisionEnd.HasValue,
+            SubdivisionEnd = value.SubdivisionEnd ?? 0,
+            UseRandomSubdivision = value.UseRandomSubdivision,
+            BlendBetweenSubdivisions = value.BlendBetweenSubdivisions,
             TextureResourceReference = ConvertResourceReference(value.TextureResourceReference),
             TextureResource = ConvertResourceLocation(value.TextureResource),
             HasOpacity = value.Opacity.HasValue,
@@ -1091,6 +1506,20 @@ internal static class SkillVisualImportBuilder
             SpinsPerSecondRange = ConvertRangeVector(value.SpinsPerSecondRange),
             ColorScale = value.ColorScale?.Select(ConvertColorScale).ToArray() ?? Array.Empty<L2ParticleColorScaleData>(),
             SizeScale = value.SizeScale?.Select(ConvertSizeScale).ToArray() ?? Array.Empty<L2ParticleSizeScaleData>()
+        };
+    }
+
+    private static L2SkillVisualMeshPartData ConvertMeshPart(SceneSkillVisualMeshPartData value)
+    {
+        return new L2SkillVisualMeshPartData
+        {
+            SubMeshIndex = value.SubMeshIndex,
+            MaterialId = value.MaterialId,
+            TriangleCount = value.TriangleCount,
+            MaterialReference = value.MaterialReference ?? string.Empty,
+            MaterialResource = ConvertResourceLocation(value.MaterialResource),
+            PrimaryTextureReference = value.PrimaryTextureReference ?? string.Empty,
+            PrimaryTextureResource = ConvertResourceLocation(value.PrimaryTextureResource)
         };
     }
 
@@ -1198,11 +1627,12 @@ internal static class SkillVisualImportBuilder
         return $"{PrefabOutputRoot}/{BuildSkillPrefabName(data)}.prefab";
     }
 
-    private static string BuildSkillMaterialPath(string reference)
+    private static string BuildSkillMaterialPath(string reference, byte drawStyle)
     {
+        var styledReference = $"{reference}_PTDS_{drawStyle}";
         return L2AssetManager.BuildClientPackageAssetPath(
             MaterialOutputRoot,
-            string.Equals(reference, DefaultMaterialKey, StringComparison.OrdinalIgnoreCase) ? "DefaultSkillParticle" : reference,
+            string.Equals(reference, DefaultMaterialKey, StringComparison.OrdinalIgnoreCase) ? $"DefaultSkillParticle_PTDS_{drawStyle}" : styledReference,
             "MAT",
             "mat",
             "Skills/Materials");
@@ -1332,27 +1762,6 @@ internal static class SkillVisualImportBuilder
         return new Color32(color.R, color.G, color.B, color.A);
     }
 
-    private static void AttachDiagnostic(GameObject target, string jsonText)
-    {
-        if (target == null || string.IsNullOrWhiteSpace(jsonText))
-        {
-            return;
-        }
-
-        var diagnostic = target.GetComponent<L2JsonDiagnosticData>();
-        if (diagnostic == null)
-        {
-            diagnostic = target.AddComponent<L2JsonDiagnosticData>();
-        }
-
-        diagnostic.JsonText = jsonText;
-    }
-
-    private static string SerializeRawDiagnostic<T>(T value)
-    {
-        return JsonConvert.SerializeObject(value, DiagnosticJsonSettings);
-    }
-
     private readonly struct SkillTextureRequest
     {
         public SkillTextureRequest(string reference, SceneTextureRequest request)
@@ -1387,26 +1796,5 @@ internal static class SkillVisualImportBuilder
         public IReadOnlyDictionary<string, GameObject> StaticMeshPrefabs { get; }
     }
 
-    private sealed class SkillDiagnosticContractResolver : DefaultContractResolver
-    {
-        protected override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization)
-        {
-            var properties = base.CreateProperties(type, memberSerialization);
-            if (type == typeof(UnrParticleColorScale))
-            {
-                return properties
-                    .Where(x => !string.Equals(x.PropertyName, nameof(UnrParticleColorScale.RawHex), StringComparison.Ordinal))
-                    .ToList();
-            }
-
-            if (type == typeof(UnrParticleSizeScale))
-            {
-                return properties
-                    .Where(x => !string.Equals(x.PropertyName, nameof(UnrParticleSizeScale.RawHex), StringComparison.Ordinal))
-                    .ToList();
-            }
-
-            return properties;
-        }
-    }
 }
+

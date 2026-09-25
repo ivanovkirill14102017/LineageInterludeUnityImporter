@@ -51,7 +51,7 @@ internal sealed class CreatureNpcImporterPanel
             _creatureId = EditorGUILayout.TextField("Creature", _creatureId);
             EditorGUILayout.LabelField("Prefab Output", CreatureNpcImportBuilder.PrefabOutputRoot);
             EditorGUILayout.LabelField("Asset Output", CreatureNpcImportBuilder.AssetOutputRoot);
-            EditorGUILayout.LabelField("Example", "PF_orc_fighter_m00 or orc_fighter_m00");
+            EditorGUILayout.LabelField("Example", "25286, LineageMonster2.anakim, or anakim_m00");
             EditorGUILayout.LabelField("Note", "This importer uses the same Unity-side skinned mesh + AnimationClip + AnimatorController pipeline as map creature import.");
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -29,7 +30,7 @@ internal static class CreatureAnimationClipBuilder
         public AnimationCurve LocalRotationW { get; } = new AnimationCurve();
     }
 
-    public static ClipBuildInfo[] Build(L2SkeletalCharacterAsset asset, string referenceText, string assetRoot, string[] sequenceNames, Action<string> log, out string notes)
+    public static ClipBuildInfo[] Build(L2SkeletalCharacterAsset asset, string[] sequenceNames, Action<string> log, out string notes)
     {
         if (sequenceNames == null || sequenceNames.Length == 0)
         {
@@ -37,18 +38,40 @@ internal static class CreatureAnimationClipBuilder
             return Array.Empty<ClipBuildInfo>();
         }
 
-        var session = L2SceneSkeletalAssetBridge.CreateSession(asset);
-        var bindFrame = session.CaptureBindPoseDebugFrame();
-        var bindPoses = CreatureSkeletalImportUtility.BuildBonePoses(bindFrame.Bones, asset.Bones);
-        var clipFolder = $"{assetRoot}/Animations";
+        var clipFolder = L2AssetManager.UnrealAnimationsRoot;
         L2AssetManager.EnsureFolderExists(clipFolder);
-
-        var clipInfos = new List<ClipBuildInfo>();
-        foreach (var sequenceName in sequenceNames)
-        {
-            var sequence = asset.AnimationSequences.FirstOrDefault(x => string.Equals(x.Name, sequenceName, StringComparison.OrdinalIgnoreCase));
-            if (sequence == null)
+        var animationReference = $"{Path.GetFileNameWithoutExtension(asset.SourcePackagePath)}.{asset.AnimationObjectName}";
+        var sequenceBuilds = sequenceNames
+            .Select(sequenceName => asset.AnimationSequences.FirstOrDefault(
+                x => string.Equals(x.Name, sequenceName, StringComparison.OrdinalIgnoreCase)))
+            .Where(sequence => sequence != null)
+            .Select(sequence => new
             {
+                Sequence = sequence,
+                Path = L2AssetManager.BuildClientPackageAssetPath(
+                    clipFolder,
+                    $"{animationReference}.{CreatureSkeletalImportUtility.SanitizeName(sequence.Name)}",
+                    "AN",
+                    "anim",
+                    "SkeletalAnimations")
+            })
+            .ToArray();
+        var existingClips = sequenceBuilds.ToDictionary(
+            x => x.Path,
+            x => AssetDatabase.LoadAssetAtPath<AnimationClip>(x.Path),
+            StringComparer.OrdinalIgnoreCase);
+        var requiresBuild = existingClips.Values.Any(x => x == null);
+        var session = requiresBuild ? L2SceneSkeletalAssetBridge.CreateSession(asset) : null;
+        var bindPoses = requiresBuild
+            ? CreatureSkeletalImportUtility.BuildBonePoses(session.CaptureBindPoseDebugFrame().Bones, asset.Bones)
+            : null;
+        var clipInfos = new List<ClipBuildInfo>();
+        foreach (var build in sequenceBuilds)
+        {
+            var sequence = build.Sequence;
+            if (existingClips[build.Path] is { } existingClip)
+            {
+                clipInfos.Add(new ClipBuildInfo(build.Path, existingClip));
                 continue;
             }
 
@@ -116,15 +139,9 @@ internal static class CreatureAnimationClipBuilder
             CreatureSkeletalImportUtility.SetClipLoop(clip, sequence.SuggestedLoop);
             AttachAnimationEvents(clip, sequence);
 
-            var clipPath = L2AssetManager.BuildClientPackageAssetPath(
-                clipFolder,
-                $"{referenceText}.{CreatureSkeletalImportUtility.SanitizeName(sequence.Name)}",
-                "AN",
-                "anim",
-                "SkeletalAnimations");
-            var clipAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(clip, clipPath);
-            clipInfos.Add(new ClipBuildInfo(clipPath, clipAsset));
-            log?.Invoke($"[SkinnedPOC] AnimationClip ready: {clipPath}");
+            var clipAsset = UnityAssetDatabaseUtility.CreateAssetIfMissing(clip, build.Path);
+            clipInfos.Add(new ClipBuildInfo(build.Path, clipAsset));
+            log?.Invoke($"[SkinnedPOC] AnimationClip ready: {build.Path}");
         }
 
         notes = clipInfos.Count > 0
