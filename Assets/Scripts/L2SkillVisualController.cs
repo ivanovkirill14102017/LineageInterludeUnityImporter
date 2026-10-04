@@ -11,6 +11,8 @@ using UnityEditor;
 [DisallowMultipleComponent]
 public sealed class L2SkillVisualController : MonoBehaviour
 {
+    public const float DefaultCreatureHeight = 2f;
+    private const float CreatureMidpointHeight = DefaultCreatureHeight * 0.5f;
     public L2SkillVisualAsset Skill;
     public Transform CastPoint;
     public Transform TargetPoint;
@@ -20,7 +22,6 @@ public sealed class L2SkillVisualController : MonoBehaviour
     public int SelectedStageIndex;
     public bool PlayOnEnable;
     public bool LoopSelectedStage;
-    public bool PlayImpactAfterProjectile = true;
     public float StageIntervalSeconds = 0.45f;
     public float ProjectileSpeed = 8f;
     public float ProjectileArcHeight;
@@ -34,7 +35,11 @@ public sealed class L2SkillVisualController : MonoBehaviour
     private int _editorPreviewIndex;
     private double _editorNextStageTime;
     private bool _editorStopAfterCurrentStage;
-    private HashSet<int> _editorSkipIndexes;
+    private int[] _editorPhaseActions;
+    private int _editorPhaseActionIndex;
+    private int _editorPhaseEndIndex;
+    private double _editorPhaseStartTime;
+    private float _editorPhaseDuration;
 #endif
 
     public string[] GetStageDisplayNames()
@@ -63,9 +68,15 @@ public sealed class L2SkillVisualController : MonoBehaviour
             return;
         }
 
+        if (IsProjectileRole(binding.Role))
+        {
+            PlayStageAt(SelectedStageIndex);
+            return;
+        }
+
         DeactivateTemplateStages();
-        binding.StageRoot.transform.position = ResolveStagePosition(binding.Role);
-        binding.StageRoot.transform.rotation = ResolveStageRotation(binding.Role);
+        binding.StageRoot.transform.position = ResolveStagePosition(binding);
+        binding.StageRoot.transform.rotation = ResolveStageRotation(binding);
         binding.StageRoot.SetActive(true);
         PlayParticleSystems(binding.StageRoot);
     }
@@ -167,13 +178,22 @@ public sealed class L2SkillVisualController : MonoBehaviour
         var sourceRoot = StageContainer != null ? StageContainer : transform;
         StageBindings = sourceRoot
             .Cast<Transform>()
-            .Select((child, index) => new L2SkillVisualStageBinding
+            .Select(child =>
             {
-                StageKey = ExtractStageKey(child.name),
-                StageOrder = index,
-                StageName = child.name,
-                Role = InferStageRoleFromName(child.name),
-                StageRoot = child.gameObject
+                var source = child.GetComponent<L2SkillVisualStageSource>();
+                if (source == null)
+                {
+                    throw new InvalidOperationException($"Stage '{child.name}' has no L2SkillVisualStageSource metadata. Reimport the skill visual before rebuilding bindings.");
+                }
+
+                return new L2SkillVisualStageBinding
+                {
+                    StageOrder = source.StageOrder,
+                    StageName = source.ObjectName,
+                    Role = L2SkillVisualStageBinding.ResolveRole(source.IsProjectile, source.Placement, source.ObjectName),
+                    Placement = source.Placement,
+                    StageRoot = child.gameObject
+                };
             })
             .OrderBy(x => x.StageOrder)
             .ThenBy(x => x.StageName, StringComparer.OrdinalIgnoreCase)
@@ -209,10 +229,10 @@ public sealed class L2SkillVisualController : MonoBehaviour
             .ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase)
             .Select(x => new L2SkillVisualStageBinding
             {
-                StageKey = x.StageKey ?? string.Empty,
                 StageOrder = x.StageOrder,
                 StageName = x.ObjectName ?? string.Empty,
-                Role = x.PlaybackRole,
+                Role = L2SkillVisualStageBinding.ResolveRole(x.IsProjectile, x.Placement, x.ObjectName),
+                Placement = x.Placement,
                 StageRoot = null
             })
             .ToArray();
@@ -251,14 +271,6 @@ public sealed class L2SkillVisualController : MonoBehaviour
         return instance;
     }
 
-    internal void TrackRuntimeInstance(GameObject instance)
-    {
-        if (instance != null && !_runtimeInstances.Contains(instance))
-        {
-            _runtimeInstances.Add(instance);
-        }
-    }
-
     private IEnumerator PlaySelectedStageRoutine(L2SkillVisualStageBinding binding)
     {
         do
@@ -276,35 +288,68 @@ public sealed class L2SkillVisualController : MonoBehaviour
     private IEnumerator PlayAllStagesRoutine(int startIndex)
     {
         var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
-        var skipIndexes = new HashSet<int>();
-        for (var i = Mathf.Clamp(startIndex, 0, Math.Max(0, bindings.Length)); i < bindings.Length; i++)
+        for (var i = Mathf.Clamp(startIndex, 0, bindings.Length); i < bindings.Length;)
         {
-            if (skipIndexes.Contains(i))
+            if (bindings[i] == null)
             {
+                i++;
                 continue;
             }
 
-            var binding = bindings[i];
-            if (binding == null)
+            var phaseEnd = FindPhaseEnd(bindings, i);
+            var actions = OrderPhaseActions(bindings, i, phaseEnd);
+            var elapsed = 0f;
+            var phaseDuration = 0f;
+            foreach (var actionIndex in actions)
             {
-                continue;
-            }
-
-            if (IsProjectileRole(binding.Role))
-            {
-                var impactIndex = FindLinkedImpactStageIndex(i);
-                if (impactIndex >= 0)
+                var binding = bindings[actionIndex];
+                var delay = Mathf.Max(0f, binding.Placement.SpawnDelay);
+                if (delay > elapsed)
                 {
-                    skipIndexes.Add(impactIndex);
+                    yield return new WaitForSeconds(delay - elapsed);
+                    elapsed = delay;
                 }
+
+                phaseDuration = Mathf.Max(phaseDuration, delay + PlayStageBinding(binding));
             }
 
-            var duration = PlayStageBinding(binding);
-            yield return new WaitForSeconds(duration);
+            if (phaseDuration > elapsed)
+            {
+                yield return new WaitForSeconds(phaseDuration - elapsed);
+            }
+
+            i = phaseEnd;
         }
 
         IsPlaying = false;
         _playbackRoutine = null;
+    }
+
+    private static int FindPhaseEnd(L2SkillVisualStageBinding[] bindings, int start)
+    {
+        var placement = bindings[start].Placement ?? throw new InvalidOperationException($"Stage '{bindings[start].StageName}' has no placement.");
+        if (string.IsNullOrWhiteSpace(placement.VisualReference) || !Enum.IsDefined(typeof(L2SkillVisualPhase), placement.Phase))
+        {
+            throw new InvalidOperationException($"Stage '{bindings[start].StageName}' has no visual reference or action phase. Reimport the skill visual.");
+        }
+
+        var end = start + 1;
+        while (end < bindings.Length && bindings[end]?.Placement != null &&
+               string.Equals(bindings[end].Placement.VisualReference, placement.VisualReference, StringComparison.OrdinalIgnoreCase) &&
+               bindings[end].Placement.Phase == placement.Phase)
+        {
+            end++;
+        }
+
+        return end;
+    }
+
+    private static int[] OrderPhaseActions(L2SkillVisualStageBinding[] bindings, int start, int end)
+    {
+        return Enumerable.Range(start, end - start)
+            .OrderBy(index => Mathf.Max(0f, bindings[index].Placement.SpawnDelay))
+            .ThenBy(index => index)
+            .ToArray();
     }
 
     private float PlayStageBinding(L2SkillVisualStageBinding binding)
@@ -319,7 +364,7 @@ public sealed class L2SkillVisualController : MonoBehaviour
             return PlayProjectileStage(binding);
         }
 
-        var instance = SpawnStageInstance(binding, ResolveStagePosition(binding.Role), ResolveStageRotation(binding.Role));
+        var instance = SpawnStageInstance(binding, ResolveStagePosition(binding), ResolveStageRotation(binding));
         if (instance != null && RuntimeInstanceLifetime > 0f && Application.isPlaying)
         {
             Destroy(instance, RuntimeInstanceLifetime);
@@ -330,8 +375,11 @@ public sealed class L2SkillVisualController : MonoBehaviour
 
     private float PlayProjectileStage(L2SkillVisualStageBinding binding)
     {
-        var origin = ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster);
-        var target = ResolveStagePosition(L2SkillVisualStagePlaybackRole.Target);
+        var origin = ResolveProjectileOrigin();
+        var target = ResolveProjectileTarget();
+        var distance = Vector3.Distance(origin, target);
+        var flightTime = binding.Placement != null ? binding.Placement.FlyingTime : 0f;
+        var speed = flightTime > 0f ? distance / flightTime : Math.Max(0.01f, ProjectileSpeed);
         var rotation = ResolveTravelRotation(origin, target);
         var instance = SpawnStageInstance(binding, origin, rotation);
         if (instance == null)
@@ -339,7 +387,6 @@ public sealed class L2SkillVisualController : MonoBehaviour
             return StageIntervalSeconds;
         }
 
-        var impactBinding = PlayImpactAfterProjectile ? FindLinkedImpactStage(binding) : null;
         var projectile = instance.GetComponent<L2SkillProjectileRuntime>();
         if (projectile == null)
         {
@@ -347,17 +394,12 @@ public sealed class L2SkillVisualController : MonoBehaviour
         }
 
         projectile.Initialize(
-            this,
             origin,
             target,
-            Math.Max(0.01f, ProjectileSpeed),
-            Math.Max(0f, ProjectileArcHeight),
-            impactBinding,
-            RuntimeContainer,
-            RuntimeInstanceLifetime);
+            Math.Max(0.01f, speed),
+            Math.Max(0f, ProjectileArcHeight));
 
-        var distance = Vector3.Distance(origin, target);
-        var travelTime = distance / Math.Max(0.01f, ProjectileSpeed);
+        var travelTime = distance / Math.Max(0.01f, speed);
         return Math.Max(StageIntervalSeconds, travelTime);
     }
 
@@ -379,7 +421,7 @@ public sealed class L2SkillVisualController : MonoBehaviour
         _editorPreviewIndex = Mathf.Clamp(startIndex, 0, Math.Max(0, bindings.Length));
         _editorNextStageTime = EditorApplication.timeSinceStartup;
         _editorStopAfterCurrentStage = stopAfterCurrentStage;
-        _editorSkipIndexes = new HashSet<int>();
+        _editorPhaseActions = null;
         EditorApplication.update -= TickEditorPreview;
         EditorApplication.update += TickEditorPreview;
     }
@@ -393,11 +435,6 @@ public sealed class L2SkillVisualController : MonoBehaviour
         }
 
         var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
-        while (_editorPreviewIndex < bindings.Length && _editorSkipIndexes.Contains(_editorPreviewIndex))
-        {
-            _editorPreviewIndex++;
-        }
-
         if (_editorPreviewIndex >= bindings.Length)
         {
             StopEditorPreview();
@@ -411,22 +448,37 @@ public sealed class L2SkillVisualController : MonoBehaviour
             return;
         }
 
-        var binding = bindings[_editorPreviewIndex];
-        if (binding != null && IsProjectileRole(binding.Role))
+        if (_editorPhaseActions == null)
         {
-            var impactIndex = FindLinkedImpactStageIndex(_editorPreviewIndex);
-            if (impactIndex >= 0)
-            {
-                _editorSkipIndexes.Add(impactIndex);
-            }
+            _editorPhaseEndIndex = _editorStopAfterCurrentStage
+                ? _editorPreviewIndex + 1
+                : FindPhaseEnd(bindings, _editorPreviewIndex);
+            _editorPhaseActions = OrderPhaseActions(bindings, _editorPreviewIndex, _editorPhaseEndIndex);
+            _editorPhaseActionIndex = 0;
+            _editorPhaseStartTime = now;
+            _editorPhaseDuration = 0f;
         }
 
-        var duration = PlayStageBinding(binding);
-        _editorNextStageTime = now + Math.Max(0.01f, duration);
-        _editorPreviewIndex++;
-        if (_editorStopAfterCurrentStage)
+        while (_editorPhaseActionIndex < _editorPhaseActions.Length)
         {
-            _editorPreviewIndex = bindings.Length;
+            var binding = bindings[_editorPhaseActions[_editorPhaseActionIndex]];
+            var delay = Mathf.Max(0f, binding.Placement.SpawnDelay);
+            if (now < _editorPhaseStartTime + delay)
+            {
+                _editorNextStageTime = _editorPhaseStartTime + delay;
+                return;
+            }
+
+            _editorPhaseDuration = Mathf.Max(_editorPhaseDuration, delay + PlayStageBinding(binding));
+            _editorPhaseActionIndex++;
+        }
+
+        _editorNextStageTime = _editorPhaseStartTime + _editorPhaseDuration;
+        if (now >= _editorNextStageTime)
+        {
+            _editorPreviewIndex = _editorStopAfterCurrentStage ? bindings.Length : _editorPhaseEndIndex;
+            _editorPhaseActions = null;
+            _editorNextStageTime = now;
         }
 
         SceneView.RepaintAll();
@@ -442,7 +494,7 @@ public sealed class L2SkillVisualController : MonoBehaviour
         EditorApplication.update -= TickEditorPreview;
         _editorPreviewActive = false;
         _editorStopAfterCurrentStage = false;
-        _editorSkipIndexes = null;
+        _editorPhaseActions = null;
     }
 #endif
 
@@ -458,43 +510,13 @@ public sealed class L2SkillVisualController : MonoBehaviour
         return bindings[SelectedStageIndex];
     }
 
-    private L2SkillVisualStageBinding FindLinkedImpactStage(L2SkillVisualStageBinding projectileBinding)
-    {
-        var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
-        var projectileIndex = Array.IndexOf(bindings, projectileBinding);
-        var impactIndex = FindLinkedImpactStageIndex(projectileIndex);
-        return impactIndex >= 0 ? bindings[impactIndex] : null;
-    }
-
-    private int FindLinkedImpactStageIndex(int projectileIndex)
-    {
-        var bindings = StageBindings ?? Array.Empty<L2SkillVisualStageBinding>();
-        if (projectileIndex < 0 || projectileIndex >= bindings.Length)
-        {
-            return -1;
-        }
-
-        for (var i = projectileIndex + 1; i < bindings.Length; i++)
-        {
-            if (IsTargetLikeRole(bindings[i]?.Role ?? L2SkillVisualStagePlaybackRole.Auto))
-            {
-                return i;
-            }
-        }
-
-        for (var i = 0; i < bindings.Length; i++)
-        {
-            if (IsTargetLikeRole(bindings[i]?.Role ?? L2SkillVisualStagePlaybackRole.Auto))
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
     private Vector3 ResolveStagePosition(L2SkillVisualStagePlaybackRole role)
     {
+        if (IsProjectileRole(role))
+        {
+            return ResolveProjectileOrigin();
+        }
+
         if (IsTargetLikeRole(role))
         {
             return TargetPoint != null ? TargetPoint.position : transform.position + transform.forward * 4f;
@@ -503,16 +525,153 @@ public sealed class L2SkillVisualController : MonoBehaviour
         return CastPoint != null ? CastPoint.position : transform.position;
     }
 
+    private Vector3 ResolveStagePosition(L2SkillVisualStageBinding binding)
+    {
+        if (binding.Role == L2SkillVisualStagePlaybackRole.Projectile)
+        {
+            return ResolveProjectileOrigin();
+        }
+
+        var placement = binding.Placement ?? throw new InvalidOperationException($"Stage '{binding.StageName}' has no SkillAction placement.");
+        if (placement.Absolute)
+        {
+            throw new NotSupportedException($"Absolute attachment for stage '{binding.StageName}' is not implemented.");
+        }
+
+        var point = placement.SpawnOnTarget ? TargetPoint : CastPoint;
+        if (point == null)
+        {
+            throw new InvalidOperationException($"Stage '{binding.StageName}' requires a {(placement.SpawnOnTarget ? "TargetPoint" : "CastPoint")}.");
+        }
+
+        var attachment = ResolveAttachment(point, placement, binding.StageName);
+        var rawOffset = placement.Offset;
+        var scale = L2WorldScale.UnrealToUnityScale;
+        var horizontalScale = scale;
+        var verticalScale = scale;
+        if (placement.RelativeToCylinder)
+        {
+            var collider = point.parent != null ? point.parent.GetComponent<CapsuleCollider>() : null;
+            if (collider == null)
+            {
+                throw new InvalidOperationException($"Stage '{binding.StageName}' requires a capsule collider for bRelativeToCylinder.");
+            }
+
+            horizontalScale = collider.radius * Mathf.Max(Mathf.Abs(collider.transform.lossyScale.x), Mathf.Abs(collider.transform.lossyScale.z));
+            verticalScale = collider.height * Mathf.Abs(collider.transform.lossyScale.y) * 0.5f;
+        }
+
+        var direction = ResolveTravelRotation(ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster), ResolveStagePosition(L2SkillVisualStagePlaybackRole.Target));
+        var forward = direction * Vector3.forward;
+        var right = direction * Vector3.right;
+        return attachment.position + forward * (rawOffset.x * horizontalScale) + right * (rawOffset.y * horizontalScale) + Vector3.up * (rawOffset.z * verticalScale);
+    }
+
+    private Quaternion ResolveStageRotation(L2SkillVisualStageBinding binding)
+    {
+        if (binding.Role == L2SkillVisualStagePlaybackRole.Projectile)
+        {
+            return ResolveStageRotation(binding.Role);
+        }
+
+        var placement = binding.Placement ?? throw new InvalidOperationException($"Stage '{binding.StageName}' has no SkillAction placement.");
+        if (placement.UseCharacterRotation)
+        {
+            var point = placement.SpawnOnTarget ? TargetPoint : CastPoint;
+            return point != null && point.parent != null ? point.parent.rotation : transform.rotation;
+        }
+
+        return ResolveTravelRotation(ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster), ResolveStagePosition(L2SkillVisualStagePlaybackRole.Target));
+    }
+
+    private static Transform ResolveAttachment(Transform point, L2SkillVisualPlacementData placement, string stageName)
+    {
+        if (placement.AttachOn == L2SkillEffectAttachMethod.None || placement.AttachOn == L2SkillEffectAttachMethod.Trail)
+        {
+            return point;
+        }
+
+        var actor = point.parent != null ? point.parent : point;
+        var animator = actor.GetComponentInChildren<Animator>();
+        HumanBodyBones? humanoidBone = placement.AttachOn switch
+        {
+            L2SkillEffectAttachMethod.RightHand => HumanBodyBones.RightHand,
+            L2SkillEffectAttachMethod.LeftHand => HumanBodyBones.LeftHand,
+            L2SkillEffectAttachMethod.RightFoot => HumanBodyBones.RightFoot,
+            L2SkillEffectAttachMethod.LeftFoot => HumanBodyBones.LeftFoot,
+            _ => null
+        };
+        if (humanoidBone.HasValue && animator != null && animator.isHuman)
+        {
+            var bone = animator.GetBoneTransform(humanoidBone.Value);
+            if (bone != null)
+            {
+                return bone;
+            }
+        }
+
+        var name = placement.AttachOn switch
+        {
+            L2SkillEffectAttachMethod.RightHand => "RightHand",
+            L2SkillEffectAttachMethod.LeftHand => "LeftHand",
+            L2SkillEffectAttachMethod.RightFoot => "RightFoot",
+            L2SkillEffectAttachMethod.LeftFoot => "LeftFoot",
+            L2SkillEffectAttachMethod.BoneSpecified or L2SkillEffectAttachMethod.AliasSpecified => placement.AttachBoneName,
+            _ => throw new NotSupportedException($"Stage '{stageName}' uses unknown AttachOn={placement.AttachOn}.")
+        };
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException($"Stage '{stageName}' has no attachment bone name.");
+        }
+
+        var normalized = NormalizeBoneName(name);
+        foreach (var candidate in actor.GetComponentsInChildren<Transform>(true))
+        {
+            var candidateName = NormalizeBoneName(candidate.name);
+            if (candidateName == normalized || MatchesStandardAttachmentName(placement.AttachOn, candidateName))
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException($"Stage '{stageName}' requires attachment bone '{name}' on '{actor.name}'.");
+    }
+
+    private static string NormalizeBoneName(string name)
+    {
+        return new string(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+    }
+
+    private static bool MatchesStandardAttachmentName(L2SkillEffectAttachMethod method, string candidate)
+    {
+        return method switch
+        {
+            L2SkillEffectAttachMethod.RightHand => candidate == "rhand" || candidate == "handr" || candidate == "bip01rhand" || candidate == "bip01righthand",
+            L2SkillEffectAttachMethod.LeftHand => candidate == "lhand" || candidate == "handl" || candidate == "bip01lhand" || candidate == "bip01lefthand",
+            L2SkillEffectAttachMethod.RightFoot => candidate == "rfoot" || candidate == "bip01rfoot" || candidate == "bip01rightfoot",
+            L2SkillEffectAttachMethod.LeftFoot => candidate == "lfoot" || candidate == "bip01lfoot" || candidate == "bip01leftfoot",
+            _ => false
+        };
+    }
+
     private Quaternion ResolveStageRotation(L2SkillVisualStagePlaybackRole role)
     {
         if (IsProjectileRole(role))
         {
-            return ResolveTravelRotation(
-                CastPoint != null ? CastPoint.position : transform.position,
-                TargetPoint != null ? TargetPoint.position : transform.position + transform.forward * 4f);
+            return ResolveTravelRotation(ResolveProjectileOrigin(), ResolveProjectileTarget());
         }
 
-        return transform.rotation;
+        return IsTargetLikeRole(role) && TargetPoint != null ? TargetPoint.rotation : transform.rotation;
+    }
+
+    private Vector3 ResolveProjectileOrigin()
+    {
+        return ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster) + Vector3.up * CreatureMidpointHeight;
+    }
+
+    private Vector3 ResolveProjectileTarget()
+    {
+        return ResolveStagePosition(L2SkillVisualStagePlaybackRole.Target) + Vector3.up * CreatureMidpointHeight;
     }
 
     private static Quaternion ResolveTravelRotation(Vector3 origin, Vector3 target)
@@ -592,7 +751,6 @@ public sealed class L2SkillVisualController : MonoBehaviour
         ProjectileSpeed = templateController.ProjectileSpeed;
         ProjectileArcHeight = templateController.ProjectileArcHeight;
         RuntimeInstanceLifetime = templateController.RuntimeInstanceLifetime;
-        PlayImpactAfterProjectile = templateController.PlayImpactAfterProjectile;
 
         var bindings = new List<L2SkillVisualStageBinding>();
         foreach (var binding in templateController.StageBindings ?? Array.Empty<L2SkillVisualStageBinding>())
@@ -607,10 +765,10 @@ public sealed class L2SkillVisualController : MonoBehaviour
 
             bindings.Add(new L2SkillVisualStageBinding
             {
-                StageKey = binding?.StageKey ?? string.Empty,
                 StageOrder = binding?.StageOrder ?? bindings.Count,
                 StageName = binding?.StageName ?? (stageRoot != null ? stageRoot.name : string.Empty),
                 Role = binding?.Role ?? L2SkillVisualStagePlaybackRole.Auto,
+                Placement = binding?.Placement,
                 StageRoot = stageRoot
             });
         }
@@ -704,48 +862,6 @@ public sealed class L2SkillVisualController : MonoBehaviour
                role == L2SkillVisualStagePlaybackRole.Impact;
     }
 
-    private static string ExtractStageKey(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return string.Empty;
-        }
-
-        var lastUnderscore = name.LastIndexOf('_');
-        return lastUnderscore >= 0 && lastUnderscore < name.Length - 1
-            ? name.Substring(lastUnderscore + 1)
-            : string.Empty;
-    }
-
-    private static L2SkillVisualStagePlaybackRole InferStageRoleFromName(string name)
-    {
-        var stageKey = ExtractStageKey(name);
-        if (stageKey.Equals("pr", StringComparison.OrdinalIgnoreCase) ||
-            stageKey.Equals("fl", StringComparison.OrdinalIgnoreCase) ||
-            name.IndexOf("projectile", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            name.IndexOf("arrow", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            name.IndexOf("bolt", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            name.IndexOf("shot", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            return L2SkillVisualStagePlaybackRole.Projectile;
-        }
-
-        if (stageKey.Equals("ta", StringComparison.OrdinalIgnoreCase) ||
-            stageKey.Equals("to", StringComparison.OrdinalIgnoreCase) ||
-            name.IndexOf("target", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            return L2SkillVisualStagePlaybackRole.Target;
-        }
-
-        if (name.IndexOf("hit", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            name.IndexOf("impact", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            name.IndexOf("explosion", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            return L2SkillVisualStagePlaybackRole.Impact;
-        }
-
-        return L2SkillVisualStagePlaybackRole.Caster;
-    }
 }
 
 public enum L2SkillVisualStagePlaybackRole
@@ -761,10 +877,10 @@ public enum L2SkillVisualStagePlaybackRole
 [Serializable]
 public sealed class L2SkillVisualStageBinding
 {
-    public string StageKey;
     public int StageOrder;
     public string StageName;
     public L2SkillVisualStagePlaybackRole Role = L2SkillVisualStagePlaybackRole.Auto;
+    public L2SkillVisualPlacementData Placement;
     public GameObject StageRoot;
 
     public string GetDisplayName(int fallbackIndex)
@@ -772,8 +888,20 @@ public sealed class L2SkillVisualStageBinding
         var name = string.IsNullOrWhiteSpace(StageName)
             ? StageRoot != null ? StageRoot.name : $"Stage {fallbackIndex}"
             : StageName;
-        return string.IsNullOrWhiteSpace(StageKey)
-            ? $"{StageOrder:D2} {Role} - {name}"
-            : $"{StageOrder:D2} {StageKey} {Role} - {name}";
+        return $"{StageOrder:D2} {Role} - {name}";
+    }
+
+    public static L2SkillVisualStagePlaybackRole ResolveRole(bool isProjectile, L2SkillVisualPlacementData placement, string stageName)
+    {
+        if (placement == null)
+        {
+            throw new NotSupportedException($"Skill stage '{stageName}' has no explicit SkillAction placement.");
+        }
+
+        return isProjectile
+            ? L2SkillVisualStagePlaybackRole.Projectile
+            : placement.SpawnOnTarget
+                ? L2SkillVisualStagePlaybackRole.Target
+                : L2SkillVisualStagePlaybackRole.Caster;
     }
 }

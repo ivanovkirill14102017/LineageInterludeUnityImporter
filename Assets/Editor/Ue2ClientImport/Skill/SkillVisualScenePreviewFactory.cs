@@ -9,8 +9,7 @@ using UnityEngine;
 internal static class SkillVisualScenePreviewFactory
 {
     private const float DefaultTargetDistance = 4f;
-    private const float CasterHeight = 1f;
-    private const float AnchorHeight = 1.15f;
+    private const float CapsuleCenterHeight = L2SkillVisualController.DefaultCreatureHeight * 0.5f;
 
     public static L2SkillVisualController Create(L2SkillVisualAsset skill)
     {
@@ -23,11 +22,13 @@ internal static class SkillVisualScenePreviewFactory
         Undo.RegisterCreatedObjectUndo(root, "Create skill visual preview rig");
 
         var targetDistance = ResolveTargetDistance(skill);
-        var caster = CreateCapsule("Caster", root.transform, new Vector3(0f, CasterHeight, 0f));
-        var target = CreateCapsule("Target", root.transform, new Vector3(0f, CasterHeight, targetDistance));
+        var caster = CreateCapsule("Caster", root.transform, new Vector3(0f, CapsuleCenterHeight, 0f));
+        var target = CreateCapsule("Target", root.transform, new Vector3(0f, CapsuleCenterHeight, targetDistance));
+        CreateBodyAnchors(caster.transform);
+        CreateBodyAnchors(target.transform);
 
-        var castPoint = CreateAnchor("CastPoint", caster.transform, new Vector3(0f, AnchorHeight - CasterHeight, 0f));
-        var targetPoint = CreateAnchor("TargetPoint", target.transform, new Vector3(0f, AnchorHeight - CasterHeight, 0f));
+        var castPoint = CreateAnchor("CastPoint", caster.transform, new Vector3(0f, -CapsuleCenterHeight, 0f));
+        var targetPoint = CreateAnchor("TargetPoint", target.transform, new Vector3(0f, -CapsuleCenterHeight, 0f));
 
         var stageContainer = new GameObject("Stages");
         stageContainer.transform.SetParent(root.transform, false);
@@ -45,8 +46,8 @@ internal static class SkillVisualScenePreviewFactory
         controller.TargetPoint = targetPoint.transform;
         controller.StageContainer = stageContainer.transform;
         controller.RuntimeContainer = runtimeContainer.transform;
-        controller.CastPoint.localPosition = new Vector3(0f, AnchorHeight - CasterHeight, 0f);
-        controller.TargetPoint.localPosition = new Vector3(0f, AnchorHeight - CasterHeight, 0f);
+        controller.CastPoint.localPosition = new Vector3(0f, -CapsuleCenterHeight, 0f);
+        controller.TargetPoint.localPosition = new Vector3(0f, -CapsuleCenterHeight, 0f);
 
         caster.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
         target.transform.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
@@ -63,7 +64,19 @@ internal static class SkillVisualScenePreviewFactory
         capsule.name = name;
         capsule.transform.SetParent(parent, false);
         capsule.transform.localPosition = localPosition;
+        capsule.transform.localScale = Vector3.one;
+        var collider = capsule.GetComponent<CapsuleCollider>();
+        collider.height = L2SkillVisualController.DefaultCreatureHeight;
+        collider.radius = 0.5f;
         return capsule;
+    }
+
+    private static void CreateBodyAnchors(Transform capsule)
+    {
+        CreateAnchor("RightHand", capsule, new Vector3(0.35f, 0.35f, 0f));
+        CreateAnchor("LeftHand", capsule, new Vector3(-0.35f, 0.35f, 0f));
+        CreateAnchor("RightFoot", capsule, new Vector3(0.16f, -0.85f, 0f));
+        CreateAnchor("LeftFoot", capsule, new Vector3(-0.16f, -0.85f, 0f));
     }
 
     private static GameObject CreateAnchor(string name, Transform parent, Vector3 localPosition)

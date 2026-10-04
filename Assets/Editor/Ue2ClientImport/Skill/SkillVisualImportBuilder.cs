@@ -368,7 +368,7 @@ internal static class SkillVisualImportBuilder
             var stageBindings = new List<L2SkillVisualStageBinding>();
             foreach (var stage in sceneData.Stages.OrderBy(x => x.StageOrder).ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase))
             {
-                stageBindings.AddRange(BuildStagePlaybackBindings(stage, stageContainer.transform, dependencies, log));
+                stageBindings.Add(BuildStagePlaybackBinding(stage, stageContainer.transform, dependencies, log));
             }
 
             controller.Skill = asset;
@@ -431,115 +431,34 @@ internal static class SkillVisualImportBuilder
         }
     }
 
-    private static IEnumerable<L2SkillVisualStageBinding> BuildStagePlaybackBindings(
+    private static L2SkillVisualStageBinding BuildStagePlaybackBinding(
         SceneSkillVisualStageData stage,
         Transform stageContainer,
         SkillVisualDependencyContext dependencies,
         Action<string>? log)
     {
-        var orderedLayers = stage.Layers
-            .OrderBy(x => x.ExportIndex)
-            .ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var playbackRole = InferPlaybackRole(stage);
-
-        if (IsTargetPlaybackRole(playbackRole))
-        {
-            var projectileLayers = orderedLayers.Where(IsProjectileLayer).ToArray();
-            if (projectileLayers.Length > 0 && projectileLayers.Length < orderedLayers.Length)
-            {
-                var impactLayers = orderedLayers.Except(projectileLayers).ToArray();
-                yield return BuildStagePlaybackBinding(
-                    stage,
-                    stageContainer,
-                    dependencies,
-                    log,
-                    projectileLayers,
-                    L2SkillVisualStagePlaybackRole.Projectile,
-                    stage.StageOrder,
-                    "Projectile");
-                yield return BuildStagePlaybackBinding(
-                    stage,
-                    stageContainer,
-                    dependencies,
-                    log,
-                    impactLayers,
-                    L2SkillVisualStagePlaybackRole.Impact,
-                    stage.StageOrder + 1,
-                    "Impact");
-                yield break;
-            }
-        }
-
-        yield return BuildStagePlaybackBinding(
-            stage,
-            stageContainer,
-            dependencies,
-            log,
-            orderedLayers,
-            playbackRole,
-            stage.StageOrder,
-            null);
-    }
-
-    private static L2SkillVisualStageBinding BuildStagePlaybackBinding(
-        SceneSkillVisualStageData stage,
-        Transform stageContainer,
-        SkillVisualDependencyContext dependencies,
-        Action<string>? log,
-        IReadOnlyList<SceneSkillVisualLayerData> layers,
-        L2SkillVisualStagePlaybackRole role,
-        int order,
-        string? roleSuffix)
-    {
-        var stageObjectName = BuildStageObjectName(stage);
-        if (!string.IsNullOrWhiteSpace(roleSuffix))
-        {
-            stageObjectName = $"{stageObjectName}_{roleSuffix}";
-        }
-
-        var stageObject = new GameObject(stageObjectName);
+        var stageObject = new GameObject(BuildStageObjectName(stage));
         stageObject.transform.SetParent(stageContainer, false);
-        foreach (var layer in layers)
+        var source = stageObject.AddComponent<L2SkillVisualStageSource>();
+        source.SuperClassName = stage.SuperClassName;
+        source.IsProjectile = stage.IsProjectile;
+        source.ObjectName = stage.ObjectName;
+        source.StageOrder = stage.StageOrder;
+        source.Placement = ConvertPlacement(stage.Placement);
+        foreach (var layer in stage.Layers.OrderBy(x => x.ExportIndex).ThenBy(x => x.ObjectName, StringComparer.OrdinalIgnoreCase))
         {
             BuildLayerObject(layer, stageObject.transform, dependencies, log);
         }
 
-        var baseStageKey = stage.StageKey ?? string.Empty;
-        var baseStageName = stage.ObjectName ?? stageObject.name;
-        var suffix = roleSuffix ?? string.Empty;
         stageObject.SetActive(false);
         return new L2SkillVisualStageBinding
         {
-            StageKey = string.IsNullOrWhiteSpace(suffix) ? baseStageKey : $"{baseStageKey}_{suffix.ToLowerInvariant()}",
-            StageOrder = order,
-            StageName = string.IsNullOrWhiteSpace(suffix) ? baseStageName : $"{baseStageName}_{suffix}",
-            Role = role,
+            StageOrder = stage.StageOrder,
+            StageName = stage.ObjectName ?? stageObject.name,
+            Role = L2SkillVisualStageBinding.ResolveRole(stage.IsProjectile, source.Placement, stage.ObjectName),
+            Placement = source.Placement,
             StageRoot = stageObject
         };
-    }
-
-    private static bool IsTargetPlaybackRole(L2SkillVisualStagePlaybackRole role)
-    {
-        return role == L2SkillVisualStagePlaybackRole.Target ||
-               role == L2SkillVisualStagePlaybackRole.Impact;
-    }
-
-    private static bool IsProjectileLayer(SceneSkillVisualLayerData layer)
-    {
-        var text = string.Join(" ",
-            layer.LayerName ?? string.Empty,
-            layer.ObjectName ?? string.Empty,
-            layer.ClassName ?? string.Empty,
-            layer.StaticMeshReference ?? string.Empty);
-
-        return text.IndexOf("projectile", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("arrow", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("bolt", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("shot", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("spear", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("missile", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               string.Equals(layer.ClassName, "BeamEmitter", StringComparison.OrdinalIgnoreCase);
     }
 
     private static ParticleSystem CreateParticleSystemObject(string name, Transform parent, ParticleSystemRenderMode renderMode)
@@ -799,9 +718,9 @@ internal static class SkillVisualImportBuilder
         rotationOverLifetime.separateAxes = isMeshEmitter;
         if (isMeshEmitter)
         {
-            rotationOverLifetime.x = new ParticleSystem.MinMaxCurve(0f);
-            rotationOverLifetime.y = spin;
-            rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(0f);
+            rotationOverLifetime.x = BuildAxisRotationCurve(spinsPerSecondRange.X);
+            rotationOverLifetime.y = BuildAxisRotationCurve(spinsPerSecondRange.Z);
+            rotationOverLifetime.z = BuildAxisRotationCurve(spinsPerSecondRange.Y);
         }
         else
         {
@@ -856,11 +775,10 @@ internal static class SkillVisualImportBuilder
             return;
         }
 
-        var spin = BuildRotationCurve(range);
         main.startRotation3D = true;
-        main.startRotationX = new ParticleSystem.MinMaxCurve(0f);
-        main.startRotationY = spin;
-        main.startRotationZ = new ParticleSystem.MinMaxCurve(0f);
+        main.startRotationX = BuildAxisRotationCurve(range?.X);
+        main.startRotationY = BuildAxisRotationCurve(range?.Z);
+        main.startRotationZ = BuildAxisRotationCurve(range?.Y);
     }
 
     private static ParticleSystem.MinMaxCurve BuildSizeCurve(UnrRangeVector? range, float fallbackMin, float fallbackMax)
@@ -885,6 +803,13 @@ internal static class SkillVisualImportBuilder
         var min = ComputeDominantAxisValue(range, useMax: false) * Mathf.PI * 2f;
         var max = ComputeDominantAxisValue(range, useMax: true) * Mathf.PI * 2f;
         return new ParticleSystem.MinMaxCurve(min, max);
+    }
+
+    private static ParticleSystem.MinMaxCurve BuildAxisRotationCurve(UnrFloatRange? range)
+    {
+        return range == null
+            ? new ParticleSystem.MinMaxCurve(0f)
+            : new ParticleSystem.MinMaxCurve(-range.Max * Mathf.PI * 2f, -range.Min * Mathf.PI * 2f);
     }
 
     private static Color BuildStartColor(float? opacity, UnrParticleColorScale[] colorScale, bool applyOpacity)
@@ -1428,18 +1353,19 @@ internal static class SkillVisualImportBuilder
         return new L2SkillVisualEffectData
         {
             Stem = value.Stem ?? string.Empty,
-            Source = value.Source ?? string.Empty,
             Stages = value.Stages?.Select(ConvertStage).ToArray() ?? Array.Empty<L2SkillVisualStageData>()
         };
     }
 
     private static L2SkillVisualStageData ConvertStage(SceneSkillVisualStageData value)
     {
+        var placement = ConvertPlacement(value.Placement);
         return new L2SkillVisualStageData
         {
-            StageKey = value.StageKey ?? string.Empty,
             StageOrder = value.StageOrder,
-            PlaybackRole = InferPlaybackRole(value),
+            PlaybackRole = L2SkillVisualStageBinding.ResolveRole(value.IsProjectile, placement, value.ObjectName),
+            Placement = placement,
+            IsProjectile = value.IsProjectile,
             ObjectName = value.ObjectName ?? string.Empty,
             SuperClassName = value.SuperClassName ?? string.Empty,
             StageReference = ConvertResourceReference(value.StageReference),
@@ -1447,6 +1373,50 @@ internal static class SkillVisualImportBuilder
             EmitterReferences = value.EmitterReferences?.Select(ConvertResourceReference).ToArray() ?? Array.Empty<L2ResourceReferenceData>(),
             EmitterResources = value.EmitterResources?.Select(ConvertResourceLocation).ToArray() ?? Array.Empty<L2ResourceLocationData>(),
             Layers = value.Layers?.Select(ConvertLayer).ToArray() ?? Array.Empty<L2SkillVisualLayerData>()
+        };
+    }
+
+    private static L2SkillVisualPlacementData ConvertPlacement(SceneSkillVisualPlacementData value)
+    {
+        if (value == null)
+        {
+            throw new InvalidOperationException("Skill stage has no SkillAction_LocateEffect placement.");
+        }
+
+        if (value.Absolute)
+        {
+            throw new NotSupportedException($"SkillAction in phase '{value.Phase}' uses bAbsolute attachment, which is not supported by the Unity placement adapter.");
+        }
+
+        return new L2SkillVisualPlacementData
+        {
+            VisualReference = value.VisualReference ?? string.Empty,
+            Phase = ResolvePhase(value.Phase),
+            SpecificStage = value.SpecificStage,
+            AttachOn = (L2SkillEffectAttachMethod)value.AttachOn,
+            AttachBoneName = value.AttachBoneName ?? string.Empty,
+            Offset = new Vector3(value.Offset.X, value.Offset.Y, value.Offset.Z),
+            SpawnOnTarget = value.SpawnOnTarget,
+            RelativeToCylinder = value.RelativeToCylinder,
+            UseCharacterRotation = value.UseCharacterRotation,
+            Absolute = value.Absolute,
+            OnMultiTarget = value.OnMultiTarget,
+            SizeScale = value.SizeScale,
+            SpawnDelay = value.SpawnDelay,
+            FlyingTime = value.FlyingTime ?? 0f
+        };
+    }
+
+    private static L2SkillVisualPhase ResolvePhase(SceneSkillVisualPhase phase)
+    {
+        return phase switch
+        {
+            SceneSkillVisualPhase.Casting => L2SkillVisualPhase.Casting,
+            SceneSkillVisualPhase.Channeling => L2SkillVisualPhase.Channeling,
+            SceneSkillVisualPhase.Preshot => L2SkillVisualPhase.Preshot,
+            SceneSkillVisualPhase.Shot => L2SkillVisualPhase.Shot,
+            SceneSkillVisualPhase.Explosion => L2SkillVisualPhase.Explosion,
+            _ => throw new NotSupportedException($"Unsupported skill visual action phase '{phase}'.")
         };
     }
 
@@ -1668,49 +1638,6 @@ internal static class SkillVisualImportBuilder
             ? Mathf.Clamp(castRange * L2WorldScale.BakeUnrealToUnityScale, 1.5f, 12f)
             : 4f;
         return Vector3.forward * distance;
-    }
-
-    private static L2SkillVisualStagePlaybackRole InferPlaybackRole(SceneSkillVisualStageData stage)
-    {
-        var stageKey = stage.StageKey ?? string.Empty;
-        var objectName = stage.ObjectName ?? string.Empty;
-        var hasBeamLayer = stage.Layers?.Any(x => string.Equals(x.ClassName, "BeamEmitter", StringComparison.OrdinalIgnoreCase)) == true;
-        var hasMeshProjectileToken = stage.Layers?.Any(x =>
-        {
-            var reference = x.StaticMeshReference ?? string.Empty;
-            return reference.IndexOf("arrow", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   reference.IndexOf("bolt", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   reference.IndexOf("shot", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   reference.IndexOf("projectile", StringComparison.OrdinalIgnoreCase) >= 0;
-        }) == true;
-
-        if (stageKey.Equals("pr", StringComparison.OrdinalIgnoreCase) ||
-            stageKey.Equals("fl", StringComparison.OrdinalIgnoreCase) ||
-            hasBeamLayer ||
-            hasMeshProjectileToken ||
-            objectName.IndexOf("projectile", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            objectName.IndexOf("arrow", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            objectName.IndexOf("bolt", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            objectName.IndexOf("shot", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            return L2SkillVisualStagePlaybackRole.Projectile;
-        }
-
-        if (stageKey.Equals("ta", StringComparison.OrdinalIgnoreCase) ||
-            stageKey.Equals("to", StringComparison.OrdinalIgnoreCase) ||
-            objectName.IndexOf("target", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            return L2SkillVisualStagePlaybackRole.Target;
-        }
-
-        if (objectName.IndexOf("hit", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            objectName.IndexOf("impact", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            objectName.IndexOf("explosion", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            return L2SkillVisualStagePlaybackRole.Impact;
-        }
-
-        return L2SkillVisualStagePlaybackRole.Caster;
     }
 
     private static string ResolveDisplayName(SceneSkillVisualData data)

@@ -89,23 +89,63 @@ public sealed class L2MobSkillVisualData
 public sealed class L2SkillVisualEffectData
 {
     public string Stem;
-    public string Source;
     public L2SkillVisualStageData[] Stages = Array.Empty<L2SkillVisualStageData>();
 }
 
 [Serializable]
 public sealed class L2SkillVisualStageData
 {
-    public string StageKey;
     public int StageOrder;
     public L2SkillVisualStagePlaybackRole PlaybackRole;
+    public L2SkillVisualPlacementData Placement;
     public string ObjectName;
     public string SuperClassName;
+    public bool IsProjectile;
     public L2ResourceReferenceData StageReference;
     public L2ResourceLocationData StageResource;
     public L2ResourceReferenceData[] EmitterReferences = Array.Empty<L2ResourceReferenceData>();
     public L2ResourceLocationData[] EmitterResources = Array.Empty<L2ResourceLocationData>();
     public L2SkillVisualLayerData[] Layers = Array.Empty<L2SkillVisualLayerData>();
+}
+
+[Serializable]
+public sealed class L2SkillVisualPlacementData
+{
+    public string VisualReference;
+    public L2SkillVisualPhase Phase;
+    public int SpecificStage;
+    public L2SkillEffectAttachMethod AttachOn;
+    public string AttachBoneName;
+    public Vector3 Offset;
+    public bool SpawnOnTarget;
+    public bool RelativeToCylinder;
+    public bool UseCharacterRotation;
+    public bool Absolute;
+    public bool OnMultiTarget;
+    public bool SizeScale;
+    public float SpawnDelay;
+    public float FlyingTime;
+}
+
+public enum L2SkillVisualPhase
+{
+    Casting = 0,
+    Channeling = 1,
+    Preshot = 2,
+    Shot = 3,
+    Explosion = 4
+}
+
+public enum L2SkillEffectAttachMethod : byte
+{
+    None = 0,
+    RightHand = 1,
+    LeftHand = 2,
+    BoneSpecified = 3,
+    AliasSpecified = 4,
+    Trail = 5,
+    RightFoot = 6,
+    LeftFoot = 7
 }
 
 [Serializable]
