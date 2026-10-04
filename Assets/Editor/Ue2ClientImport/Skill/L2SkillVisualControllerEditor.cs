@@ -37,7 +37,7 @@ public sealed class L2SkillVisualControllerEditor : Editor
     {
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Playback", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.StageIntervalSeconds)));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.SelectedStageReplayIntervalSeconds)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.ProjectileSpeed)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.ProjectileArcHeight)));
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(L2SkillVisualController.RuntimeInstanceLifetime)));

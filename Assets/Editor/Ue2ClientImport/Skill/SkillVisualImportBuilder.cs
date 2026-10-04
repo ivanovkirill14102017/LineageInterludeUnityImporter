@@ -379,7 +379,7 @@ internal static class SkillVisualImportBuilder
             controller.StageBindings = stageBindings.ToArray();
             controller.SelectedStageIndex = 0;
             controller.ProjectileSpeed = 8f;
-            controller.StageIntervalSeconds = 0.45f;
+            controller.SelectedStageReplayIntervalSeconds = 0.45f;
             controller.RuntimeInstanceLifetime = 3f;
 
             L2AssetManager.EnsureParentFolderExists(prefabPath);
