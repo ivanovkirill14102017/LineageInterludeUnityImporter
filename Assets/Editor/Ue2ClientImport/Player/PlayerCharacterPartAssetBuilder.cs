@@ -46,6 +46,16 @@ internal static class PlayerCharacterPartAssetBuilder
         return BuildMeshOnlyAsset(location, baseAsset, SceneCharacterPartBinding.MeshSkinning);
     }
 
+    public static bool IsRigidHairBoundToCharacterRoot(SceneSkeletalAsset asset)
+    {
+        var bones = asset.Skeleton.Bones;
+        var weights = asset.Mesh.Weights;
+        return bones.Count > 0 &&
+               string.Equals(bones[0].Name, "Bip01", StringComparison.OrdinalIgnoreCase) &&
+               weights.Count > 0 &&
+               weights.All(weight => weight.BoneIndex == 0);
+    }
+
     public static SceneSkeletalAsset BuildMeshOnlyAsset(
         SceneResourceLocation location,
         SceneSkeletalAsset baseAsset,

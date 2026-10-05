@@ -66,7 +66,10 @@ internal static class PlayerCharacterMeshAssetResolver
                     source.Location.ObjectName,
                     source.Asset);
                 var meshPath = BuildMeshPath(source);
-                if (source.Variant.Binding == SceneCharacterPartBinding.RigidHead)
+                var rigidHead = source.Variant.Binding == SceneCharacterPartBinding.RigidHead ||
+                                (source.Variant.SlotName == "Hair" &&
+                                 PlayerCharacterPartAssetBuilder.IsRigidHairBoundToCharacterRoot(source.Asset));
+                if (rigidHead)
                 {
                     var adaptedSource = PlayerCharacterPartAssetBuilder.BuildMeshOnlyAsset(
                         source.Location,

@@ -58,6 +58,7 @@ public sealed class L2CharacterVariantPartData
     public Material[] Materials = Array.Empty<Material>();
     public string[] BoneNames = Array.Empty<string>();
     public int[] BoneParentIndices = Array.Empty<int>();
+    public string RootAttachmentBoneName;
     public bool UsesOwnSkeleton;
 }
 public static class L2SkeletalBoneBinding
@@ -67,7 +68,8 @@ public static class L2SkeletalBoneBinding
         Transform skeletonRoot,
         string[] sourceNames,
         int[] sourceParentIndices,
-        string partName)
+        string partName,
+        string rootAttachmentBoneName = null)
     {
         targetBones = targetBones ?? Array.Empty<Transform>();
         sourceNames = sourceNames ?? Array.Empty<string>();
@@ -106,7 +108,11 @@ public static class L2SkeletalBoneBinding
                     $"Part '{partName}' bone '{sourceNames[index]}' has invalid parent index {parentIndex}.");
             }
 
-            var expectedParent = parentIndex >= 0 ? ResolveBone(parentIndex) : skeletonRoot;
+            var expectedParent = parentIndex >= 0
+                ? ResolveBone(parentIndex)
+                : string.IsNullOrEmpty(rootAttachmentBoneName)
+                    ? skeletonRoot
+                    : targetBones.Single(x => string.Equals(x.name, rootAttachmentBoneName, StringComparison.OrdinalIgnoreCase));
             if (!candidatesByName.TryGetValue(sourceNames[index], out var candidates))
             {
                 throw new InvalidOperationException(

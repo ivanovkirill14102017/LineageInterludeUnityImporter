@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using L2Viewer.SceneDomain.Models;
+using UnityEngine;
 
 internal static class PlayerCharacterSkeletonMergeUtility
 {
@@ -150,5 +151,40 @@ internal static class PlayerCharacterSkeletonMergeUtility
             IsRoot = parentIndex < 0,
             DontInvertRoot = source.DontInvertRoot
         };
+    }
+}
+
+internal static class PlayerCharacterHairBinding
+{
+    public static string ResolveRootAttachment(string slotName, string[] boneNames, int[] parentIndices)
+    {
+        return slotName == "Hair" &&
+               boneNames.Length > 0 &&
+               parentIndices.Length > 0 &&
+               parentIndices[0] < 0 &&
+               string.Equals(boneNames[0], "Hair01", StringComparison.OrdinalIgnoreCase)
+            ? "Bip01_head"
+            : null;
+    }
+
+    public static void AttachRootsToHead(
+        Transform skeletonRoot,
+        Transform[] bones,
+        IEnumerable<string> hairRootNames)
+    {
+        var roots = hairRootNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (roots.Length == 0)
+        {
+            return;
+        }
+
+        var head = bones.Single(x => string.Equals(x.name, "Bip01_head", StringComparison.OrdinalIgnoreCase));
+        foreach (var rootName in roots)
+        {
+            var hairRoot = bones.Single(x =>
+                x.parent == skeletonRoot &&
+                string.Equals(x.name, rootName, StringComparison.OrdinalIgnoreCase));
+            hairRoot.SetParent(head, true);
+        }
     }
 }

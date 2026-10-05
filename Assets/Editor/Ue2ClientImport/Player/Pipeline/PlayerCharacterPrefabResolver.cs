@@ -46,6 +46,8 @@ internal static class PlayerCharacterPrefabResolver
                             Materials = part.Materials,
                             BoneNames = part.BoneNames,
                             BoneParentIndices = part.BoneParentIndices,
+                            RootAttachmentBoneName = PlayerCharacterHairBinding.ResolveRootAttachment(
+                                slotName, part.BoneNames, part.BoneParentIndices),
                             UsesOwnSkeleton = PlayerCharacterImportPlanBuilder.IsWeaponSlotName(variant.SlotName)
                         })
                         .ToArray()
@@ -78,6 +80,12 @@ internal static class PlayerCharacterPrefabResolver
             $"PC_{characterName}",
             build =>
             {
+                var hairRoots = slots.First(x => x.SlotName == "Hair").Variants
+                    .SelectMany(x => x.Parts ?? Array.Empty<L2CharacterVariantPartData>())
+                    .Where(x => x.RootAttachmentBoneName != null)
+                    .Select(x => x.BoneNames[0]);
+                PlayerCharacterHairBinding.AttachRootsToHead(build.SkeletonRoot, build.Bones, hairRoots);
+
                 var metadata = build.Root.AddComponent<L2PlayerCharacterDebugMetadata>();
                 metadata.BaseClass = archetype.BaseClass;
                 metadata.Gender = archetype.Gender;

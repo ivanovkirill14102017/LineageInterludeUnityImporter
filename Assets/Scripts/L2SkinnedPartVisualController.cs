@@ -72,7 +72,8 @@ internal sealed class L2SkinnedPartVisualController
                 RemoveOwnSkeleton(renderer);
                 renderer.rootBone = rootBone;
                 renderer.bones = L2SkeletalBoneBinding.Resolve(
-                    bones, skeletonRoot, part.BoneNames, part.BoneParentIndices, part.Name);
+                    bones, skeletonRoot, part.BoneNames, part.BoneParentIndices, part.Name,
+                    part.RootAttachmentBoneName);
             }
 
             renderer.updateWhenOffscreen = true;

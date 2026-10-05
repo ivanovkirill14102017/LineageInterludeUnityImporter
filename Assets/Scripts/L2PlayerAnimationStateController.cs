@@ -1,11 +1,7 @@
 using System;
 using System.Linq;
 using UnityEngine;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
-[ExecuteAlways]
 [DisallowMultipleComponent]
 public sealed class L2PlayerAnimationStateController : MonoBehaviour
 {
@@ -38,15 +34,11 @@ public sealed class L2PlayerAnimationStateController : MonoBehaviour
     public int CustomAnimationIndex;
     public bool LoopCustomAnimation;
 
-    private L2CharacterAnimationPlayback _playback;
     private L2SkeletalAnimationSequenceData _currentSequence;
     private Phase _phase;
     private L2WeaponAnimationClass _lastWeaponClass;
     private int _attackIndex;
     private int _lastCustomIndex = -1;
-#if UNITY_EDITOR
-    private double _phaseStartedEditorTime;
-#endif
 
     public string[] GetAnimationNames()
     {
@@ -68,7 +60,7 @@ public sealed class L2PlayerAnimationStateController : MonoBehaviour
 
     public void Refresh()
     {
-        if (Archetype?.BaseAsset == null || Animator == null || Equipment == null)
+        if (!Application.isPlaying || Archetype?.BaseAsset == null || Animator == null || Equipment == null)
         {
             return;
         }
@@ -299,30 +291,14 @@ public sealed class L2PlayerAnimationStateController : MonoBehaviour
             throw new InvalidOperationException($"Character '{Archetype.ArchetypeName}' has a null animation sequence.");
         }
 
-        (_playback ??= new L2CharacterAnimationPlayback(this)).Play(Archetype, Animator, sequence.Name);
+        L2CharacterAnimationPlayback.Play(Archetype, Animator, sequence.Name);
         _currentSequence = sequence;
         _phase = phase;
-#if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
-            _phaseStartedEditorTime = EditorApplication.timeSinceStartup;
-        }
-#endif
     }
 
     private bool CurrentFinished()
     {
-        if (Application.isPlaying)
-        {
-            return L2CharacterAnimationPlayback.IsFinished(Animator);
-        }
-
-#if UNITY_EDITOR
-        return _currentSequence != null &&
-               EditorApplication.timeSinceStartup - _phaseStartedEditorTime >= SequenceDuration(_currentSequence);
-#else
-        return false;
-#endif
+        return L2CharacterAnimationPlayback.IsFinished(Animator);
     }
 
     private void RepeatHoldIfNeeded()
@@ -335,25 +311,7 @@ public sealed class L2PlayerAnimationStateController : MonoBehaviour
 
     private void OnEnable()
     {
-#if UNITY_EDITOR
-        if (!Application.isPlaying && EditorUtility.IsPersistent(this))
-        {
-            return;
-        }
-
-        if (!Application.isPlaying)
-        {
-            EditorApplication.update += EditorTick;
-        }
-#endif
         Refresh();
-    }
-
-    private void OnDisable()
-    {
-#if UNITY_EDITOR
-        EditorApplication.update -= EditorTick;
-#endif
     }
 
     private void OnValidate()
@@ -363,38 +321,6 @@ public sealed class L2PlayerAnimationStateController : MonoBehaviour
             Refresh();
         }
     }
-
-#if UNITY_EDITOR
-    private static float SequenceDuration(L2SkeletalAnimationSequenceData sequence)
-    {
-        if (sequence.AnimRate > 0.0001f)
-        {
-            return Mathf.Max(0.01f, (sequence.NumRawFrames - 1) / sequence.AnimRate);
-        }
-
-        return Mathf.Max(0.01f, sequence.TrackTime);
-    }
-
-    private void EditorTick()
-    {
-        if (Application.isPlaying || !isActiveAndEnabled || EditorUtility.IsPersistent(this))
-        {
-            return;
-        }
-
-        Refresh();
-        if (_currentSequence == null)
-        {
-            return;
-        }
-
-        var duration = SequenceDuration(_currentSequence);
-        var elapsed = (float)(EditorApplication.timeSinceStartup - _phaseStartedEditorTime);
-        var sampleTime = _currentSequence.SuggestedLoop ? elapsed % duration : Mathf.Min(elapsed, duration);
-        (_playback ??= new L2CharacterAnimationPlayback(this))
-            .SampleInEditor(Archetype, Animator, _currentSequence, sampleTime);
-    }
-#endif
 
     private void Update()
     {

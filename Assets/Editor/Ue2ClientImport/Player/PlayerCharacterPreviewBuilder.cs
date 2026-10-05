@@ -46,6 +46,7 @@ internal static class PlayerCharacterPreviewBuilder
         public Material[] Materials { get; set; }
         public string[] BoneNames { get; set; }
         public int[] BoneParentIndices { get; set; }
+        public string RootAttachmentBoneName { get; set; }
     }
 
     public static ImportResult Import(
@@ -227,7 +228,14 @@ internal static class PlayerCharacterPreviewBuilder
                 }
 
                 var location = ResolveMeshLocation(clientRoot, packageIndex, meshReference);
-                var sharedAsset = BuildPartSharedAsset(location, baseSharedAsset, part.Binding, log);
+                var binding = part.Binding;
+                var sharedAsset = BuildPartSharedAsset(location, baseSharedAsset, binding, log);
+                if (part.Slot == SceneCharacterPaperdollSlot.Hair &&
+                    PlayerCharacterPartAssetBuilder.IsRigidHairBoundToCharacterRoot(sharedAsset))
+                {
+                    binding = SceneCharacterPartBinding.RigidHead;
+                    sharedAsset = BuildPartSharedAsset(location, baseSharedAsset, binding, log);
+                }
                 var partName = $"{CreatureSkeletalImportUtility.SanitizeName(part.Slot.ToString())}_{i:D2}_{meshReference.ObjectName}";
                 var partAsset = L2SkeletalCharacterAssetFactory.Build(partName, sharedAsset);
                 ApplyPartTextureOverrides(partAsset, part, i, buildContext);
@@ -258,7 +266,7 @@ internal static class PlayerCharacterPreviewBuilder
                     "asset",
                     $"{variantToken}_mesh");
                 var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshAssetPath);
-                if (mesh == null || part.Binding == SceneCharacterPartBinding.RigidHead)
+                if (mesh == null || binding == SceneCharacterPartBinding.RigidHead)
                 {
                     var builtMesh = CreatureSkinnedMeshBuilder.Build(partAsset, materials, log, out _);
                     if (mesh == null)
@@ -279,7 +287,11 @@ internal static class PlayerCharacterPreviewBuilder
                     Mesh = mesh,
                     Materials = materials,
                     BoneNames = partAsset.Bones.Select(x => x.Name).ToArray(),
-                    BoneParentIndices = partAsset.Bones.Select(x => x.ParentIndex).ToArray()
+                    BoneParentIndices = partAsset.Bones.Select(x => x.ParentIndex).ToArray(),
+                    RootAttachmentBoneName = PlayerCharacterHairBinding.ResolveRootAttachment(
+                        part.Slot.ToString(),
+                        partAsset.Bones.Select(x => x.Name).ToArray(),
+                        partAsset.Bones.Select(x => x.ParentIndex).ToArray())
                 });
             }
         }
@@ -523,6 +535,10 @@ internal static class PlayerCharacterPreviewBuilder
             skeletonRoot.SetParent(root.transform, false);
             var boneTransforms = CreatureSkeletalImportUtility.CreateBoneHierarchy(baseAsset.Bones, bonePoses, skeletonRoot);
             var rootBone = CreatureSkeletalImportUtility.ResolveRootBone(baseAsset.Bones, boneTransforms);
+            PlayerCharacterHairBinding.AttachRootsToHead(
+                skeletonRoot,
+                boneTransforms,
+                renderParts.Where(x => x.RootAttachmentBoneName != null).Select(x => x.BoneNames[0]));
 
             foreach (var part in renderParts)
             {
@@ -546,7 +562,8 @@ internal static class PlayerCharacterPreviewBuilder
                     skeletonRoot,
                     part.BoneNames,
                     part.BoneParentIndices,
-                    part.Name);
+                    part.Name,
+                    part.RootAttachmentBoneName);
                 renderer.updateWhenOffscreen = true;
                 renderer.localBounds = part.Mesh.bounds;
             }
