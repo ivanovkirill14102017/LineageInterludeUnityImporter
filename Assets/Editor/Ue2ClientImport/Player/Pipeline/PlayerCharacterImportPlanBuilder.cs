@@ -80,7 +80,8 @@ internal static class PlayerCharacterImportPlanBuilder
                     -1,
                     SceneCharacterPartBinding.MeshSkinning,
                     item.MeshResources,
-                    item.TextureResources));
+                    item.TextureResources,
+                    item));
             }
         }
 
@@ -103,6 +104,12 @@ internal static class PlayerCharacterImportPlanBuilder
         SceneCharacterPaperdollSlot slot,
         SceneCharacterEquipmentCatalogItemData item)
     {
+        if (slot == SceneCharacterPaperdollSlot.LeftHand &&
+            item.AnimationClass != SceneWeaponAnimationClass.None)
+        {
+            return false;
+        }
+
         return item.IsRenderableWithCurrentAppearanceBuilder ||
                (IsWeaponSlot(slot) && item.MeshResources.Length > 0);
     }

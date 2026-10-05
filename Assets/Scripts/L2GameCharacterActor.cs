@@ -11,10 +11,7 @@ public sealed class L2GameCharacterActor : MonoBehaviour
     private const float FallSpeed = 12f;
 
     private CharacterController _controller;
-    private L2PlayerCharacterWardrobe _wardrobe;
-    private int _idleAnimationIndex;
-    private int _runAnimationIndex;
-    private bool _lastMoving;
+    private L2PlayerAnimationStateController _animation;
 
     public L2PcInstance Player { get; private set; }
 
@@ -36,9 +33,8 @@ public sealed class L2GameCharacterActor : MonoBehaviour
         _controller.radius = player.CollisionRadius;
         _controller.height = player.CollisionHeight;
         _controller.center = new Vector3(0f, player.CollisionHeight * 0.5f, 0f);
-        _wardrobe = GetComponent<L2PlayerCharacterWardrobe>();
-        ResolveAnimationIndices();
-        ApplyAnimationState(force: true);
+        _animation = GetComponent<L2PlayerAnimationStateController>();
+        _animation?.SetRunning(player.IsMoving);
     }
 
     public void MoveTo(Vector3 worldPosition)
@@ -76,7 +72,7 @@ public sealed class L2GameCharacterActor : MonoBehaviour
         }
 
         Player.Location = new Location(transform.position.x, transform.position.y, transform.position.z, Player.Location.Heading);
-        ApplyAnimationState(force: false);
+        _animation?.SetRunning(Player.IsMoving);
     }
 
     private float ResolveVerticalMotion(float deltaSeconds)
@@ -117,71 +113,4 @@ public sealed class L2GameCharacterActor : MonoBehaviour
         return false;
     }
 
-    private void ResolveAnimationIndices()
-    {
-        _idleAnimationIndex = FindAnimationIndex(new[] { "idle", "wait", "stand", "wait01", "wait_01" });
-        _runAnimationIndex = FindAnimationIndex(new[] { "run", "walk", "move" });
-    }
-
-    private int FindAnimationIndex(string[] tokens)
-    {
-        var names = _wardrobe?.GetAnimationNames() ?? System.Array.Empty<string>();
-        for (var i = 0; i < names.Length; i++)
-        {
-            var name = names[i]?.ToLowerInvariant() ?? string.Empty;
-            if (IsDeadLikeAnimationName(name))
-            {
-                continue;
-            }
-
-            foreach (var token in tokens)
-            {
-                if (name.Contains(token))
-                {
-                    return i;
-                }
-            }
-        }
-
-        for (var i = 0; i < names.Length; i++)
-        {
-            var name = names[i]?.ToLowerInvariant() ?? string.Empty;
-            if (!IsDeadLikeAnimationName(name))
-            {
-                return i;
-            }
-        }
-
-        return 0;
-    }
-
-    private static bool IsDeadLikeAnimationName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return false;
-        }
-
-        return name.Contains("dead") ||
-               name.Contains("death") ||
-               name.Contains("die") ||
-               name.Contains("died");
-    }
-
-    private void ApplyAnimationState(bool force)
-    {
-        if (_wardrobe == null)
-        {
-            return;
-        }
-
-        var moving = Player?.IsMoving == true;
-        if (!force && moving == _lastMoving)
-        {
-            return;
-        }
-
-        _lastMoving = moving;
-        _wardrobe.SetSelectedAnimation(moving ? _runAnimationIndex : _idleAnimationIndex);
-    }
 }

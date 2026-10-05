@@ -12,7 +12,7 @@ internal static class L2ModularCharacterPrefabFactory
         public Transform SkeletonRoot;
         public Transform RootBone;
         public Transform[] Bones;
-        public L2ModularSkeletalCharacterBehaviour.SlotBinding[] SlotBindings;
+        public L2CharacterSlotBinding[] SlotBindings;
         public Animator Animator;
     }
 
@@ -80,7 +80,7 @@ internal static class L2ModularCharacterPrefabFactory
         }
     }
 
-    private static L2ModularSkeletalCharacterBehaviour.SlotBinding[] BuildSlotBindings(
+    private static L2CharacterSlotBinding[] BuildSlotBindings(
         Transform root,
         IEnumerable<L2CharacterSlotCatalogData> slots,
         IReadOnlyList<Transform> bones)
@@ -90,12 +90,12 @@ internal static class L2ModularCharacterPrefabFactory
             .Select(x => x.SlotName)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var bindings = new List<L2ModularSkeletalCharacterBehaviour.SlotBinding>(slotNames.Length);
+        var bindings = new List<L2CharacterSlotBinding>(slotNames.Length);
         foreach (var slotName in slotNames)
         {
             var slotRoot = new GameObject(slotName).transform;
             slotRoot.SetParent(ResolveSlotParent(root, slotName, bones), false);
-            bindings.Add(new L2ModularSkeletalCharacterBehaviour.SlotBinding
+            bindings.Add(new L2CharacterSlotBinding
             {
                 SlotName = slotName,
                 Root = slotRoot
@@ -108,18 +108,33 @@ internal static class L2ModularCharacterPrefabFactory
     internal static Transform ResolveSlotParent(Transform root, string slotName, IReadOnlyList<Transform> bones)
     {
         if (string.Equals(slotName, "RightHand", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(slotName, "LeftRightHand", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(slotName, "Weapon", StringComparison.OrdinalIgnoreCase))
+            string.Equals(slotName, "LeftRightHand", StringComparison.OrdinalIgnoreCase))
         {
-            return FindBone(bones, RightHandBoneNames) ?? root;
+            return RequireBone(bones, "Weapon_R_Bone", slotName);
         }
 
         if (string.Equals(slotName, "LeftHand", StringComparison.OrdinalIgnoreCase))
         {
-            return FindBone(bones, LeftHandBoneNames) ?? root;
+            return RequireBone(bones, "Shield_L_Bone", slotName);
+        }
+
+        if (string.Equals(slotName, "Weapon", StringComparison.OrdinalIgnoreCase))
+        {
+            return FindBoneExact(bones, "Weapon_R_Bone") ?? FindBone(bones, RightHandBoneNames) ?? root;
         }
 
         return root;
+    }
+
+    private static Transform RequireBone(IReadOnlyList<Transform> bones, string boneName, string slotName)
+    {
+        return FindBoneExact(bones, boneName) ?? throw new InvalidOperationException(
+            $"Slot '{slotName}' requires attachment bone '{boneName}'.");
+    }
+
+    private static Transform FindBoneExact(IReadOnlyList<Transform> bones, string boneName)
+    {
+        return bones?.FirstOrDefault(bone => string.Equals(bone?.name, boneName, StringComparison.OrdinalIgnoreCase));
     }
 
     private static Transform FindBone(IReadOnlyList<Transform> bones, IReadOnlyList<string> candidateNames)
@@ -177,19 +192,5 @@ internal static class L2ModularCharacterPrefabFactory
         "hand right",
         "weapon r",
         "rightweapon"
-    };
-
-    private static readonly string[] LeftHandBoneNames =
-    {
-        "lhand",
-        "l hand",
-        "left hand",
-        "bip01 l hand",
-        "bip01 lhand",
-        "bip01 left hand",
-        "hand l",
-        "hand left",
-        "weapon l",
-        "leftweapon"
     };
 }

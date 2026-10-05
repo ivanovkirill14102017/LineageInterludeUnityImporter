@@ -11,6 +11,25 @@ public abstract class L2ModularCharacterArchetypeAssetBase : ScriptableObject
 }
 
 [Serializable]
+public sealed class L2CharacterSlotBinding
+{
+    public string SlotName;
+    public Transform Root;
+}
+
+public enum L2WeaponAnimationClass
+{
+    None,
+    Hand,
+    OneHanded,
+    TwoHanded,
+    Bow,
+    Dual,
+    Pole,
+    Fishing
+}
+
+[Serializable]
 public sealed class L2CharacterSlotCatalogData
 {
     public string SlotName;
@@ -25,6 +44,9 @@ public sealed class L2CharacterVariantData
     public string DisplayName;
     public int VariantId = -1;
     public int AuxVariantId = -1;
+    public L2WeaponAnimationClass WeaponAnimationClass;
+    public uint RawWeaponType;
+    public uint RawHandness;
     public L2CharacterVariantPartData[] Parts = Array.Empty<L2CharacterVariantPartData>();
 }
 

@@ -10,7 +10,7 @@ internal static class CreatureAnimatorControllerBuilder
     private const string CombatModeParameter = "CombatMode";
     private const string SkillModeParameter = "SkillMode";
 
-    public static AnimatorController Build(L2SkeletalCharacterAsset asset, string referenceText, string prefabRoot, CreatureAnimationClipBuilder.ClipBuildInfo[] clips, Action<string> log, out string notes)
+    public static AnimatorController Build(L2SkeletalCharacterAsset asset, string referenceText, string prefabRoot, CreatureAnimationClipBuilder.ClipBuildInfo[] clips, Action<string> log, out string notes, bool createSemanticTransitions = true)
     {
         if (clips == null || clips.Length == 0)
         {
@@ -34,7 +34,7 @@ internal static class CreatureAnimatorControllerBuilder
             created = true;
         }
 
-        var createdNotes = PopulateController(controller, asset, clips);
+        var createdNotes = PopulateController(controller, asset, clips, createSemanticTransitions);
         notes = created
             ? $"AnimatorController created: {createdNotes}"
             : $"AnimatorController rebuilt: {controllerPath}. {createdNotes}";
@@ -47,12 +47,16 @@ internal static class CreatureAnimatorControllerBuilder
     private static string PopulateController(
         AnimatorController controller,
         L2SkeletalCharacterAsset asset,
-        CreatureAnimationClipBuilder.ClipBuildInfo[] clips)
+        CreatureAnimationClipBuilder.ClipBuildInfo[] clips,
+        bool createSemanticTransitions)
     {
         var layer = EnsureBaseLayerStateMachineAsset(controller);
 
         ResetControllerParameters(controller);
-        EnsureCoreParameters(controller);
+        if (createSemanticTransitions)
+        {
+            EnsureCoreParameters(controller);
+        }
 
         foreach (var childState in layer.stateMachine.states)
         {
@@ -93,7 +97,10 @@ internal static class CreatureAnimatorControllerBuilder
             }
         }
 
-        CreateSemanticTransitions(controller, asset, layer.stateMachine, statesBySequenceName);
+        if (createSemanticTransitions)
+        {
+            CreateSemanticTransitions(controller, asset, layer.stateMachine, statesBySequenceName);
+        }
         defaultState = ResolveDefaultState(asset, statesBySequenceName) ?? defaultState;
         layer.stateMachine.defaultState = defaultState;
         controller.layers = new[] { layer };

@@ -24,7 +24,8 @@ internal sealed class PlayerCharacterVariantPlan
         int auxiliaryId,
         SceneCharacterPartBinding binding,
         SceneResourceReference[] meshReferences,
-        SceneResourceReference[] surfaceReferences)
+        SceneResourceReference[] surfaceReferences,
+        SceneCharacterEquipmentCatalogItemData item = null)
     {
         SlotName = slotName;
         DisplayName = displayName;
@@ -34,6 +35,7 @@ internal sealed class PlayerCharacterVariantPlan
         Binding = binding;
         MeshReferences = meshReferences;
         SurfaceReferences = surfaceReferences;
+        Item = item;
     }
 
     public string SlotName { get; }
@@ -44,4 +46,5 @@ internal sealed class PlayerCharacterVariantPlan
     public SceneCharacterPartBinding Binding { get; }
     public SceneResourceReference[] MeshReferences { get; }
     public SceneResourceReference[] SurfaceReferences { get; }
+    public SceneCharacterEquipmentCatalogItemData Item { get; }
 }

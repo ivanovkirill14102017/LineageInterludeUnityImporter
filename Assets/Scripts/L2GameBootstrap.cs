@@ -185,8 +185,8 @@ public sealed class L2GameBootstrap : MonoBehaviour
         {
             var path = AssetDatabase.GUIDToAssetPath(guid);
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            var wardrobe = prefab != null ? prefab.GetComponent<L2PlayerCharacterWardrobe>() : null;
-            var archetype = wardrobe?.Archetype;
+            var appearance = prefab != null ? prefab.GetComponent<L2PlayerAppearanceVisual>() : null;
+            var archetype = appearance?.Archetype;
             if (archetype == null)
             {
                 continue;

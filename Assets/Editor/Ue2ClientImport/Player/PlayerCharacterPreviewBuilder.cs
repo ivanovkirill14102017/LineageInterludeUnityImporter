@@ -102,7 +102,8 @@ internal static class PlayerCharacterPreviewBuilder
             PlayerCharacterImportBuilder.PrefabOutputRoot,
             clips,
             log,
-            out _);
+            out _,
+            createSemanticTransitions: false);
 
         var renderParts = BuildRenderParts(
             clientRoot,

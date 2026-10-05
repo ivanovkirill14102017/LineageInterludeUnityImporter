@@ -20,6 +20,7 @@ internal static class PlayerCharacterAnimationAssetResolver
             PlayerCharacterImportBuilder.PrefabOutputRoot,
             clips,
             null,
-            out _);
+            out _,
+            createSemanticTransitions: false);
     }
 }

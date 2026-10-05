@@ -35,6 +35,9 @@ internal static class PlayerCharacterPrefabResolver
                     DisplayName = variant.DisplayName,
                     VariantId = variant.Id,
                     AuxVariantId = variant.AuxiliaryId,
+                    WeaponAnimationClass = ResolveWeaponAnimationClass(variant.Item),
+                    RawWeaponType = variant.Item?.RawWeaponType ?? 0,
+                    RawHandness = variant.Item?.RawHandness ?? 0,
                     Parts = builtByVariant[variant]
                         .Select(part => new L2CharacterVariantPartData
                         {
@@ -82,16 +85,45 @@ internal static class PlayerCharacterPrefabResolver
                 metadata.SkeletonReference = assets.BaseAsset.MeshObjectName;
                 metadata.SkeletonUri = assets.BaseAsset.SourcePackagePath;
 
-                var wardrobe = build.Root.AddComponent<L2PlayerCharacterWardrobe>();
-                wardrobe.Archetype = archetype;
-                wardrobe.SkeletonRoot = build.SkeletonRoot;
-                wardrobe.RootBone = build.RootBone;
-                wardrobe.Bones = build.Bones;
-                wardrobe.SlotBindings = build.SlotBindings;
-                wardrobe.Animator = build.Animator;
-                wardrobe.ApplyAppearance();
-                wardrobe.ApplyAnimation();
+                var appearance = build.Root.AddComponent<L2PlayerAppearanceVisual>();
+                appearance.Archetype = archetype;
+                appearance.SkeletonRoot = build.SkeletonRoot;
+                appearance.RootBone = build.RootBone;
+                appearance.Bones = build.Bones;
+                appearance.SlotBindings = build.SlotBindings;
+                appearance.SelectedFaceIndex = slots.First(x => x.SlotName == "Face").DefaultVariantIndex;
+                appearance.ApplyAppearance();
+
+                var equipment = build.Root.AddComponent<L2PlayerEquipmentVisual>();
+                equipment.Archetype = archetype;
+                equipment.SkeletonRoot = build.SkeletonRoot;
+                equipment.RootBone = build.RootBone;
+                equipment.Bones = build.Bones;
+                equipment.SlotBindings = build.SlotBindings;
+                equipment.ApplyEquipment();
+
+                var animation = build.Root.AddComponent<L2PlayerAnimationStateController>();
+                animation.Archetype = archetype;
+                animation.Equipment = equipment;
+                animation.Animator = build.Animator;
+                animation.Refresh();
             },
             replaceExisting: true);
+    }
+
+    private static L2WeaponAnimationClass ResolveWeaponAnimationClass(SceneCharacterEquipmentCatalogItemData item)
+    {
+        return item?.AnimationClass switch
+        {
+            null or SceneWeaponAnimationClass.None => L2WeaponAnimationClass.None,
+            SceneWeaponAnimationClass.Hand => L2WeaponAnimationClass.Hand,
+            SceneWeaponAnimationClass.OneHanded => L2WeaponAnimationClass.OneHanded,
+            SceneWeaponAnimationClass.TwoHanded => L2WeaponAnimationClass.TwoHanded,
+            SceneWeaponAnimationClass.Bow => L2WeaponAnimationClass.Bow,
+            SceneWeaponAnimationClass.Dual => L2WeaponAnimationClass.Dual,
+            SceneWeaponAnimationClass.Pole => L2WeaponAnimationClass.Pole,
+            SceneWeaponAnimationClass.Fishing => L2WeaponAnimationClass.Fishing,
+            _ => throw new ArgumentOutOfRangeException(nameof(item.AnimationClass), item.AnimationClass, null)
+        };
     }
 }
