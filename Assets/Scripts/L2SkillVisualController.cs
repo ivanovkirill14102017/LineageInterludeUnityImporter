@@ -389,12 +389,13 @@ public sealed class L2SkillVisualController : MonoBehaviour
 
     private float PlayProjectileStage(L2SkillVisualStageBinding binding)
     {
-        var origin = PlacementResolver.ResolveProjectileOrigin();
-        var target = PlacementResolver.ResolveProjectileTarget();
+        var returnsToCaster = binding.Placement?.ReturnsToCaster == true;
+        var origin = returnsToCaster ? PlacementResolver.ResolveProjectileTarget() : PlacementResolver.ResolveProjectileOrigin();
+        var target = returnsToCaster ? PlacementResolver.ResolveProjectileOrigin() : PlacementResolver.ResolveProjectileTarget();
         var distance = Vector3.Distance(origin, target);
         var flightTime = binding.Placement != null ? binding.Placement.FlyingTime : 0f;
         var speed = flightTime > 0f ? distance / flightTime : Math.Max(0.01f, ProjectileSpeed);
-        var rotation = L2SkillVisualPlacementResolver.ResolveTravelRotation(origin, target);
+        var rotation = L2SkillVisualPlacementResolver.ResolveEffectRotation(origin, target);
         var instance = SpawnStageInstance(binding, origin, rotation);
         var travelTime = distance / Math.Max(0.01f, speed);
         if (instance == null)
@@ -412,7 +413,7 @@ public sealed class L2SkillVisualController : MonoBehaviour
             origin,
             target,
             Math.Max(0.01f, speed),
-            Math.Max(0f, ProjectileArcHeight));
+            Math.Max(0f, returnsToCaster && ProjectileArcHeight <= 0f ? 0.75f : ProjectileArcHeight));
 
         return travelTime;
     }

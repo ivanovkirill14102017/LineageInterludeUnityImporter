@@ -118,7 +118,7 @@ public sealed class L2SkillProjectileRuntime : MonoBehaviour
     {
         if (direction.sqrMagnitude > 0.0001f)
         {
-            transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+            transform.rotation = L2SkillVisualPlacementResolver.ResolveEffectRotation(Vector3.zero, direction);
         }
     }
 }

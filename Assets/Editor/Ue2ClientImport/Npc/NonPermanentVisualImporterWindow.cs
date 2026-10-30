@@ -15,6 +15,7 @@ using UnityEngine;
 public sealed class NonPermanentVisualImporterWindow : EditorWindow
 {
     private NonPermanentVisualImporterPanel _panel;
+    private ImportDashboardStatus _status;
 
     [MenuItem("L2/Import Non-Permanent Visuals")]
     private static void OpenWindow()
@@ -26,40 +27,32 @@ public sealed class NonPermanentVisualImporterWindow : EditorWindow
 
     private void OnEnable()
     {
-        _panel = new NonPermanentVisualImporterPanel(Repaint);
+        _status = new ImportDashboardStatus(Repaint);
+        _panel = new NonPermanentVisualImporterPanel(_status);
     }
 
     private void OnGUI()
     {
-        _panel ??= new NonPermanentVisualImporterPanel(Repaint);
+        _status ??= new ImportDashboardStatus(Repaint);
+        _panel ??= new NonPermanentVisualImporterPanel(_status);
+        ImportDashboardFields.DrawPaths();
         _panel.OnGUI();
+        _status.Draw();
     }
 }
 
 internal sealed class NonPermanentVisualImporterPanel
 {
-    private readonly Action _repaint;
-    private string _status = "Ready to import non-permanent creature visuals.";
-    private Vector2 _scroll;
+    private readonly ImportDashboardStatus _status;
 
-    public NonPermanentVisualImporterPanel(Action repaint)
+    public NonPermanentVisualImporterPanel(ImportDashboardStatus status)
     {
-        _repaint = repaint;
+        _status = status;
     }
 
     public void OnGUI()
     {
         EditorGUILayout.LabelField("Import non-permanent visuals", EditorStyles.boldLabel);
-        EditorGUILayout.Space();
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Client", ConstInfo.L2GameClientPath);
-            EditorGUILayout.LabelField("DB", ConstInfo.L2DbRootPath);
-            EditorGUILayout.LabelField("Creature Output", CreatureNpcImportBuilder.PrefabOutputRoot);
-            EditorGUILayout.LabelField("Mode", "Build prefab assets only. Nothing is placed into the current scene.");
-        }
-
         EditorGUILayout.Space();
 
         using (new EditorGUI.DisabledScope(EditorApplication.isCompiling))
@@ -70,47 +63,38 @@ internal sealed class NonPermanentVisualImporterPanel
             }
         }
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(150f)))
-        {
-            _scroll = scroll.scrollPosition;
-            EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
-        }
     }
 
     private void Import()
     {
         try
         {
-            _status = "Import started...";
+            _status.Set("Import started...");
             var result = NonPermanentVisualImportBuilder.Import(
                 ConstInfo.L2GameClientPath,
                 ConstInfo.L2DbRootPath,
                 AppendStatus);
-            _status +=
-                "\nDone." +
+            _status.Append(
+                "Done." +
                 $"\nCandidates: {result.CandidateCount}" +
                 $"\nCreated: {result.CreatedCount}" +
                 $"\nReused/skipped existing: {result.ReusedCount}" +
-                $"\nFailed: {result.FailedCount}";
+                $"\nFailed: {result.FailedCount}");
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             UnityEngine.Debug.LogException(exception);
         }
         finally
         {
             EditorUtility.ClearProgressBar();
-            _repaint?.Invoke();
         }
     }
 
     private void AppendStatus(string message)
     {
-        _status = $"{_status}\n{message}";
-        _repaint?.Invoke();
+        _status.Append(message);
     }
 }
 

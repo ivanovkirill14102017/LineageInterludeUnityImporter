@@ -33,7 +33,7 @@ internal sealed class L2SkillVisualPlacementResolver
     {
         if (binding.Role == L2SkillVisualStagePlaybackRole.Projectile)
         {
-            return ResolveProjectileOrigin();
+            return binding.Placement?.ReturnsToCaster == true ? ResolveProjectileTarget() : ResolveProjectileOrigin();
         }
 
         var placement = binding.Placement ?? throw new InvalidOperationException($"Stage '{binding.StageName}' has no SkillAction placement.");
@@ -75,17 +75,24 @@ internal sealed class L2SkillVisualPlacementResolver
     {
         if (binding.Role == L2SkillVisualStagePlaybackRole.Projectile)
         {
-            return ResolveStageRotation(binding.Role);
+            return binding.Placement?.ReturnsToCaster == true
+                ? ResolveEffectRotation(ResolveProjectileTarget(), ResolveProjectileOrigin())
+                : ResolveEffectRotation(ResolveProjectileOrigin(), ResolveProjectileTarget());
         }
 
         var placement = binding.Placement ?? throw new InvalidOperationException($"Stage '{binding.StageName}' has no SkillAction placement.");
         if (placement.UseCharacterRotation)
         {
             var point = placement.SpawnOnTarget ? TargetPoint : CastPoint;
-            return point != null && point.parent != null ? point.parent.rotation : _controller.transform.rotation;
+            var actorRotation = point != null && point.parent != null ? point.parent.rotation : _controller.transform.rotation;
+            return actorRotation * Quaternion.Euler(0f, -90f, 0f);
         }
 
-        return ResolveTravelRotation(ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster), ResolveStagePosition(L2SkillVisualStagePlaybackRole.Target));
+        var caster = ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster);
+        var target = ResolveStagePosition(L2SkillVisualStagePlaybackRole.Target);
+        return placement.SpawnOnTarget
+            ? ResolveEffectRotation(target, caster)
+            : ResolveEffectRotation(caster, target);
     }
 
     private static Transform ResolveAttachment(Transform point, L2SkillVisualPlacementData placement, string stageName)
@@ -158,16 +165,6 @@ internal sealed class L2SkillVisualPlacementResolver
         };
     }
 
-    private Quaternion ResolveStageRotation(L2SkillVisualStagePlaybackRole role)
-    {
-        if (role == L2SkillVisualStagePlaybackRole.Projectile)
-        {
-            return ResolveTravelRotation(ResolveProjectileOrigin(), ResolveProjectileTarget());
-        }
-
-        return IsTargetLikeRole(role) && TargetPoint != null ? TargetPoint.rotation : _controller.transform.rotation;
-    }
-
     public Vector3 ResolveProjectileOrigin()
     {
         return ResolveStagePosition(L2SkillVisualStagePlaybackRole.Caster) + Vector3.up * CreatureMidpointHeight;
@@ -184,6 +181,12 @@ internal sealed class L2SkillVisualPlacementResolver
         return delta.sqrMagnitude > 0.0001f
             ? Quaternion.LookRotation(delta.normalized, Vector3.up)
             : Quaternion.identity;
+    }
+
+    public static Quaternion ResolveEffectRotation(Vector3 origin, Vector3 target)
+    {
+        // Unreal effects face local +X; the imported mesh keeps that axis while Unity's LookRotation faces +Z.
+        return ResolveTravelRotation(origin, target) * Quaternion.Euler(0f, -90f, 0f);
     }
 
     private static bool IsTargetLikeRole(L2SkillVisualStagePlaybackRole role)

@@ -1,3 +1,4 @@
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,6 +12,7 @@ public sealed class L2StartupWindow : EditorWindow
     private NonPermanentVisualImporterPanel _nonPermanentVisualImporter;
     private PlayerCharacterImporterPanel _playerCharacterImporter;
     private SkillVisualImporterPanel _skillVisualImporter;
+    private ImportDashboardStatus _status;
     private Vector2 _scroll;
 
     static L2StartupWindow()
@@ -39,11 +41,8 @@ public sealed class L2StartupWindow : EditorWindow
 
     private void OnEnable()
     {
-        _mapImporter = new MapImporterPanel(Repaint);
-        _creatureImporter = new CreatureNpcImporterPanel(Repaint);
-        _nonPermanentVisualImporter = new NonPermanentVisualImporterPanel(Repaint);
-        _playerCharacterImporter = new PlayerCharacterImporterPanel(Repaint);
-        _skillVisualImporter = new SkillVisualImporterPanel(Repaint);
+        _status = new ImportDashboardStatus(Repaint);
+        EnsurePanels();
     }
 
     private void OnDisable()
@@ -54,6 +53,7 @@ public sealed class L2StartupWindow : EditorWindow
         _nonPermanentVisualImporter = null;
         _playerCharacterImporter = null;
         _skillVisualImporter = null;
+        _status = null;
     }
 
     private void OnGUI()
@@ -66,6 +66,8 @@ public sealed class L2StartupWindow : EditorWindow
 
             EditorGUILayout.LabelField("Lineage II Interlude Import Startup", EditorStyles.boldLabel);
             EditorGUILayout.Space(6f);
+            ImportDashboardFields.DrawPaths();
+            EditorGUILayout.Space(8f);
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
@@ -99,15 +101,64 @@ public sealed class L2StartupWindow : EditorWindow
             {
                 _skillVisualImporter.OnGUI();
             }
+
+            EditorGUILayout.Space(8f);
+            _status.Draw();
         }
     }
 
     private void EnsurePanels()
     {
-        _mapImporter ??= new MapImporterPanel(Repaint);
-        _creatureImporter ??= new CreatureNpcImporterPanel(Repaint);
-        _nonPermanentVisualImporter ??= new NonPermanentVisualImporterPanel(Repaint);
-        _playerCharacterImporter ??= new PlayerCharacterImporterPanel(Repaint);
-        _skillVisualImporter ??= new SkillVisualImporterPanel(Repaint);
+        _status ??= new ImportDashboardStatus(Repaint);
+        _mapImporter ??= new MapImporterPanel(Repaint, _status);
+        _creatureImporter ??= new CreatureNpcImporterPanel(_status);
+        _nonPermanentVisualImporter ??= new NonPermanentVisualImporterPanel(_status);
+        _playerCharacterImporter ??= new PlayerCharacterImporterPanel(_status);
+        _skillVisualImporter ??= new SkillVisualImporterPanel(_status);
+    }
+}
+
+internal static class ImportDashboardFields
+{
+    public static void DrawPaths()
+    {
+        ConstInfo.L2GameClientPath = EditorGUILayout.TextField("Client", ConstInfo.L2GameClientPath);
+        ConstInfo.L2DbRootPath = EditorGUILayout.TextField("DB Root", ConstInfo.L2DbRootPath);
+    }
+}
+
+internal sealed class ImportDashboardStatus
+{
+    private readonly Action _repaint;
+    private string _current = "Ready to import.";
+    private string _log = string.Empty;
+    private Vector2 _scroll;
+
+    public ImportDashboardStatus(Action repaint)
+    {
+        _repaint = repaint;
+    }
+
+    public void Set(string message)
+    {
+        _current = message;
+        _log = string.IsNullOrEmpty(_log) ? message : $"{_log}\n{message}";
+        _repaint?.Invoke();
+    }
+
+    public void Append(string message)
+    {
+        _log = string.IsNullOrEmpty(_log) ? message : $"{_log}\n{message}";
+        _repaint?.Invoke();
+    }
+
+    public void Draw()
+    {
+        EditorGUILayout.LabelField("Status", _current, EditorStyles.boldLabel);
+        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
+        {
+            _scroll = scroll.scrollPosition;
+            EditorGUILayout.TextArea(_log, GUILayout.ExpandHeight(true));
+        }
     }
 }

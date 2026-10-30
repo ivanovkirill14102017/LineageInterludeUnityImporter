@@ -118,6 +118,7 @@ public sealed class L2SkillVisualPlacementData
     public string AttachBoneName;
     public Vector3 Offset;
     public bool SpawnOnTarget;
+    public bool ReturnsToCaster;
     public bool RelativeToCylinder;
     public bool UseCharacterRotation;
     public bool Absolute;

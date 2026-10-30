@@ -44,7 +44,6 @@ internal static class SkillVisualImportBuilder
         string clientRoot,
         int skillId,
         Action<string>? log = null,
-        bool buildPrefab = true,
         MapImportExecutionContext? context = null)
     {
         if (skillId <= 0)
@@ -75,7 +74,7 @@ internal static class SkillVisualImportBuilder
 
         var dependencies = SkillVisualDependencyContext.Empty;
         var prefabPath = string.Empty;
-        if (buildPrefab)
+        if (sceneData.Stages.Count > 0)
         {
             context?.ThrowIfCancellationRequested();
             context?.Report("Skill Visual", "Import prefab dependencies", 0.48f);
@@ -86,6 +85,10 @@ internal static class SkillVisualImportBuilder
             prefabPath = BuildSkillVisualPrefab(sceneData, asset, dependencies, log);
             asset.PreviewPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             EditorUtility.SetDirty(asset);
+        }
+        else if (sceneData.Stages.Count == 0)
+        {
+            log?.Invoke($"[Skill] Skill {skillId} has no visual reference in skillgrp.dat; imported metadata and sounds without a visual prefab.");
         }
 
         context?.Report("Skill Visual", "Save assets", 0.95f);
@@ -718,8 +721,9 @@ internal static class SkillVisualImportBuilder
         rotationOverLifetime.separateAxes = isMeshEmitter;
         if (isMeshEmitter)
         {
-            rotationOverLifetime.x = BuildAxisRotationCurve(spinsPerSecondRange.X);
-            rotationOverLifetime.y = BuildAxisRotationCurve(spinsPerSecondRange.Z);
+            // The source X spin of horizontal skill meshes (for example m_u003_a) is around Unity's up axis.
+            rotationOverLifetime.x = BuildAxisRotationCurve(spinsPerSecondRange.Z);
+            rotationOverLifetime.y = BuildAxisRotationCurve(spinsPerSecondRange.X);
             rotationOverLifetime.z = BuildAxisRotationCurve(spinsPerSecondRange.Y);
         }
         else
@@ -776,8 +780,8 @@ internal static class SkillVisualImportBuilder
         }
 
         main.startRotation3D = true;
-        main.startRotationX = BuildAxisRotationCurve(range?.X);
-        main.startRotationY = BuildAxisRotationCurve(range?.Z);
+        main.startRotationX = BuildAxisRotationCurve(range?.Z);
+        main.startRotationY = BuildAxisRotationCurve(range?.X);
         main.startRotationZ = BuildAxisRotationCurve(range?.Y);
     }
 
@@ -1397,6 +1401,7 @@ internal static class SkillVisualImportBuilder
             AttachBoneName = value.AttachBoneName ?? string.Empty,
             Offset = new Vector3(value.Offset.X, value.Offset.Y, value.Offset.Z),
             SpawnOnTarget = value.SpawnOnTarget,
+            ReturnsToCaster = value.ReturnsToCaster,
             RelativeToCylinder = value.RelativeToCylinder,
             UseCharacterRotation = value.UseCharacterRotation,
             Absolute = value.Absolute,

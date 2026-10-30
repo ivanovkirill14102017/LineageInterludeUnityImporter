@@ -8,6 +8,7 @@ using UnityEngine;
 public sealed class SkillVisualImporterWindow : EditorWindow
 {
     private SkillVisualImporterPanel _panel;
+    private ImportDashboardStatus _status;
 
     [MenuItem("L2/Import Skill Visual")]
     private static void OpenWindow()
@@ -19,24 +20,24 @@ public sealed class SkillVisualImporterWindow : EditorWindow
 
     private void OnEnable()
     {
-        _panel = new SkillVisualImporterPanel(Repaint);
+        _status = new ImportDashboardStatus(Repaint);
+        _panel = new SkillVisualImporterPanel(_status);
     }
 
     private void OnGUI()
     {
-        _panel ??= new SkillVisualImporterPanel(Repaint);
+        _status ??= new ImportDashboardStatus(Repaint);
+        _panel ??= new SkillVisualImporterPanel(_status);
+        ImportDashboardFields.DrawPaths();
         _panel.OnGUI();
+        _status.Draw();
     }
 }
 
 internal sealed class SkillVisualImporterPanel
 {
-    private readonly Action _repaint;
+    private readonly ImportDashboardStatus _status;
     private int _skillId = 1;
-    private bool _buildPrefab = true;
-    private bool _createScenePreviewRig = true;
-    private string _status = "Ready to import SceneDomain skill visual data.";
-    private Vector2 _scroll;
     private ScenePlayableSkillCatalogData _skillCatalog;
     private string[] _classOptions = Array.Empty<string>();
     private int _selectedClassIndex;
@@ -47,9 +48,9 @@ internal sealed class SkillVisualImporterPanel
     private int _visibleSkillsClassId = int.MinValue;
     private bool _catalogLoadAttempted;
 
-    public SkillVisualImporterPanel(Action repaint)
+    public SkillVisualImporterPanel(ImportDashboardStatus status)
     {
-        _repaint = repaint;
+        _status = status;
     }
 
     public void OnGUI()
@@ -61,18 +62,7 @@ internal sealed class SkillVisualImporterPanel
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("Client", ConstInfo.L2GameClientPath);
-            EditorGUILayout.LabelField("DB", ConstInfo.L2DbRootPath);
             DrawSkillCatalogSelector();
-            _buildPrefab = EditorGUILayout.Toggle("Build Preview Prefab", _buildPrefab);
-            using (new EditorGUI.DisabledScope(!_buildPrefab))
-            {
-                _createScenePreviewRig = EditorGUILayout.Toggle("Create Scene Preview Rig", _createScenePreviewRig);
-            }
-
-            EditorGUILayout.LabelField("Asset Output", SkillVisualImportBuilder.AssetOutputRoot);
-            EditorGUILayout.LabelField("Prefab Output", SkillVisualImportBuilder.PrefabOutputRoot);
-            EditorGUILayout.LabelField("Texture Output", SkillVisualImportBuilder.TextureOutputRoot);
         }
 
         EditorGUILayout.Space();
@@ -85,13 +75,6 @@ internal sealed class SkillVisualImporterPanel
             }
         }
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
-        {
-            _scroll = scroll.scrollPosition;
-            EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
-        }
     }
 
     private void EnsureCatalogLoadedOnce()
@@ -188,14 +171,13 @@ internal sealed class SkillVisualImporterPanel
             _visibleSkills = Array.Empty<ScenePlayableSkillData>();
             _skillOptions = Array.Empty<string>();
             _visibleSkillsClassId = int.MinValue;
-            _status = $"Skill catalog loaded: {_skillCatalog.Classes.Count} playable classes.";
-            _repaint?.Invoke();
+            _status.Set($"Skill catalog loaded: {_skillCatalog.Classes.Count} playable classes.");
         }
         catch (Exception exception)
         {
             _skillCatalog = null;
             _classOptions = Array.Empty<string>();
-            _status = $"Skill catalog load failed. Manual skill id input is still available.\n{exception}";
+            _status.Set($"Skill catalog load failed. Manual skill id input is still available.\n{exception}");
             Debug.LogException(exception);
         }
     }
@@ -246,41 +228,39 @@ internal sealed class SkillVisualImporterPanel
     {
         try
         {
-            _status = $"Import started for skill id={_skillId}...";
+            _status.Set($"Import started for skill id={_skillId}...");
             using var context = new MapImportExecutionContext("Import Skill Visual");
             var result = SkillVisualImportBuilder.ImportBySkillId(
                 ConstInfo.L2GameClientPath,
                 _skillId,
                 AppendStatus,
-                _buildPrefab,
                 context);
 
-            _status +=
-                $"\nDone. Asset: {result.AssetPath}" +
+            _status.Append(
+                $"Done. Asset: {result.AssetPath}" +
                 (string.IsNullOrWhiteSpace(result.PrefabPath) ? string.Empty : $"\nPrefab: {result.PrefabPath}") +
-                $"\nNames={result.NameCount}, Levels={result.LevelCount}, Sounds={result.SoundCount}, Stages={result.StageCount}, Layers={result.LayerCount}, MobTriggers={result.MobTriggerCount}, MobVisuals={result.MobVisualCount}, Warnings={result.WarningCount}.";
+                $"\nNames={result.NameCount}, Levels={result.LevelCount}, Sounds={result.SoundCount}, Stages={result.StageCount}, Layers={result.LayerCount}, MobTriggers={result.MobTriggerCount}, MobVisuals={result.MobVisualCount}, Warnings={result.WarningCount}.");
 
-            if (_buildPrefab && _createScenePreviewRig && result.Asset != null)
+            if (result.StageCount > 0 && result.Asset != null)
             {
                 var controller = SkillVisualScenePreviewFactory.Create(result.Asset);
-                _status += $"\nScene preview rig created: {controller.transform.root.name}.";
+                _status.Append($"Scene preview rig created: {controller.transform.root.name}.");
             }
         }
         catch (OperationCanceledException)
         {
-            _status = $"{_status}\nImport cancelled by user.";
+            _status.Append("Import cancelled by user.");
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
 
     private void AppendStatus(string message)
     {
-        _status = $"{_status}\n{message}";
-        _repaint?.Invoke();
+        _status.Append(message);
     }
 }
 

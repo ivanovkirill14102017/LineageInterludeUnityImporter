@@ -9,6 +9,7 @@ using UnityEngine;
 public sealed class PlayerCharacterImporterWindow : EditorWindow
 {
     private PlayerCharacterImporterPanel _panel;
+    private ImportDashboardStatus _status;
 
     [MenuItem("L2/Import Player Character Archetype")]
     private static void OpenWindow()
@@ -20,31 +21,33 @@ public sealed class PlayerCharacterImporterWindow : EditorWindow
 
     private void OnEnable()
     {
-        _panel = new PlayerCharacterImporterPanel(Repaint);
+        _status = new ImportDashboardStatus(Repaint);
+        _panel = new PlayerCharacterImporterPanel(_status);
     }
 
     private void OnGUI()
     {
-        _panel ??= new PlayerCharacterImporterPanel(Repaint);
+        _status ??= new ImportDashboardStatus(Repaint);
+        _panel ??= new PlayerCharacterImporterPanel(_status);
+        ImportDashboardFields.DrawPaths();
         _panel.OnGUI();
+        _status.Draw();
     }
 }
 
 internal sealed class PlayerCharacterImporterPanel
 {
-    private readonly Action _repaint;
+    private readonly ImportDashboardStatus _status;
     private SceneCharacterBaseClass _baseClass = SceneCharacterBaseClass.HumanFighter;
     private SceneCharacterGender _gender = SceneCharacterGender.Male;
-    private string _status = "Ready to import a player-character wardrobe archetype prefab.";
-    private Vector2 _scroll;
     private SceneCharacterAppearanceOptionsData _appearanceOptions;
     private SceneCharacterEquipmentCatalogData _equipmentCatalog;
     private SceneCharacterBaseClass _loadedBaseClass;
     private SceneCharacterGender _loadedGender;
 
-    public PlayerCharacterImporterPanel(Action repaint)
+    public PlayerCharacterImporterPanel(ImportDashboardStatus status)
     {
-        _repaint = repaint;
+        _status = status;
     }
 
     public void OnGUI()
@@ -54,8 +57,6 @@ internal sealed class PlayerCharacterImporterPanel
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("Client", ConstInfo.L2GameClientPath);
-            ConstInfo.L2DbRootPath = EditorGUILayout.TextField("DB Root", ConstInfo.L2DbRootPath);
             var newBaseClass = (SceneCharacterBaseClass)EditorGUILayout.EnumPopup("Base Class", _baseClass);
             var newGender = (SceneCharacterGender)EditorGUILayout.EnumPopup("Gender", _gender);
             if (newBaseClass != _baseClass || newGender != _gender)
@@ -64,8 +65,6 @@ internal sealed class PlayerCharacterImporterPanel
                 _gender = newGender;
             }
 
-            EditorGUILayout.LabelField("Prefab Output", PlayerCharacterImportBuilder.PrefabOutputRoot);
-            EditorGUILayout.LabelField("Asset Output", PlayerCharacterImportBuilder.AssetOutputRoot);
         }
 
         EditorGUILayout.Space();
@@ -77,13 +76,6 @@ internal sealed class PlayerCharacterImporterPanel
             }
         }
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
-        {
-            _scroll = scroll.scrollPosition;
-            EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
-        }
     }
 
     private bool HasLoadedAppearanceDataForCurrentArchetype()
@@ -102,7 +94,7 @@ internal sealed class PlayerCharacterImporterPanel
         }
 
         ConstInfo.L2DbRootPath = NormalizeDbRoot(ConstInfo.L2DbRootPath);
-        _status = $"Loading archetype catalog for '{_gender} {_baseClass}'...";
+        _status.Set($"Loading archetype catalog for '{_gender} {_baseClass}'...");
         var optionsBuilder = new SceneCharacterAppearanceOptionsBuilder();
         _appearanceOptions = optionsBuilder.Build(ConstInfo.L2GameClientPath, _baseClass, _gender);
 
@@ -110,10 +102,10 @@ internal sealed class PlayerCharacterImporterPanel
         _equipmentCatalog = catalogBuilder.Build(ConstInfo.L2GameClientPath, ConstInfo.L2DbRootPath, _baseClass, _gender);
         _loadedBaseClass = _baseClass;
         _loadedGender = _gender;
-        _status += $"\nLoaded: Faces={_appearanceOptions.FaceOptions.Count}, HairStyles={_appearanceOptions.HairStyleOptions.Count}, Slots={_equipmentCatalog.Slots.Count}.";
+        _status.Append($"Loaded: Faces={_appearanceOptions.FaceOptions.Count}, HairStyles={_appearanceOptions.HairStyleOptions.Count}, Slots={_equipmentCatalog.Slots.Count}.");
         if (_equipmentCatalog.Warnings.Count > 0)
         {
-            _status += $"\nCatalog warnings: {_equipmentCatalog.Warnings.Count}";
+            _status.Append($"Catalog warnings: {_equipmentCatalog.Warnings.Count}");
         }
     }
 
@@ -123,7 +115,7 @@ internal sealed class PlayerCharacterImporterPanel
         {
             ConstInfo.L2DbRootPath = NormalizeDbRoot(ConstInfo.L2DbRootPath);
 
-            _status = $"Archetype import started for '{_gender} {_baseClass}'...";
+            _status.Set($"Archetype import started for '{_gender} {_baseClass}'...");
             using var context = new MapImportExecutionContext("Import Player Character Archetype");
             var result = PlayerCharacterArchetypeBuilder.Import(
                 ConstInfo.L2GameClientPath,
@@ -134,23 +126,22 @@ internal sealed class PlayerCharacterImporterPanel
                 HasLoadedAppearanceDataForCurrentArchetype() ? _equipmentCatalog : null,
                 context,
                 AppendStatus);
-            _status += $"\nDone. Prefab: {result.PrefabPath}";
+            _status.Append($"Done. Prefab: {result.PrefabPath}");
         }
         catch (OperationCanceledException)
         {
-            _status = $"{_status}\nImport cancelled by user.";
+            _status.Append("Import cancelled by user.");
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
 
     private void AppendStatus(string message)
     {
-        _status = $"{_status}\n{message}";
-        _repaint?.Invoke();
+        _status.Append(message);
     }
 
     private static string NormalizeDbRoot(string dbRoot)

@@ -6,8 +6,12 @@ internal static class L2SkillVisualTimeline
 {
     public static float ResolveHitTime(L2SkillVisualAsset skill, string visualReference)
     {
+        var isNativeVisual = skill != null && string.Equals(
+            visualReference,
+            $"native.skill.{skill.SkillId}",
+            StringComparison.OrdinalIgnoreCase);
         var level = skill?.Levels?
-            .Where(x => x != null && string.Equals(x.DescriptionToken, visualReference, StringComparison.OrdinalIgnoreCase))
+            .Where(x => x != null && (isNativeVisual || string.Equals(x.DescriptionToken, visualReference, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(x => x.SkillLevel)
             .FirstOrDefault();
         if (level == null || level.HitTime < 0f || float.IsNaN(level.HitTime) || float.IsInfinity(level.HitTime))

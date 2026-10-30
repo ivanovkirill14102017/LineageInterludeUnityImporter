@@ -7,6 +7,7 @@ using UnityEngine;
 public sealed class MapImporterWindow : EditorWindow
 {
     private MapImporterPanel _panel;
+    private ImportDashboardStatus _status;
 
     [MenuItem("L2/Import Terrain")]
     private static void OpenWindow()
@@ -18,7 +19,8 @@ public sealed class MapImporterWindow : EditorWindow
 
     private void OnEnable()
     {
-        _panel = new MapImporterPanel(Repaint);
+        _status = new ImportDashboardStatus(Repaint);
+        _panel = new MapImporterPanel(Repaint, _status);
     }
 
     private void OnDisable()
@@ -29,8 +31,11 @@ public sealed class MapImporterWindow : EditorWindow
 
     private void OnGUI()
     {
-        _panel ??= new MapImporterPanel(Repaint);
+        _status ??= new ImportDashboardStatus(Repaint);
+        _panel ??= new MapImporterPanel(Repaint, _status);
+        ImportDashboardFields.DrawPaths();
         _panel.OnGUI();
+        _status.Draw();
     }
 }
 
@@ -39,16 +44,15 @@ internal sealed class MapImporterPanel : IDisposable
     private const string DefaultMapRelativePath = @"Maps\20_20.unr";
 
     private readonly Action _repaint;
+    private readonly ImportDashboardStatus _status;
     private readonly ConcurrentQueue<string> _logQueue = new ConcurrentQueue<string>();
     private string _mapRelativePath = DefaultMapRelativePath;
-    private string _dbRootPath = ConstInfo.L2DbRootPath;
     private bool _isImportRunning;
-    private string _status = "Ready to import.";
-    private Vector2 _scroll;
 
-    public MapImporterPanel(Action repaint)
+    public MapImporterPanel(Action repaint, ImportDashboardStatus status)
     {
         _repaint = repaint;
+        _status = status;
         EditorApplication.update += OnEditorUpdate;
     }
 
@@ -64,10 +68,7 @@ internal sealed class MapImporterPanel : IDisposable
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("Client", ConstInfo.L2GameClientPath);
-            _dbRootPath = EditorGUILayout.TextField("DB Root", _dbRootPath);
             _mapRelativePath = EditorGUILayout.TextField("Map", _mapRelativePath);
-            EditorGUILayout.LabelField("Output Root", MapImportPaths.OutputRoot);
         }
 
         EditorGUILayout.Space();
@@ -123,14 +124,6 @@ internal sealed class MapImporterPanel : IDisposable
             }
         }
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-
-        using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.MinHeight(120f)))
-        {
-            _scroll = scroll.scrollPosition;
-            EditorGUILayout.TextArea(_status, GUILayout.ExpandHeight(true));
-        }
     }
 
     private void OnEditorUpdate()
@@ -138,7 +131,7 @@ internal sealed class MapImporterPanel : IDisposable
         var hasMessages = false;
         while (_logQueue.TryDequeue(out var message))
         {
-            _status = $"{_status}\n{message}";
+            _status.Append(message);
             hasMessages = true;
         }
 
@@ -168,7 +161,7 @@ internal sealed class MapImporterPanel : IDisposable
             }
             catch (OperationCanceledException)
             {
-                _status = $"{_status}\nImport cancelled by user.";
+                _status.Append("Import cancelled by user.");
             }
             finally
             {
@@ -183,8 +176,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import all map content.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import all map content.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportAll(request, AppendStatus, context);
         }
@@ -194,7 +186,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -203,8 +195,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import terrain.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import terrain.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportTerrain(request, AppendStatus, context);
         }
@@ -214,7 +205,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -223,14 +214,14 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to ensure modern skybox.";
+            _status.Set("Ready to ensure modern skybox.");
             context?.Report("Ensure Skybox", "L2ModernSkybox", 0.5f);
             ModernSkyboxImporter.EnsureModernSkybox(AppendStatus);
             context?.Report("Done", "L2ModernSkybox", 1f);
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
 
@@ -241,8 +232,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import meshes.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import meshes.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportMeshes(request, AppendStatus, context);
         }
@@ -252,7 +242,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -261,8 +251,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import room-grouped BSP.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import room-grouped BSP.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportBsp(request, AppendStatus, context);
         }
@@ -272,7 +261,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -281,8 +270,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import lights.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import lights.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportLights(request, AppendStatus, context);
         }
@@ -292,7 +280,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -301,8 +289,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import volumes.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import volumes.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportVolumes(request, AppendStatus, context);
         }
@@ -312,7 +299,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -321,8 +308,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import particles.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import particles.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportParticles(request, AppendStatus, context);
         }
@@ -332,7 +318,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
@@ -341,8 +327,7 @@ internal sealed class MapImporterPanel : IDisposable
     {
         try
         {
-            _status = "Ready to import creatures.";
-            ConstInfo.L2DbRootPath = _dbRootPath;
+            _status.Set("Ready to import creatures.");
             var request = MapImportRequest.FromMapRelativePath(_mapRelativePath);
             await MapImportOrchestrator.ImportCreatures(request, AppendStatus, context);
         }
@@ -352,7 +337,7 @@ internal sealed class MapImporterPanel : IDisposable
         }
         catch (Exception exception)
         {
-            _status = exception.ToString();
+            _status.Set(exception.ToString());
             Debug.LogException(exception);
         }
     }
