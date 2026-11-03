@@ -1,0 +1,2020 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!29 &1
+OcclusionCullingSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_OcclusionBakeSettings:
+    smallestOccluder: 5
+    smallestHole: 0.25
+    backfaceThreshold: 100
+  m_SceneGUID: 00000000000000000000000000000000
+  m_OcclusionCullingData: {fileID: 0}
+--- !u!104 &2
+RenderSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 10
+  m_Fog: 1
+  m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  m_FogMode: 1
+  m_FogDensity: 0.01
+  m_LinearFogStart: 298.01834
+  m_LinearFogEnd: 300
+  m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
+  m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
+  m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
+  m_AmbientIntensity: 1.01
+  m_AmbientMode: 0
+  m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
+  m_SkyboxMaterial: {fileID: 0}
+  m_HaloStrength: 0.5
+  m_FlareStrength: 1
+  m_FlareFadeSpeed: 3
+  m_HaloTexture: {fileID: 0}
+  m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}
+  m_DefaultReflectionMode: 0
+  m_DefaultReflectionResolution: 128
+  m_ReflectionBounces: 1
+  m_ReflectionIntensity: 1
+  m_CustomReflection: {fileID: 0}
+  m_Sun: {fileID: 0}
+  m_UseRadianceAmbientProbe: 0
+--- !u!157 &3
+LightmapSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 13
+  m_BakeOnSceneLoad: 0
+  m_GISettings:
+    serializedVersion: 2
+    m_BounceScale: 1
+    m_IndirectOutputScale: 1
+    m_AlbedoBoost: 1
+    m_EnvironmentLightingMode: 0
+    m_EnableBakedLightmaps: 1
+    m_EnableRealtimeLightmaps: 0
+  m_LightmapEditorSettings:
+    serializedVersion: 12
+    m_Resolution: 2
+    m_BakeResolution: 40
+    m_AtlasSize: 1024
+    m_AO: 0
+    m_AOMaxDistance: 1
+    m_CompAOExponent: 1
+    m_CompAOExponentDirect: 0
+    m_ExtractAmbientOcclusion: 0
+    m_Padding: 2
+    m_LightmapParameters: {fileID: 0}
+    m_LightmapsBakeMode: 1
+    m_TextureCompression: 1
+    m_ReflectionCompression: 2
+    m_MixedBakeMode: 2
+    m_BakeBackend: 1
+    m_PVRSampling: 1
+    m_PVRDirectSampleCount: 32
+    m_PVRSampleCount: 512
+    m_PVRBounces: 2
+    m_PVREnvironmentSampleCount: 256
+    m_PVREnvironmentReferencePointCount: 2048
+    m_PVRFilteringMode: 1
+    m_PVRDenoiserTypeDirect: 1
+    m_PVRDenoiserTypeIndirect: 1
+    m_PVRDenoiserTypeAO: 1
+    m_PVRFilterTypeDirect: 0
+    m_PVRFilterTypeIndirect: 0
+    m_PVRFilterTypeAO: 0
+    m_PVREnvironmentMIS: 1
+    m_PVRCulling: 1
+    m_PVRFilteringGaussRadiusDirect: 1
+    m_PVRFilteringGaussRadiusIndirect: 5
+    m_PVRFilteringGaussRadiusAO: 2
+    m_PVRFilteringAtrousPositionSigmaDirect: 0.5
+    m_PVRFilteringAtrousPositionSigmaIndirect: 2
+    m_PVRFilteringAtrousPositionSigmaAO: 1
+    m_ExportTrainingData: 0
+    m_TrainingDataDestination: TrainingData
+    m_LightProbeSampleCountMultiplier: 4
+  m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
+  m_LightingSettings: {fileID: 0}
+--- !u!196 &4
+NavMeshSettings:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_BuildSettings:
+    serializedVersion: 3
+    agentTypeID: 0
+    agentRadius: 0.5
+    agentHeight: 2
+    agentSlope: 45
+    agentClimb: 0.4
+    ledgeDropHeight: 0
+    maxJumpAcrossDistance: 0
+    minRegionArea: 2
+    manualCellSize: 0
+    cellSize: 0.16666667
+    manualTileSize: 0
+    tileSize: 256
+    buildHeightMesh: 0
+    maxJobWorkers: 0
+    preserveTilesOutsideBounds: 0
+    debug:
+      m_Flags: 0
+  m_NavMeshData: {fileID: 0}
+--- !u!1 &100000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 100001}
+  - component: {fileID: 100002}
+  - component: {fileID: 100003}
+  - component: {fileID: 100004}
+  m_Layer: 0
+  m_Name: SharedSky
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &100001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2046159987}
+  - {fileID: 473251850}
+  - {fileID: 1787065457}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &100002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b27918ccc614d2b8c19eba754f16b85, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SharedSkyController
+  TimeProfiles:
+    Profiles:
+    - EnvironmentType: 0
+      SkyBox:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+        - Hour: 1
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+        - Hour: 2
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+        - Hour: 3
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+        - Hour: 4
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+        - Hour: 5
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+        - Hour: 6
+          Color: {r: 0.31764707, g: 0.29411766, b: 0.57254905, a: 1}
+        - Hour: 7
+          Color: {r: 0.49411765, g: 0.61960787, b: 0.94509804, a: 1}
+        - Hour: 8
+          Color: {r: 0.49411765, g: 0.61960787, b: 0.94509804, a: 1}
+        - Hour: 9
+          Color: {r: 0.49411765, g: 0.61960787, b: 0.94509804, a: 1}
+        - Hour: 10
+          Color: {r: 0.31764707, g: 0.5764706, b: 0.80784315, a: 1}
+        - Hour: 11
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 12
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 13
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 14
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 15
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 16
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 17
+          Color: {r: 0.25882354, g: 0.4862745, b: 0.6901961, a: 1}
+        - Hour: 18
+          Color: {r: 0.23529412, g: 0.43529412, b: 0.6156863, a: 1}
+        - Hour: 19
+          Color: {r: 0.23529412, g: 0.43529412, b: 0.6156863, a: 1}
+        - Hour: 20
+          Color: {r: 0.23529412, g: 0.43529412, b: 0.6156863, a: 1}
+        - Hour: 21
+          Color: {r: 0.23529412, g: 0.43529412, b: 0.6156863, a: 1}
+        - Hour: 22
+          Color: {r: 0.38431373, g: 0.41960785, b: 0.62352943, a: 1}
+        - Hour: 23
+          Color: {r: 0.32156864, g: 0.3529412, b: 0.5294118, a: 1}
+        - Hour: 24
+          Color: {r: 0.15686275, g: 0.19215687, b: 0.27450982, a: 1}
+      HazeRing:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.1882353, g: 0.24313726, b: 0.32941177, a: 1}
+        - Hour: 1
+          Color: {r: 0.1882353, g: 0.24313726, b: 0.32941177, a: 1}
+        - Hour: 2
+          Color: {r: 0.12156863, g: 0.14901961, b: 0.21176471, a: 1}
+        - Hour: 3
+          Color: {r: 0.12156863, g: 0.14901961, b: 0.21176471, a: 1}
+        - Hour: 4
+          Color: {r: 0.1882353, g: 0.24313726, b: 0.32941177, a: 1}
+        - Hour: 5
+          Color: {r: 0.26666668, g: 0.30980393, b: 0.45882353, a: 1}
+        - Hour: 6
+          Color: {r: 0.54509807, g: 0.42352942, b: 0.5686275, a: 1}
+        - Hour: 7
+          Color: {r: 0.70980394, g: 0.6392157, b: 0.74509805, a: 1}
+        - Hour: 8
+          Color: {r: 0.70980394, g: 0.6392157, b: 0.74509805, a: 1}
+        - Hour: 9
+          Color: {r: 1, g: 0.9372549, b: 0.80784315, a: 1}
+        - Hour: 10
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 11
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 12
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 13
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 14
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 15
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 16
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 17
+          Color: {r: 0.7372549, g: 0.79607844, b: 0.8784314, a: 1}
+        - Hour: 18
+          Color: {r: 0.72156864, g: 0.74509805, b: 0.92941177, a: 1}
+        - Hour: 19
+          Color: {r: 0.72156864, g: 0.74509805, b: 0.92941177, a: 1}
+        - Hour: 20
+          Color: {r: 0.72156864, g: 0.74509805, b: 0.92941177, a: 1}
+        - Hour: 21
+          Color: {r: 0.72156864, g: 0.74509805, b: 0.92941177, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.8, b: 0.63529414, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.6901961, b: 0.50980395, a: 1}
+        - Hour: 24
+          Color: {r: 0.1882353, g: 0.24313726, b: 0.32941177, a: 1}
+      Cloud1:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.26666668, g: 0.30980393, b: 0.4509804, a: 1}
+        - Hour: 1
+          Color: {r: 0.29411766, g: 0.34117648, b: 0.49411765, a: 1}
+        - Hour: 2
+          Color: {r: 0.29411766, g: 0.34117648, b: 0.49411765, a: 1}
+        - Hour: 3
+          Color: {r: 0.29411766, g: 0.34117648, b: 0.49411765, a: 1}
+        - Hour: 4
+          Color: {r: 0.29411766, g: 0.34117648, b: 0.49411765, a: 1}
+        - Hour: 5
+          Color: {r: 0.29411766, g: 0.34117648, b: 0.49411765, a: 1}
+        - Hour: 6
+          Color: {r: 0.24705882, g: 0.28235295, b: 0.4117647, a: 1}
+        - Hour: 7
+          Color: {r: 1, g: 0.93333334, b: 0.8, a: 1}
+        - Hour: 8
+          Color: {r: 1, g: 0.93333334, b: 0.8, a: 1}
+        - Hour: 9
+          Color: {r: 1, g: 0.93333334, b: 0.8, a: 1}
+        - Hour: 10
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 11
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 12
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 13
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 14
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 15
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 16
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 17
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 0.77254903, b: 0.6509804, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 0.7137255, b: 0.5568628, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.7137255, b: 0.5568628, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.7137255, b: 0.5568628, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.6627451, b: 0.5019608, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.5294118, b: 0.3254902, a: 1}
+        - Hour: 24
+          Color: {r: 0.26666668, g: 0.30980393, b: 0.4509804, a: 1}
+      Cloud2:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 1
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 2
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 3
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 4
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 5
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 6
+          Color: {r: 0.5019608, g: 0.5019608, b: 0.5019608, a: 1}
+        - Hour: 7
+          Color: {r: 0.11764706, g: 0.11764706, b: 0.11764706, a: 1}
+        - Hour: 8
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 9
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 10
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 11
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 12
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 13
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 14
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 15
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 16
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 17
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 18
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 19
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 20
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 21
+          Color: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+        - Hour: 22
+          Color: {r: 0.5019608, g: 0.5019608, b: 0.5019608, a: 1}
+        - Hour: 23
+          Color: {r: 0.5019608, g: 0.5019608, b: 0.5019608, a: 1}
+        - Hour: 24
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      Cloud3:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 1
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 2
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 3
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 4
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 5
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 6
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 7
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 8
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 9
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 10
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 11
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 12
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 13
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 14
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 15
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 16
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 17
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 18
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 19
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 20
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 21
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 22
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 23
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 24
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+    - EnvironmentType: 1
+      SkyBox:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+        - Hour: 1
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+        - Hour: 2
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+        - Hour: 3
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+        - Hour: 4
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+        - Hour: 5
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+        - Hour: 6
+          Color: {r: 0.37254903, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 7
+          Color: {r: 0.48235294, g: 0.50980395, b: 0.6901961, a: 1}
+        - Hour: 8
+          Color: {r: 0.48235294, g: 0.50980395, b: 0.6901961, a: 1}
+        - Hour: 9
+          Color: {r: 0.48235294, g: 0.50980395, b: 0.6901961, a: 1}
+        - Hour: 10
+          Color: {r: 0.48235294, g: 0.50980395, b: 0.6901961, a: 1}
+        - Hour: 11
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 12
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 13
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 14
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 15
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 16
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 17
+          Color: {r: 0.38039216, g: 0.40392157, b: 0.627451, a: 1}
+        - Hour: 18
+          Color: {r: 0.4117647, g: 0.38039216, b: 0.627451, a: 1}
+        - Hour: 19
+          Color: {r: 0.4117647, g: 0.38039216, b: 0.627451, a: 1}
+        - Hour: 20
+          Color: {r: 0.4117647, g: 0.38039216, b: 0.627451, a: 1}
+        - Hour: 21
+          Color: {r: 0.4117647, g: 0.38039216, b: 0.627451, a: 1}
+        - Hour: 22
+          Color: {r: 0.4117647, g: 0.38039216, b: 0.627451, a: 1}
+        - Hour: 23
+          Color: {r: 0.40392157, g: 0.2509804, b: 0.40784314, a: 1}
+        - Hour: 24
+          Color: {r: 0.19607843, g: 0.13725491, b: 0.13725491, a: 1}
+      HazeRing:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.76862746, g: 0.53333336, b: 0.53333336, a: 1}
+        - Hour: 1
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 2
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 3
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 4
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 5
+          Color: {r: 0.76862746, g: 0.53333336, b: 0.53333336, a: 1}
+        - Hour: 6
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 7
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 8
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 9
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 10
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 11
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 12
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 13
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 14
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 15
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 16
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 17
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 0.75686276, b: 0.43529412, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 0.75686276, b: 0.43529412, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.6901961, b: 0.5254902, a: 1}
+        - Hour: 24
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+      Cloud1:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 1
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 2
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 3
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 4
+          Color: {r: 0.62352943, g: 0.28627452, b: 0.10980392, a: 1}
+        - Hour: 5
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 6
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 7
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 8
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 9
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 10
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 11
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 12
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 13
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 14
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 15
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 16
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 17
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 0.6666667, b: 0.41568628, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 0.6666667, b: 0.41568628, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.6156863, b: 0.33333334, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.6156863, b: 0.33333334, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.6156863, b: 0.33333334, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.35686275, b: 0.08235294, a: 1}
+        - Hour: 24
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+      Cloud2:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 1
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 2
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 3
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 4
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 5
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 6
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 7
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 8
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 9
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 10
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 11
+          Color: {r: 0.47058824, g: 0.47058824, b: 0.47058824, a: 1}
+        - Hour: 12
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 13
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 14
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 15
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 16
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 17
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 18
+          Color: {r: 0.47058824, g: 0.47058824, b: 0.47058824, a: 1}
+        - Hour: 19
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 20
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 21
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 22
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 23
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 24
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      Cloud3:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 1
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 2
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 3
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 4
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 5
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 6
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 7
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 8
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 9
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 10
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 11
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 12
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 13
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 14
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 15
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 16
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 17
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 18
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 19
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 20
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 21
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 22
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 23
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 24
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+    - EnvironmentType: 2
+      SkyBox:
+        Keys:
+        - Hour: 0
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+        - Hour: 1
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+        - Hour: 2
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+        - Hour: 3
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+        - Hour: 4
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+        - Hour: 5
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+        - Hour: 6
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 7
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 8
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 9
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 10
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 11
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 12
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 13
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 14
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 15
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 16
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 17
+          Color: {r: 0.011764706, g: 0.67058825, b: 0.7607843, a: 1}
+        - Hour: 18
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 19
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 20
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 21
+          Color: {r: 0.03529412, g: 0.65882355, b: 0.627451, a: 1}
+        - Hour: 22
+          Color: {r: 0.043137256, g: 0.6666667, b: 0.6509804, a: 1}
+        - Hour: 23
+          Color: {r: 0.043137256, g: 0.48235294, b: 0.53333336, a: 1}
+        - Hour: 24
+          Color: {r: 0, g: 0.32156864, b: 0.35686275, a: 1}
+      HazeRing:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+        - Hour: 1
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+        - Hour: 2
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+        - Hour: 3
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+        - Hour: 4
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+        - Hour: 5
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+        - Hour: 6
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 7
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 8
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 9
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 10
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 11
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 12
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 13
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 14
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 15
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 16
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 17
+          Color: {r: 0.95686275, g: 1, b: 0.7254902, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.9607843, b: 0.6156863, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.9529412, b: 0.5254902, a: 1}
+        - Hour: 24
+          Color: {r: 0.61960787, g: 0.7137255, b: 0.47058824, a: 1}
+      Cloud1:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+        - Hour: 1
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+        - Hour: 2
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+        - Hour: 3
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+        - Hour: 4
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+        - Hour: 5
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+        - Hour: 6
+          Color: {r: 0.050980393, g: 0.3764706, b: 0.6431373, a: 1}
+        - Hour: 7
+          Color: {r: 0.050980393, g: 0.3764706, b: 0.6431373, a: 1}
+        - Hour: 8
+          Color: {r: 0.050980393, g: 0.3764706, b: 0.6431373, a: 1}
+        - Hour: 9
+          Color: {r: 0.050980393, g: 0.3764706, b: 0.6431373, a: 1}
+        - Hour: 10
+          Color: {r: 0.050980393, g: 0.3764706, b: 0.6431373, a: 1}
+        - Hour: 11
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 12
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 13
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 14
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 15
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 16
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 17
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 1, b: 1, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.8901961, b: 0.7254902, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.8901961, b: 0.7254902, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.7137255, b: 0.5568628, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.5803922, b: 0.34901962, a: 1}
+        - Hour: 24
+          Color: {r: 0.41960785, g: 0.45882353, b: 0.7058824, a: 1}
+      Cloud2:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 1
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 2
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 3
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 4
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 5
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 6
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 7
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 8
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 9
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 10
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 11
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 12
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 13
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 14
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 15
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 16
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 17
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 18
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 19
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 20
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 21
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 22
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 23
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 24
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      Cloud3:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 1
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 2
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 3
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 4
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 5
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 6
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 7
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 8
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 9
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 10
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 11
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 12
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 13
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 14
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 15
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 16
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 17
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 18
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 19
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 20
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 21
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 22
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 23
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 24
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+    - EnvironmentType: 3
+      SkyBox:
+        Keys:
+        - Hour: 0
+          Color: {r: 1, g: 0.019607844, b: 0.019607844, a: 1}
+      HazeRing:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.76862746, g: 0.53333336, b: 0.53333336, a: 1}
+        - Hour: 1
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 2
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 3
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 4
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+        - Hour: 5
+          Color: {r: 0.76862746, g: 0.53333336, b: 0.53333336, a: 1}
+        - Hour: 6
+          Color: {r: 1, g: 0.90588236, b: 0.5254902, a: 1}
+        - Hour: 7
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 8
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 9
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 10
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 11
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 12
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 13
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 14
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 15
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 16
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 17
+          Color: {r: 1, g: 0.90588236, b: 0.5764706, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 0.75686276, b: 0.43529412, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 0.75686276, b: 0.43529412, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.80784315, b: 0.54901963, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.6901961, b: 0.5254902, a: 1}
+        - Hour: 24
+          Color: {r: 0.58431375, g: 0.43529412, b: 0.33333334, a: 1}
+      Cloud1:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 1
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 2
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 3
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 4
+          Color: {r: 0.62352943, g: 0.28627452, b: 0.10980392, a: 1}
+        - Hour: 5
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+        - Hour: 6
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 7
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 8
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 9
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 10
+          Color: {r: 0.94509804, g: 0.90588236, b: 0.6117647, a: 1}
+        - Hour: 11
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 12
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 13
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 14
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 15
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 16
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 17
+          Color: {r: 1, g: 0.7411765, b: 0.54901963, a: 1}
+        - Hour: 18
+          Color: {r: 1, g: 0.6666667, b: 0.41568628, a: 1}
+        - Hour: 19
+          Color: {r: 1, g: 0.6666667, b: 0.41568628, a: 1}
+        - Hour: 20
+          Color: {r: 1, g: 0.6156863, b: 0.33333334, a: 1}
+        - Hour: 21
+          Color: {r: 1, g: 0.6156863, b: 0.33333334, a: 1}
+        - Hour: 22
+          Color: {r: 1, g: 0.6156863, b: 0.33333334, a: 1}
+        - Hour: 23
+          Color: {r: 1, g: 0.35686275, b: 0.08235294, a: 1}
+        - Hour: 24
+          Color: {r: 0.62352943, g: 0.31764707, b: 0.10980392, a: 1}
+      Cloud2:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 1
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 2
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 3
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 4
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 5
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 6
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 7
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 8
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 9
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 10
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 11
+          Color: {r: 0.47058824, g: 0.47058824, b: 0.47058824, a: 1}
+        - Hour: 12
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 13
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 14
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 15
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 16
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 17
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 18
+          Color: {r: 0.47058824, g: 0.47058824, b: 0.47058824, a: 1}
+        - Hour: 19
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 20
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 21
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 22
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 23
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+        - Hour: 24
+          Color: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      Cloud3:
+        Keys:
+        - Hour: 0
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 1
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 2
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 3
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 4
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 5
+          Color: {r: 0.3529412, g: 0.3529412, b: 0.3529412, a: 1}
+        - Hour: 6
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 7
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 8
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 9
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 10
+          Color: {r: 0.15686275, g: 0.15686275, b: 0.15686275, a: 1}
+        - Hour: 11
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 12
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 13
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 14
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 15
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 16
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 17
+          Color: {r: 0, g: 0, b: 0, a: 1}
+        - Hour: 18
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 19
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 20
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 21
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 22
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 23
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+        - Hour: 24
+          Color: {r: 0.2509804, g: 0.2509804, b: 0.2509804, a: 1}
+  GeometryRoot: {fileID: 1787065457}
+  MaxLayerRadius: 100
+  Layers:
+  - Role: 1
+    Renderer: {fileID: 2114885007}
+  - Role: 2
+    Renderer: {fileID: 114037903}
+  - Role: 3
+    Renderer: {fileID: 1486920159}
+  - Role: 4
+    Renderer: {fileID: 1423448288}
+  Sun:
+    Transform: {fileID: 1432730613}
+    Renderer: {fileID: 1432730611}
+  Moon:
+    Transform: {fileID: 1393669235}
+    Renderer: {fileID: 1393669233}
+  CloudPanRate: 0.002
+  CloudMinimumOpacity: 0.55
+  CloudMaximumOpacity: 0.85
+  CloudMinimumBrightness: 0.7
+  CloudVariationPeriodSeconds: 75
+  EnvironmentType: 0
+  TimeOfDayHours: 12
+  ShowTimeSlider: 1
+--- !u!114 &100003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a38321ac862e4bb195f901bb4563a05a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SharedSkyAtmosphereController
+  AmbientColor: {r: 0.161, g: 0.224, b: 0.322, a: 0.35}
+  AmbientIntensity: 1
+  ReflectionIntensity: 0.214
+  IndoorFogAttenuationDistance: 50
+  IndoorFogDistanceMultiplier: 2.5
+  GlobalFogDistanceMultiplier: 1.6
+  OutdoorFogDistanceMultiplier: 1.4285715
+  FallbackAverageSourceFogEnd: 12000
+  FogSourceScaleMin: 0.35
+  FogSourceScaleMax: 2.5
+  OutdoorZoneSourceFogEnd: 15000
+  OutdoorZoneSourceFogEndTolerance: 1
+  OutdoorZoneFogAttenuationDistance: 300
+  IndoorFogColor: {r: 0.4, g: 0.43, b: 0.46, a: 1}
+  OutdoorFogColor: {r: 0.58, g: 0.66, b: 0.74, a: 1}
+  SceneAmbientFogColorBlend: 0.35
+  FogColorIntensity: 0.82
+--- !u!114 &100004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e7c4e20f1074a68ba790bf33cb4f750, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SharedSkySunController
+  SunLight: {fileID: 2046159986}
+  MoonLight: {fileID: 473251849}
+  OutdoorSunIntensity: 4
+  NightOutdoorIntensity: 0.8
+  MoonOutdoorIntensity: 0.25
+  IndoorSunIntensity: 0
+  OutdoorSunColor: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
+  NightOutdoorColor: {r: 0.55, g: 0.7, b: 1, a: 1}
+  MoonColor: {r: 0.55, g: 0.68, b: 1, a: 1}
+  SunTransitionSeconds: 3
+--- !u!1 &114037902
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 114037905}
+  - component: {fileID: 114037904}
+  - component: {fileID: 114037903}
+  m_Layer: 0
+  m_Name: Cloud1_01
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!23 &114037903
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 114037902}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: af145d9cfcd525242964bb9c3377050d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &114037904
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 114037902}
+  m_Mesh: {fileID: 4300000, guid: b45e6d69810c5a54ea91cf6880df24fe, type: 2}
+--- !u!4 &114037905
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 114037902}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1787065457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &473251848
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 473251850}
+  - component: {fileID: 473251849}
+  m_Layer: 0
+  m_Name: MoonLight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!108 &473251849
+Light:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 473251848}
+  m_Enabled: 0
+  serializedVersion: 12
+  m_Type: 1
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 1
+  m_Range: 10
+  m_SpotAngle: 30
+  m_InnerSpotAngle: 21.80208
+  m_CookieSize2D: {x: 0.5, y: 0.5}
+  m_Shadows:
+    m_Type: 0
+    m_Resolution: -1
+    m_CustomResolution: -1
+    m_Strength: 1
+    m_Bias: 0.05
+    m_NormalBias: 0.4
+    m_NearPlane: 0.2
+    m_CullingMatrixOverride:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    m_UseCullingMatrixOverride: 0
+  m_Cookie: {fileID: 0}
+  m_DrawHalo: 0
+  m_Flare: {fileID: 0}
+  m_RenderMode: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingLayerMask: 1
+  m_Lightmapping: 4
+  m_LightShadowCasterMode: 0
+  m_AreaSize: {x: 1, y: 1}
+  m_BounceIntensity: 1
+  m_ColorTemperature: 6570
+  m_UseColorTemperature: 0
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_UseBoundingSphereOverride: 0
+  m_UseViewFrustumForShadowCasterCull: 1
+  m_ForceVisible: 0
+  m_ShadowRadius: 0
+  m_ShadowAngle: 0
+  m_LightUnit: 1
+  m_LuxAtDistance: 1
+  m_EnableSpotReflector: 1
+--- !u!4 &473251850
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 473251848}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 100001}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1393669232
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1393669235}
+  - component: {fileID: 1393669234}
+  - component: {fileID: 1393669233}
+  m_Layer: 0
+  m_Name: Moon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!23 &1393669233
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1393669232}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 4040b558f3de66741b613e2da5db35f3, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1393669234
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1393669232}
+  m_Mesh: {fileID: 4300000, guid: 625db3f17673c3b4bb3b436d72cde500, type: 2}
+--- !u!4 &1393669235
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1393669232}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.8870109, z: 0.46174863, w: 0}
+  m_LocalPosition: {x: -0, y: -79.621574, z: 55.75163}
+  m_LocalScale: {x: 30, y: 30, z: 30}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1787065457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1423448287
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1423448290}
+  - component: {fileID: 1423448289}
+  - component: {fileID: 1423448288}
+  m_Layer: 0
+  m_Name: StarsSmall_03
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!23 &1423448288
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1423448287}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 0eb6b4031afbbe64f92a37b62a4e0d42, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1423448289
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1423448287}
+  m_Mesh: {fileID: 4300000, guid: 9d15c6a9d0971924e9b1fde8305d61ef, type: 2}
+--- !u!4 &1423448290
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1423448287}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1787065457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1432730610
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1432730613}
+  - component: {fileID: 1432730612}
+  - component: {fileID: 1432730611}
+  m_Layer: 0
+  m_Name: Sun
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!23 &1432730611
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1432730610}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 1597670eb8d6bec458b7986c3fda0943, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1432730612
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1432730610}
+  m_Mesh: {fileID: 4300000, guid: 625db3f17673c3b4bb3b436d72cde500, type: 2}
+--- !u!4 &1432730613
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1432730610}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.46174863, y: -0, z: -0, w: 0.8870109}
+  m_LocalPosition: {x: 0, y: 79.45775, z: -55.636917}
+  m_LocalScale: {x: 24, y: 24, z: 24}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1787065457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1486920158
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1486920161}
+  - component: {fileID: 1486920160}
+  - component: {fileID: 1486920159}
+  m_Layer: 0
+  m_Name: StarsLarge_02
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!23 &1486920159
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1486920158}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 98d7a7e43652fb743bc23ade01a56951, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1486920160
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1486920158}
+  m_Mesh: {fileID: 4300000, guid: e757f2505b7fafc4c9047b1053d3ee2a, type: 2}
+--- !u!4 &1486920161
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1486920158}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1787065457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1787065456
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1787065457}
+  m_Layer: 0
+  m_Name: SkyLevelGeometry
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1787065457
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1787065456}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2114885009}
+  - {fileID: 114037905}
+  - {fileID: 1486920161}
+  - {fileID: 1423448290}
+  - {fileID: 1432730613}
+  - {fileID: 1393669235}
+  m_Father: {fileID: 100001}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2046159985
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2046159987}
+  - component: {fileID: 2046159986}
+  m_Layer: 0
+  m_Name: SunLight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!108 &2046159986
+Light:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2046159985}
+  m_Enabled: 0
+  serializedVersion: 12
+  m_Type: 1
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 1
+  m_Range: 10
+  m_SpotAngle: 30
+  m_InnerSpotAngle: 21.80208
+  m_CookieSize2D: {x: 0.5, y: 0.5}
+  m_Shadows:
+    m_Type: 2
+    m_Resolution: -1
+    m_CustomResolution: -1
+    m_Strength: 1
+    m_Bias: 0.05
+    m_NormalBias: 0.4
+    m_NearPlane: 0.2
+    m_CullingMatrixOverride:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    m_UseCullingMatrixOverride: 0
+  m_Cookie: {fileID: 0}
+  m_DrawHalo: 0
+  m_Flare: {fileID: 0}
+  m_RenderMode: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingLayerMask: 1
+  m_Lightmapping: 4
+  m_LightShadowCasterMode: 0
+  m_AreaSize: {x: 1, y: 1}
+  m_BounceIntensity: 1
+  m_ColorTemperature: 6570
+  m_UseColorTemperature: 0
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_UseBoundingSphereOverride: 0
+  m_UseViewFrustumForShadowCasterCull: 1
+  m_ForceVisible: 0
+  m_ShadowRadius: 0
+  m_ShadowAngle: 0
+  m_LightUnit: 1
+  m_LuxAtDistance: 1
+  m_EnableSpotReflector: 1
+--- !u!4 &2046159987
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2046159985}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 100001}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2114885006
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2114885009}
+  - component: {fileID: 2114885008}
+  - component: {fileID: 2114885007}
+  m_Layer: 0
+  m_Name: HazeRing_00
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!23 &2114885007
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2114885006}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 6e8c9cfaa215b4c4c9d33b556ee90814, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &2114885008
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2114885006}
+  m_Mesh: {fileID: 4300000, guid: 534898990ef7825479f3d7ae7e4d4b4f, type: 2}
+--- !u!4 &2114885009
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2114885006}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1787065457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1660057539 &9223372036854775807
+SceneRoots:
+  m_ObjectHideFlags: 0
+  m_Roots:
+  - {fileID: 100001}

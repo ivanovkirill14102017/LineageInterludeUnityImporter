@@ -189,8 +189,6 @@ internal static class MapImportSceneManager
         }
 
         loader.Maps = new[] { mapScene };
-        loader.LoadMapsInEditMode = true;
-        loader.LoadMapsInPlayMode = true;
         loader.NeighborRadius = 1;
         loader.Viewer = null;
         EditorUtility.SetDirty(mapObject);

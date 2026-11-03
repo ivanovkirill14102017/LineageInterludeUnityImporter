@@ -78,6 +78,30 @@ public sealed class L2StartupWindow : EditorWindow
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
+                EditorGUILayout.LabelField("Shared Sky", EditorStyles.boldLabel);
+                using (new EditorGUI.DisabledScope(EditorApplication.isCompiling))
+                {
+                    if (GUILayout.Button("Import Shared Sky", GUILayout.Height(34f)))
+                    {
+                        _status.Set("Importing Shared Sky...");
+                        try
+                        {
+                            SharedSkyTimeProfileImporter.ImportFromConfiguredClient();
+                            _status.Set("Shared Sky imported.");
+                        }
+                        catch (Exception exception)
+                        {
+                            _status.Set($"Shared Sky import failed: {exception.Message}");
+                            throw;
+                        }
+                    }
+                }
+            }
+
+            EditorGUILayout.Space(8f);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
                 _creatureImporter.OnGUI();
             }
 

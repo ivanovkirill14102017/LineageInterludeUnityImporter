@@ -3,7 +3,6 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System;
-using System.Diagnostics;
 using System.Linq;
 
 internal static class MapImportFinalizer
@@ -15,7 +14,6 @@ internal static class MapImportFinalizer
         AssetDatabase.Refresh();
 
         EnsureCameraAtmosphereRig(log);
-        ModernSkyboxImporter.EnsureModernSkybox(log);
 
         Selection.activeObject = mapRoot;
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
@@ -23,12 +21,7 @@ internal static class MapImportFinalizer
 
     private static void EnsureCameraAtmosphereRig(Action<string> log)
     {
-        var camera = FindPreferredCamera();
-        if (camera == null)
-        {
-            log?.Invoke("[Finalizer] No scene camera found. Skipping automatic atmosphere rig setup.");
-            return;
-        }
+        var camera = FindMainCamera();
 
         var rig = camera.GetComponent<L2CameraAtmosphereRig>();
         if (rig == null)
@@ -46,17 +39,14 @@ internal static class MapImportFinalizer
         EditorUtility.SetDirty(camera.gameObject);
     }
 
-    private static Camera FindPreferredCamera()
+    private static Camera FindMainCamera()
     {
         var cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None)
-            .Where(camera => camera != null && camera.gameObject.scene.IsValid())
+            .Where(camera => camera != null && camera.gameObject.scene.IsValid() &&
+                             camera.CompareTag("MainCamera"))
             .ToArray();
-        if (cameras.Length == 0)
-        {
-            return null;
-        }
-
-        var taggedMainCamera = cameras.FirstOrDefault(camera => camera.CompareTag("MainCamera"));
-        return taggedMainCamera != null ? taggedMainCamera : cameras[0];
+        if (cameras.Length != 1)
+            throw new InvalidOperationException($"Expected one camera tagged MainCamera, found {cameras.Length}.");
+        return cameras[0];
     }
 }

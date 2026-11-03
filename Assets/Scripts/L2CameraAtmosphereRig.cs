@@ -15,15 +15,9 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
     public bool AutoBuildRig = true;
     public bool FollowSceneViewCameraInEditMode = true;
     public string ProbeNodeName = "AtmosphereProbe";
-    public string DayNightNodeName = "DayNight";
-    public string SunNodeName = "SunControl";
-    public string FogNodeName = "FogControl";
 
     [Header("References")]
     [SerializeField] private L2CameraAtmosphereProbe probe;
-    [SerializeField] private L2DayNightController dayNight;
-    [SerializeField] private L2SunController sun;
-    [SerializeField] private L2FogController fog;
     [SerializeField] private L2LocalLightRuntimeOptimizer localLightOptimizer;
 
 #if UNITY_EDITOR
@@ -31,9 +25,6 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
 #endif
 
     public L2CameraAtmosphereProbe Probe { get { return probe; } }
-    public L2DayNightController DayNight { get { return dayNight; } }
-    public L2SunController Sun { get { return sun; } }
-    public L2FogController Fog { get { return fog; } }
     public L2LocalLightRuntimeOptimizer LocalLightOptimizer { get { return localLightOptimizer; } }
 
     private void OnEnable()
@@ -77,28 +68,14 @@ public sealed class L2CameraAtmosphereRig : MonoBehaviour
         }
 
         var probeNode = GetOrCreateChild(ProbeNodeName);
-        var dayNightNode = GetOrCreateChild(DayNightNodeName);
-        var sunNode = GetOrCreateChild(SunNodeName);
-        var fogNode = GetOrCreateChild(FogNodeName);
 
         probe = GetOrAddComponent<L2CameraAtmosphereProbe>(probeNode);
-        dayNight = GetOrAddComponent<L2DayNightController>(dayNightNode);
-        sun = GetOrAddComponent<L2SunController>(sunNode);
-        fog = GetOrAddComponent<L2FogController>(fogNode);
         localLightOptimizer = GetOrAddComponent<L2LocalLightRuntimeOptimizer>(transform);
 
         probeNode.localPosition = Vector3.zero;
         probeNode.localRotation = Quaternion.identity;
         probeNode.localScale = Vector3.one;
 
-        dayNight.Probe = probe;
-        sun.Probe = probe;
-        sun.DayNight = dayNight;
-        fog.BindToProbe(probe);
-
-        dayNight.enabled = false;
-        dayNight.AutoFindDirectionalLights = true;
-        sun.AutoFindReferences = false;
     }
 
     private void SyncToSceneViewCamera()

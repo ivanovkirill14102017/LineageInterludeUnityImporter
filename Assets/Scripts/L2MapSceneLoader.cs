@@ -4,14 +4,12 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.Serialization;
 
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
 #endif
 
-[ExecuteAlways]
 public sealed class L2MapSceneLoader : MonoBehaviour
 {
     [Serializable]
@@ -24,13 +22,8 @@ public sealed class L2MapSceneLoader : MonoBehaviour
         public Vector3 Size;
     }
 
-    [FormerlySerializedAs("LoadChunksInEditMode")]
-    public bool LoadMapsInEditMode = true;
-    [FormerlySerializedAs("LoadChunksInPlayMode")]
-    public bool LoadMapsInPlayMode = true;
     public int NeighborRadius = 1;
     public Transform Viewer;
-    [FormerlySerializedAs("CommonScenes")]
     public MapScene[] Maps = Array.Empty<MapScene>();
 
     private readonly HashSet<string> _requestedLoads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -38,19 +31,7 @@ public sealed class L2MapSceneLoader : MonoBehaviour
 
     private void Update()
     {
-        if (Maps == null || Maps.Length == 0)
-        {
-            return;
-        }
-
-        if (Application.isPlaying)
-        {
-            if (!LoadMapsInPlayMode)
-            {
-                return;
-            }
-        }
-        else if (!LoadMapsInEditMode)
+        if (!Application.isPlaying || Maps == null || Maps.Length == 0)
         {
             return;
         }
@@ -66,11 +47,7 @@ public sealed class L2MapSceneLoader : MonoBehaviour
 
     private bool ShouldUpdateNow()
     {
-#if UNITY_EDITOR
-        var now = EditorApplication.timeSinceStartup;
-#else
         var now = Time.realtimeSinceStartupAsDouble;
-#endif
         if (now < _nextUpdateTime)
         {
             return false;
@@ -92,14 +69,6 @@ public sealed class L2MapSceneLoader : MonoBehaviour
         {
             return mainCamera.transform.position;
         }
-
-#if UNITY_EDITOR
-        var sceneView = SceneView.lastActiveSceneView;
-        if (sceneView != null && sceneView.camera != null)
-        {
-            return sceneView.camera.transform.position;
-        }
-#endif
 
         return transform.position;
     }
@@ -242,34 +211,21 @@ public sealed class L2MapSceneLoader : MonoBehaviour
         }
 
 #if UNITY_EDITOR
-        if (!Application.isPlaying)
+        var parameters = new LoadSceneParameters(LoadSceneMode.Additive);
+        var editorLoad = EditorSceneManager.LoadSceneAsyncInPlayMode(scenePath, parameters);
+        if (editorLoad != null)
         {
-            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
+            editorLoad.completed += _ => _requestedLoads.Remove(scenePath);
+        }
+        else
+        {
             _requestedLoads.Remove(scenePath);
-            return;
         }
-#endif
-
+        return;
+#else
         var sceneName = Path.GetFileNameWithoutExtension(scenePath);
-#if UNITY_EDITOR
-        if (Application.isPlaying)
-        {
-            var parameters = new LoadSceneParameters(LoadSceneMode.Additive);
-            var editorLoad = EditorSceneManager.LoadSceneAsyncInPlayMode(scenePath, parameters);
-            if (editorLoad != null)
-            {
-                editorLoad.completed += _ => _requestedLoads.Remove(scenePath);
-            }
-            else
-            {
-                _requestedLoads.Remove(scenePath);
-            }
-
-            return;
-        }
-#endif
-
         SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive).completed += _ => _requestedLoads.Remove(scenePath);
+#endif
     }
 
     private void EnsureUnloaded(string scenePath)
@@ -279,14 +235,6 @@ public sealed class L2MapSceneLoader : MonoBehaviour
         {
             return;
         }
-
-#if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
-            EditorSceneManager.CloseScene(scene, true);
-            return;
-        }
-#endif
 
         SceneManager.UnloadSceneAsync(scene);
     }
